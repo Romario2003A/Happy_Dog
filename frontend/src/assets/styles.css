@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --blue:#0f766e;
+  --blue-dark:#134e4a;
+  --ink:#1b2524;
+  --muted:#687672;
+  --line:rgba(255,255,255,.5);
+  --glass:rgba(255,255,255,.38);
+  --bg:#f5faf8;
+  --shadow:0 24px 80px rgba(19,78,74,.16);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:linear-gradient(135deg,#f9fcfb 0%,#edf7f4 44%,#f8f2ed 100%);background-attachment:fixed}
+button,input,textarea,select{font:inherit}
+button{border:0;border-radius:12px;background:linear-gradient(135deg,var(--blue),#0b5f59);color:white;padding:12px 16px;font-weight:700;cursor:pointer;box-shadow:0 12px 30px rgba(15,118,110,.22)}
+button.secondary,button.ghost{background:rgba(255,255,255,.34);color:var(--blue-dark);box-shadow:inset 0 1px 0 rgba(255,255,255,.45);border:1px solid var(--line);backdrop-filter:blur(16px)}
+button.small{padding:8px 10px;font-size:13px}
+.glass-card,.glass-panel{background:linear-gradient(145deg,rgba(255,255,255,.54),rgba(255,255,255,.24));border:1px solid rgba(255,255,255,.62);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.55);backdrop-filter:blur(28px) saturate(145%);-webkit-backdrop-filter:blur(28px) saturate(145%);border-radius:24px}
+.login-page,.public-page{min-height:100vh;padding:40px}
+.login-page{display:grid;place-items:center}
+.login-card{width:min(440px,92vw);padding:34px}
+.login-card h1,.public-hero h1{font-size:clamp(32px,5vw,56px);margin:12px 0}
+.badge{display:inline-flex;padding:8px 12px;border-radius:999px;background:rgba(15,118,110,.1);color:var(--blue-dark);font-weight:800;font-size:13px}
+.public-hero{padding:50px;max-width:1160px;margin:0 auto 24px}
+.public-grid,.panel-grid{display:grid;grid-template-columns:1.4fr .8fr;gap:24px;max-width:1160px;margin:0 auto}
+.panel-grid.wide{grid-template-columns:1fr 1fr;max-width:none}
+.glass-card{padding:24px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid textarea{grid-column:1/-1;min-height:110px}
+.stack{display:grid;gap:12px}
+input,textarea,select{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.32);backdrop-filter:blur(14px);border-radius:14px;padding:13px 14px;outline:none;color:var(--ink)}
+input:focus,textarea:focus,select:focus{border-color:rgba(15,118,110,.55);box-shadow:0 0 0 4px rgba(15,118,110,.09)}
+label{display:grid;gap:8px;margin:14px 0;font-weight:700}
+.app-shell{min-height:100vh;display:grid;grid-template-columns:280px 1fr;gap:24px;padding:24px}
+.client-shell{min-height:100vh;padding:24px;display:grid;gap:22px}
+.client-top{padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.client-top nav,.user-actions{display:flex;align-items:center;gap:10px}
+.page-heading h1{margin:0}
+.page-heading p{color:var(--muted)}
+.full{width:100%;margin-top:14px}
+.sidebar{padding:22px;display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;gap:12px;align-items:center}
+.brand small{display:block;color:var(--muted)}
+.logo{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--blue),#b88746);color:white;font-weight:900}
+.sidebar nav{display:grid;gap:10px}
+.dashboard-main{display:grid;gap:22px;align-content:start}
+.topbar{padding:22px;display:flex;justify-content:space-between;align-items:center}
+.topbar h1{margin:0}
+.topbar p,.muted-text,.public-hero p{color:var(--muted)}
+.user-pill{padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.28);border:1px solid var(--line);backdrop-filter:blur(14px)}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.metric span{color:var(--muted);font-weight:700}
+.metric strong{display:block;font-size:34px;margin-top:8px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
+.empty{text-align:center;color:var(--muted);padding:28px}
+.status{border-radius:999px;padding:6px 10px;background:rgba(184,135,70,.12);color:#7a5727;font-weight:800;font-size:12px}
+.success{color:#047857;font-weight:700}
+.error{color:#be123c;font-weight:700}
+@media(max-width:900px){.app-shell{grid-template-columns:1fr}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-grid,.panel-grid,.panel-grid.wide,.form-grid,.cards{grid-template-columns:1fr}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}}

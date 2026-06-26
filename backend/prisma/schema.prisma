@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  VETERINARIAN
+  CLIENT
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  WAITING
+  IN_CONSULTATION
+  ATTENDED
+  CANCELLED
+}
+
+enum PetSex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum SaleStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  YAPE
+  PLIN
+  OTHER
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  PRESCRIPTION
+  SALE
+}
+
+model User {
+  id String @id @default(uuid())
+  fullName String
+  email String @unique
+  passwordHash String
+  role Role
+  active Boolean @default(true)
+  appointments Appointment[] @relation("VetAppointments")
+  medicalRecords MedicalRecord[]
+  sales Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id String @id @default(uuid())
+  fullName String
+  documentNumber String?
+  phone String?
+  email String? @unique
+  passwordHash String?
+  active Boolean @default(true)
+  address String?
+  pets Pet[]
+  appointments Appointment[]
+  sales Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([fullName])
+  @@index([phone])
+}
+
+model Pet {
+  id String @id @default(uuid())
+  name String
+  species String
+  breed String?
+  sex PetSex @default(UNKNOWN)
+  color String?
+  age String?
+  weightKg Float?
+  sterilized Boolean @default(false)
+  photoUrl String?
+  clientId String
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  medicalRecords MedicalRecord[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([clientId])
+  @@index([name])
+}
+
+model Service {
+  id String @id @default(uuid())
+  name String @unique
+  description String?
+  price Decimal @db.Decimal(10,2)
+  active Boolean @default(true)
+  appointments Appointment[]
+  saleItems SaleItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id String @id @default(uuid())
+  scheduledAt DateTime
+  reason String
+  status AppointmentStatus @default(PENDING)
+  notes String?
+  clientId String
+  petId String
+  veterinarianId String?
+  serviceId String?
+  client Client @relation(fields: [clientId], references: [id])
+  pet Pet @relation(fields: [petId], references: [id])
+  veterinarian User? @relation("VetAppointments", fields: [veterinarianId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+  medicalRecord MedicalRecord?
+  sale Sale?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+model MedicalRecord {
+  id String @id @default(uuid())
+  appointmentId String @unique
+  petId String
+  veterinarianId String
+  visitDate DateTime @default(now())
+  reason String
+  weightKg Float?
+  temperatureC Float?
+  diagnosis String
+  treatment String?
+  observations String?
+  nextControlAt DateTime?
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  pet Pet @relation(fields: [petId], references: [id])
+  veterinarian User @relation(fields: [veterinarianId], references: [id])
+  prescriptions PrescriptionItem[]
+  files ClinicalFile[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([petId])
+  @@index([visitDate])
+}
+
+model Product {
+  id String @id @default(uuid())
+  name String
+  sku String? @unique
+  category String?
+  description String?
+  unitPrice Decimal @db.Decimal(10,2)
+  stock Int @default(0)
+  minStock Int @default(0)
+  expirationDate DateTime?
+  active Boolean @default(true)
+  prescriptionItems PrescriptionItem[]
+  saleItems SaleItem[]
+  movements InventoryMovement[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([name])
+  @@index([stock])
+}
+
+model PrescriptionItem {
+  id String @id @default(uuid())
+  medicalRecordId String
+  productId String
+  quantity Int
+  dosage String?
+  instructions String?
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model InventoryMovement {
+  id String @id @default(uuid())
+  productId String
+  type MovementType
+  quantity Int
+  reason String?
+  referenceId String?
+  product Product @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model Sale {
+  id String @id @default(uuid())
+  clientId String
+  appointmentId String? @unique
+  cashierId String?
+  status SaleStatus @default(PENDING)
+  paymentMethod PaymentMethod?
+  subtotal Decimal @db.Decimal(10,2)
+  tax Decimal @db.Decimal(10,2) @default(0)
+  total Decimal @db.Decimal(10,2)
+  client Client @relation(fields: [clientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  cashier User? @relation(fields: [cashierId], references: [id])
+  items SaleItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SaleItem {
+  id String @id @default(uuid())
+  saleId String
+  productId String?
+  serviceId String?
+  description String
+  quantity Int
+  unitPrice Decimal @db.Decimal(10,2)
+  total Decimal @db.Decimal(10,2)
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+}
+
+model ClinicalFile {
+  id String @id @default(uuid())
+  medicalRecordId String
+  originalName String
+  mimeType String
+  size Int
+  url String
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}

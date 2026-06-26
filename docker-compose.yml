@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vet_user
+      POSTGRES_PASSWORD: vet_password
+      POSTGRES_DB: vet_db
+    ports: ["5432:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+  backend:
+    build: ./backend
+    container_name: vet_backend
+    depends_on: [postgres]
+    env_file: ./backend/.env
+    ports: ["3000:3000"]
+    volumes: [./backend/uploads:/app/uploads]
+  frontend:
+    build: ./frontend
+    container_name: vet_frontend
+    depends_on: [backend]
+    ports: ["5173:80"]
+volumes:
+  postgres_data:
