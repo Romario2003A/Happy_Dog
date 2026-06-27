@@ -303,39 +303,19 @@ onMounted(loadData);
       </div>
     </section>
 
-    <section class="quick-actions glass-card">
-      <div class="section-title">
-        <div>
-          <span class="badge">Accesos rapidos</span>
-          <h2>Trabajo clinico</h2>
-        </div>
-      </div>
-      <div class="quick-action-grid">
-        <button @click="petSearch=''; selected=null; selectedStandalonePet=null">Ver citas listas</button>
-        <button class="secondary" @click="$router.push('/veterinario/cuenta')">Mi cuenta</button>
-      </div>
-    </section>
-
     <div class="clinical-grid">
       <section class="glass-card appointment-list">
         <div class="section-title">
           <span class="badge">Agenda</span>
-          <h2>{{ petSearch ? 'Pacientes encontrados' : 'Citas listas para atender' }}</h2>
+          <h2>Citas listas para atender</h2>
         </div>
-        <p class="muted-text">{{ petSearch ? 'Estos pacientes existen en el sistema. Selecciona uno para revisar historial o emitir una receta desde su ficha.' : 'Aqui aparecen citas confirmadas, en espera o en consulta. Cuando guardas el registro medico, la cita pasa a Atendida y sale de esta lista.' }}</p>
-        <input ref="patientSearch" v-model="petSearch" class="search-field" placeholder="Buscar paciente en historial">
-        <div v-if="petSearch" class="patient-search-results">
-          <button v-for="pet in filteredPets" :key="pet.id" class="appointment-item" @click="selectPet(pet)">
-            <strong>{{ pet.name }}</strong>
-            <span>{{ pet.client?.fullName || 'Sin dueno' }}</span>
-            <small>{{ pet.species }} {{ pet.breed ? '- ' + pet.breed : '' }}</small>
-          </button>
-          <p v-if="!filteredPets.length" class="empty">No se encontraron pacientes con esa busqueda.</p>
-        </div>
+        <p class="muted-text">Recepcion envia aqui las citas confirmadas, en espera o en consulta.</p>
         <p v-if="loading" class="muted-text">Cargando citas...</p>
-        <p v-else-if="!petSearch && !visibleAppointments.length" class="empty">No hay citas listas para atender ahora. Recepcion debe confirmar o pasar una cita a consulta. Si ya guardaste el registro medico, esa cita ya quedo Atendida.</p>
+        <div v-else-if="!visibleAppointments.length" class="empty-state">
+          <strong>Sin citas por atender ahora</strong>
+          <span>Cuando recepcion confirme una cita, aparecera en esta lista.</span>
+        </div>
         <button
-          v-if="!petSearch"
           v-for="appointment in visibleAppointments"
           :key="appointment.id"
           class="appointment-item"
@@ -346,12 +326,31 @@ onMounted(loadData);
           <span>{{ appointment.client?.fullName || 'Cliente sin nombre' }}</span>
           <small>{{ formatDate(appointment.scheduledAt) }} - {{ statusLabel(appointment.status) }}</small>
         </button>
+
+        <div class="history-search-card">
+          <span class="badge">Historial</span>
+          <h3>Buscar paciente</h3>
+          <p class="muted-text">Para revisar antecedentes, recetas anteriores o atender sin cita activa.</p>
+          <input ref="patientSearch" v-model="petSearch" class="search-field" placeholder="Nombre de mascota o dueno">
+          <div v-if="petSearch" class="patient-search-results">
+            <button v-for="pet in filteredPets" :key="pet.id" class="appointment-item" @click="selectPet(pet)">
+              <strong>{{ pet.name }}</strong>
+              <span>{{ pet.client?.fullName || 'Sin dueno' }}</span>
+              <small>{{ pet.species }} {{ pet.breed ? '- ' + pet.breed : '' }}</small>
+            </button>
+            <p v-if="!filteredPets.length" class="empty">No se encontraron pacientes.</p>
+          </div>
+        </div>
       </section>
 
       <section class="glass-card patient-card">
         <div class="section-title">
           <span class="badge">Paciente</span>
-          <h2>{{ selectedPet?.name || 'Selecciona una cita o busca un paciente' }}</h2>
+          <h2>{{ selectedPet?.name || 'Ficha del paciente' }}</h2>
+        </div>
+        <div v-if="!selectedPet" class="empty-state patient-empty">
+          <strong>Selecciona una cita o un paciente</strong>
+          <span>La ficha, historial y receta se activan cuando eliges una mascota.</span>
         </div>
         <div v-if="selectedPet" class="patient-grid">
           <div><span>Especie</span><strong>{{ selectedPet?.species || '-' }}</strong></div>

@@ -87,6 +87,9 @@ button.small{padding:8px 10px;font-size:13px}
 .section-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
 .section-title h2{margin:0}
 .appointment-list{display:grid;align-content:start;gap:12px}
+.history-search-card{margin-top:14px;padding:16px;border-radius:18px;background:rgba(255,255,255,.58);border:1px solid var(--line)}
+.history-search-card h3{margin:10px 0 6px}
+.history-search-card .search-field{margin-top:12px}
 .appointment-item{display:grid;gap:6px;text-align:left;background:rgba(15,143,125,.06);color:var(--ink);border:1px solid var(--line);box-shadow:none}
 .appointment-item:hover{background:rgba(15,143,125,.1);box-shadow:0 14px 30px rgba(6,60,53,.1)}
 .appointment-item span,.appointment-item small{color:var(--muted)}
@@ -187,6 +190,9 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 table{width:100%;border-collapse:collapse}
 th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 .empty{text-align:center;color:var(--muted);padding:28px}
+.empty-state{display:grid;gap:8px;place-items:center;text-align:center;color:var(--muted);padding:28px;border:1px dashed rgba(21,91,102,.2);border-radius:18px;background:rgba(255,255,255,.45)}
+.empty-state strong{color:var(--ink);font-size:17px}
+.patient-empty{min-height:210px}
 .status{border-radius:999px;padding:6px 10px;background:rgba(15,143,125,.1);color:var(--blue-dark);font-weight:800;font-size:12px}
 .success{color:#047857;font-weight:700}
 .error{color:#be123c;font-weight:700}
