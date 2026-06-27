@@ -13,9 +13,14 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 const success = ref('');
+const search = ref('');
+const quickMode = ref('new');
+const selectedAppointment = ref(null);
 const selectedDate = ref(new Date().toISOString().slice(0, 10));
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
 const quick = ref({
+  clientId: '',
+  petId: '',
   fullName: '',
   phone: '',
   email: '',
@@ -28,8 +33,16 @@ const quick = ref({
 
 const dayAppointments = computed(() => appointments.value.filter(item => {
   if (!item.scheduledAt) return false;
-  return item.scheduledAt.slice(0, 10) === selectedDate.value;
+  const text = `${item.client?.fullName || ''} ${item.client?.phone || ''} ${item.pet?.name || ''} ${item.reason || ''}`.toLowerCase();
+  return item.scheduledAt.slice(0, 10) === selectedDate.value && text.includes(search.value.toLowerCase());
 }));
+
+const filteredClients = computed(() => clients.value.filter(client => {
+  const text = `${client.fullName || ''} ${client.phone || ''} ${client.email || ''} ${client.pets?.map(p => p.name).join(' ') || ''}`.toLowerCase();
+  return text.includes(search.value.toLowerCase());
+}));
+
+const selectedClientPets = computed(() => clients.value.find(client => client.id === quick.value.clientId)?.pets || []);
 
 function formatTime(value) {
   if (!value) return '';
@@ -79,6 +92,7 @@ async function setStatus(appointment, status) {
   try {
     const { data } = await api.patch(`/appointments/${appointment.id}`, { status });
     appointments.value = appointments.value.map(item => item.id === data.id ? data : item);
+    if (selectedAppointment.value?.id === data.id) selectedAppointment.value = data;
     success.value = 'Cita actualizada correctamente.';
   } catch (e) {
     error.value = 'No se pudo actualizar la cita.';
@@ -86,7 +100,7 @@ async function setStatus(appointment, status) {
 }
 
 function resetQuick() {
-  quick.value = { fullName: '', phone: '', email: '', petName: '', species: '', breed: '', scheduledAt: '', reason: '' };
+  quick.value = { clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', scheduledAt: '', reason: '' };
 }
 
 async function saveQuickAppointment() {
@@ -94,20 +108,28 @@ async function saveQuickAppointment() {
   error.value = '';
   success.value = '';
   try {
-    const { data: client } = await api.post('/clients', {
-      fullName: quick.value.fullName,
-      phone: quick.value.phone,
-      email: quick.value.email || undefined,
-    });
-    const { data: pet } = await api.post('/pets', {
-      name: quick.value.petName,
-      species: quick.value.species,
-      breed: quick.value.breed || undefined,
-      clientId: client.id,
-    });
+    let clientId = quick.value.clientId;
+    let petId = quick.value.petId;
+
+    if (quickMode.value === 'new') {
+      const { data: client } = await api.post('/clients', {
+        fullName: quick.value.fullName,
+        phone: quick.value.phone,
+        email: quick.value.email || undefined,
+      });
+      const { data: pet } = await api.post('/pets', {
+        name: quick.value.petName,
+        species: quick.value.species,
+        breed: quick.value.breed || undefined,
+        clientId: client.id,
+      });
+      clientId = client.id;
+      petId = pet.id;
+    }
+
     await api.post('/appointments', {
-      clientId: client.id,
-      petId: pet.id,
+      clientId,
+      petId,
       scheduledAt: quick.value.scheduledAt,
       reason: quick.value.reason,
     });
@@ -156,21 +178,23 @@ onMounted(loadData);
           </div>
           <input v-model="selectedDate" type="date">
         </div>
+        <input v-model="search" class="search-field" placeholder="Buscar por cliente, telefono, mascota o motivo">
 
         <p v-if="loading" class="muted-text">Cargando agenda...</p>
         <div v-else class="day-calendar">
           <div v-for="hour in hours" :key="hour" class="calendar-row">
             <div class="calendar-time">{{ String(hour).padStart(2, '0') }}:00</div>
             <div class="calendar-slot">
-              <article v-for="item in hourAppointments(hour)" :key="item.id" class="calendar-event" :data-status="item.status">
+              <article v-for="item in hourAppointments(hour)" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectedAppointment=item">
                 <div>
                   <strong>{{ formatTime(item.scheduledAt) }} - {{ item.pet?.name || 'Mascota' }}</strong>
                   <span>{{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
                 </div>
                 <div class="event-actions">
                   <span class="status">{{ statusLabel(item.status) }}</span>
-                  <button class="small secondary" @click="setStatus(item,'CONFIRMED')">Confirmar</button>
-                  <button class="small secondary" @click="setStatus(item,'WAITING')">En espera</button>
+                  <button class="small secondary" @click.stop="setStatus(item,'CONFIRMED')">Confirmar</button>
+                  <button class="small secondary" @click.stop="setStatus(item,'WAITING')">En espera</button>
+                  <button class="small secondary" @click.stop="setStatus(item,'CANCELLED')">Cancelar</button>
                 </div>
               </article>
               <span v-if="!hourAppointments(hour).length" class="empty-slot">Libre</span>
@@ -190,16 +214,54 @@ onMounted(loadData);
         <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar registro rapido' : '+ Registro rapido' }}</button>
 
         <form v-if="showQuick" class="stack quick-form" @submit.prevent="saveQuickAppointment">
-          <label>Dueno<input v-model="quick.fullName" required placeholder="Nombre completo"></label>
-          <label>Telefono / WhatsApp<input v-model="quick.phone" required placeholder="999 999 999"></label>
-          <label>Correo opcional<input v-model="quick.email" type="email" placeholder="correo@ejemplo.com"></label>
-          <label>Mascota<input v-model="quick.petName" required placeholder="Nombre de la mascota"></label>
-          <label>Especie<input v-model="quick.species" required placeholder="Perro, gato, conejo"></label>
-          <label>Raza<input v-model="quick.breed" placeholder="Raza o cruce"></label>
+          <div class="segmented">
+            <button type="button" :class="{active:quickMode==='new'}" @click="quickMode='new'">Cliente nuevo</button>
+            <button type="button" :class="{active:quickMode==='existing'}" @click="quickMode='existing'">Cliente existente</button>
+          </div>
+
+          <template v-if="quickMode==='existing'">
+            <label>Cliente
+              <select v-model="quick.clientId" required @change="quick.petId=''">
+                <option value="">Seleccionar cliente</option>
+                <option v-for="client in clients" :key="client.id" :value="client.id">{{ client.fullName }} - {{ client.phone || client.email || 'sin contacto' }}</option>
+              </select>
+            </label>
+            <label>Mascota
+              <select v-model="quick.petId" required>
+                <option value="">Seleccionar mascota</option>
+                <option v-for="pet in selectedClientPets" :key="pet.id" :value="pet.id">{{ pet.name }} - {{ pet.species }}</option>
+              </select>
+            </label>
+          </template>
+
+          <template v-else>
+            <label>Dueno<input v-model="quick.fullName" required placeholder="Nombre completo"></label>
+            <label>Telefono / WhatsApp<input v-model="quick.phone" required placeholder="999 999 999"></label>
+            <label>Correo opcional<input v-model="quick.email" type="email" placeholder="correo@ejemplo.com"></label>
+            <label>Mascota<input v-model="quick.petName" required placeholder="Nombre de la mascota"></label>
+            <label>Especie<input v-model="quick.species" required placeholder="Perro, gato, conejo"></label>
+            <label>Raza<input v-model="quick.breed" placeholder="Raza o cruce"></label>
+          </template>
+
           <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local"></label>
           <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
-          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Crear cliente, mascota y cita' }}</button>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Crear cliente, mascota y cita' : 'Crear cita' }}</button>
         </form>
+
+        <div v-if="selectedAppointment" class="detail-box">
+          <span class="badge">Detalle</span>
+          <h3>{{ selectedAppointment.pet?.name || 'Mascota' }}</h3>
+          <p><b>Cliente:</b> {{ selectedAppointment.client?.fullName || '-' }}</p>
+          <p><b>Contacto:</b> {{ selectedAppointment.client?.phone || selectedAppointment.client?.email || '-' }}</p>
+          <p><b>Hora:</b> {{ formatTime(selectedAppointment.scheduledAt) }}</p>
+          <p><b>Motivo:</b> {{ selectedAppointment.reason }}</p>
+          <p><b>Estado:</b> {{ statusLabel(selectedAppointment.status) }}</p>
+          <div class="detail-actions">
+            <button class="small" @click="setStatus(selectedAppointment,'CONFIRMED')">Confirmar</button>
+            <button class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">En consulta</button>
+            <button class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -207,6 +269,7 @@ onMounted(loadData);
       <section class="glass-card">
         <h2>{{ active==='clientes'?'Clientes y mascotas':active==='usuarios'?'Usuarios del sistema':'Caja / POS' }}</h2>
         <p class="muted-text">Recepcion administra la operacion diaria y la configuracion del sistema.</p>
+        <input v-if="active==='clientes'" v-model="search" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
         <table v-if="active==='usuarios'">
           <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th></tr></thead>
           <tbody>
@@ -217,8 +280,8 @@ onMounted(loadData);
         <table v-else-if="active==='clientes'">
           <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th></tr></thead>
           <tbody>
-            <tr v-if="!clients.length"><td colspan="3" class="empty">No hay clientes registrados todavia.</td></tr>
-            <tr v-for="client in clients" :key="client.id"><td>{{ client.fullName }}</td><td>{{ client.phone || client.email || '-' }}</td><td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td></tr>
+            <tr v-if="!filteredClients.length"><td colspan="3" class="empty">No hay clientes registrados todavia.</td></tr>
+            <tr v-for="client in filteredClients" :key="client.id"><td>{{ client.fullName }}</td><td>{{ client.phone || client.email || '-' }}</td><td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td></tr>
           </tbody>
         </table>
         <div v-else class="empty">Modulo de caja listo para conectar ventas y pagos.</div>

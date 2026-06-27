@@ -8,11 +8,14 @@ const auth = useAuthStore();
 const appointments = ref([]);
 const history = ref([]);
 const products = ref([]);
+const pets = ref([]);
 const selected = ref(null);
+const selectedStandalonePet = ref(null);
 const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 const success = ref('');
+const petSearch = ref('');
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
 const form = ref({
   reason: '',
@@ -25,8 +28,12 @@ const form = ref({
 });
 
 const visibleAppointments = computed(() => appointments.value.filter(a => a.status !== 'ATTENDED' && a.status !== 'CANCELLED'));
-const selectedPet = computed(() => selected.value?.pet);
-const selectedClient = computed(() => selected.value?.client);
+const filteredPets = computed(() => pets.value.filter(pet => {
+  const text = `${pet.name || ''} ${pet.species || ''} ${pet.breed || ''} ${pet.client?.fullName || ''}`.toLowerCase();
+  return text.includes(petSearch.value.toLowerCase());
+}).slice(0, 8));
+const selectedPet = computed(() => selected.value?.pet || selectedStandalonePet.value);
+const selectedClient = computed(() => selected.value?.client || selectedStandalonePet.value?.client);
 
 function formatDate(value) {
   if (!value) return 'Sin fecha';
@@ -64,12 +71,14 @@ async function loadData() {
   loading.value = true;
   error.value = '';
   try {
-    const [appointmentsRes, productsRes] = await Promise.all([
+    const [appointmentsRes, productsRes, petsRes] = await Promise.all([
       api.get('/appointments'),
       api.get('/inventory'),
+      api.get('/pets'),
     ]);
     appointments.value = appointmentsRes.data;
     products.value = productsRes.data.filter(p => p.active !== false);
+    pets.value = petsRes.data;
     if (!selected.value && visibleAppointments.value.length) await selectAppointment(visibleAppointments.value[0]);
   } catch (e) {
     error.value = 'No se pudieron cargar las citas del doctor.';
@@ -80,11 +89,24 @@ async function loadData() {
 
 async function selectAppointment(appointment) {
   selected.value = appointment;
+  selectedStandalonePet.value = null;
   resetForm(appointment);
   history.value = [];
   if (!appointment?.petId) return;
   try {
     history.value = (await api.get(`/medical-records/pet/${appointment.petId}`)).data;
+  } catch (e) {
+    error.value = 'No se pudo cargar el historial de la mascota.';
+  }
+}
+
+async function selectPet(pet) {
+  selected.value = null;
+  selectedStandalonePet.value = pet;
+  resetForm({ pet, reason: '' });
+  history.value = [];
+  try {
+    history.value = (await api.get(`/medical-records/pet/${pet.id}`)).data;
   } catch (e) {
     error.value = 'No se pudo cargar el historial de la mascota.';
   }
@@ -159,6 +181,14 @@ onMounted(loadData);
           <span class="badge">Agenda</span>
           <h2>Citas pendientes</h2>
         </div>
+        <input v-model="petSearch" class="search-field" placeholder="Buscar paciente o dueno">
+        <div v-if="petSearch" class="patient-search-results">
+          <button v-for="pet in filteredPets" :key="pet.id" class="appointment-item" @click="selectPet(pet)">
+            <strong>{{ pet.name }}</strong>
+            <span>{{ pet.client?.fullName || 'Sin dueno' }}</span>
+            <small>{{ pet.species }} {{ pet.breed ? '- ' + pet.breed : '' }}</small>
+          </button>
+        </div>
         <p v-if="loading" class="muted-text">Cargando citas...</p>
         <p v-else-if="!visibleAppointments.length" class="empty">No hay citas pendientes para atender.</p>
         <button
@@ -179,7 +209,7 @@ onMounted(loadData);
           <span class="badge">Paciente</span>
           <h2>{{ selectedPet?.name || 'Selecciona una cita' }}</h2>
         </div>
-        <div v-if="selected" class="patient-grid">
+        <div v-if="selectedPet" class="patient-grid">
           <div><span>Especie</span><strong>{{ selectedPet?.species || '-' }}</strong></div>
           <div><span>Raza</span><strong>{{ selectedPet?.breed || '-' }}</strong></div>
           <div><span>Sexo</span><strong>{{ selectedPet?.sex || '-' }}</strong></div>
@@ -187,7 +217,7 @@ onMounted(loadData);
           <div><span>Peso</span><strong>{{ selectedPet?.weightKg || '-' }} kg</strong></div>
           <div><span>Dueno</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
           <div><span>Telefono</span><strong>{{ selectedClient?.phone || '-' }}</strong></div>
-          <div><span>Motivo</span><strong>{{ selected.reason }}</strong></div>
+          <div><span>Motivo</span><strong>{{ selected?.reason || 'Revision de historial' }}</strong></div>
         </div>
         <button v-if="selected && selected.status !== 'IN_CONSULTATION'" class="secondary full" @click="startConsultation">Iniciar atencion</button>
       </section>
@@ -221,7 +251,7 @@ onMounted(loadData);
             <input v-model="prescription.instructions" placeholder="Indicaciones">
           </div>
 
-          <button :disabled="!selected || saving">{{ saving ? 'Guardando...' : 'Guardar atencion' }}</button>
+          <button :disabled="!selected || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atencion' : 'Selecciona una cita para atender' }}</button>
         </form>
       </section>
 
