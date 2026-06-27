@@ -156,7 +156,9 @@ async function saveRecord() {
     await loadData();
     if (selected.value?.petId) history.value = (await api.get(`/medical-records/pet/${selected.value.petId}`)).data;
   } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo guardar la atencion.';
+    error.value = e.response?.status === 403
+      ? 'Tu sesion no tiene permiso para guardar historias clinicas. Cierra sesion y entra nuevamente con la cuenta del doctor.'
+      : e.response?.data?.message || 'No se pudo guardar la atencion.';
   } finally {
     saving.value = false;
   }
