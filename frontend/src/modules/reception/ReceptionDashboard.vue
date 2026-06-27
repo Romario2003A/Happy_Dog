@@ -24,6 +24,7 @@ onMounted(async()=>{
       <button @click="active='caja'">Caja</button>
       <button @click="active='usuarios'">Usuarios</button>
       <button @click="active='reportes'">Reportes</button>
+      <button @click="$router.push('/recepcion/cuenta')">Mi cuenta</button>
     </template>
 
     <div v-if="active==='reportes'" class="cards">

@@ -16,7 +16,7 @@ onMounted(async()=>{
 </script>
 <template>
   <VeterinarianLayout title="Doctor Veterinario" subtitle="Consultorio, historia clinica y recetas">
-    <template #nav><button>Consultas</button><button>Historial</button><button>Recetas</button></template>
+    <template #nav><button>Consultas</button><button>Historial</button><button>Recetas</button><button @click="$router.push('/veterinario/cuenta')">Mi cuenta</button></template>
     <div class="panel-grid wide">
       <section class="glass-card">
         <h2>Evolucion medica</h2>

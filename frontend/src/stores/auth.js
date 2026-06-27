@@ -24,6 +24,10 @@ export const useAuthStore = defineStore('auth',{
       const {data}=await api.post('/auth/client/register',payload);
       return this.setSession(data);
     },
+    async changePassword(payload){
+      const {data}=await api.post('/auth/change-password',payload);
+      return data;
+    },
     logout(){
       this.token=null;
       this.user=null;

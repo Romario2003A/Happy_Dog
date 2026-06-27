@@ -3,6 +3,7 @@ import ClientPortal from '../modules/client/ClientPortal.vue';
 import ClientLogin from '../modules/client/ClientLogin.vue';
 import ClientDashboard from '../modules/client/ClientDashboard.vue';
 import RoleLogin from '../modules/auth/RoleLogin.vue';
+import AccountSettings from '../modules/account/AccountSettings.vue';
 import ReceptionDashboard from '../modules/reception/ReceptionDashboard.vue';
 import VetDashboard from '../modules/veterinarian/VetDashboard.vue';
 import { useAuthStore } from '../stores/auth';
@@ -16,7 +17,9 @@ const routes=[
  {path:'/veterinario/login', component:RoleLogin, meta:{role:'VETERINARIAN', title:'Doctor Veterinario'}},
  {path:'/admin/login', redirect:'/recepcion/login'},
  {path:'/recepcion', component:ReceptionDashboard, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/recepcion/login'}},
+ {path:'/recepcion/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/recepcion/login'}},
  {path:'/veterinario', component:VetDashboard, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/veterinario/login'}},
+ {path:'/veterinario/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/veterinario/login'}},
  {path:'/admin', redirect:'/recepcion'}
 ];
 

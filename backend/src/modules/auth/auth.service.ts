@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterClientDto } from './dto/register-client.dto';
 @Injectable()
@@ -43,5 +44,23 @@ export class AuthService {
     if (user) return user;
     const client = await this.prisma.client.findUnique({ where: { id: userId }, select: { id:true, fullName:true, email:true, active:true } });
     return client ? { ...client, role: 'CLIENT' } : null;
+  }
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      const ok = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+      if (!ok) throw new UnauthorizedException('Contrasena actual incorrecta');
+      const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+      await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+      return { message: 'Contrasena actualizada correctamente' };
+    }
+
+    const client = await this.prisma.client.findUnique({ where: { id: userId } });
+    if (!client || !client.passwordHash) throw new NotFoundException('Usuario no encontrado');
+    const ok = await bcrypt.compare(dto.currentPassword, client.passwordHash);
+    if (!ok) throw new UnauthorizedException('Contrasena actual incorrecta');
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.client.update({ where: { id: userId }, data: { passwordHash } });
+    return { message: 'Contrasena actualizada correctamente' };
   }
 }
