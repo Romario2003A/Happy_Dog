@@ -5,6 +5,8 @@ import doctorDog from '../../assets/images/doctor-dog.webp';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
 
+const facebookUrl = 'https://www.facebook.com/share/1DARyzQs2j/';
+const whatsappUrl = 'https://wa.me/51953280579';
 const form=ref({fullName:'',phone:'',email:'',petName:'',species:'',breed:'',sex:'UNKNOWN',age:'',weightKg:'',reason:'',scheduledAt:''});
 const sent=ref(false);
 const error=ref('');
@@ -30,12 +32,14 @@ async function submit(){
         <p>Completa la solicitud y recepción te confirmará la disponibilidad por teléfono o WhatsApp.</p>
         <div class="hero-actions">
           <a class="button-link" href="#solicitar-cita">Agendar cita</a>
-          <a class="button-link secondary-link" href="https://wa.me/51953280579" target="_blank" rel="noreferrer">WhatsApp</a>
+          <a class="button-link secondary-link" :href="whatsappUrl" target="_blank" rel="noreferrer">WhatsApp</a>
+          <a class="button-link secondary-link" :href="facebookUrl" target="_blank" rel="noreferrer">Facebook</a>
         </div>
         <div class="trust-strip" aria-label="Servicios principales">
           <span>Consultas</span>
           <span>Vacunas</span>
           <span>Controles</span>
+          <span>Atención en Cayma</span>
         </div>
       </div>
       <img class="hero-doctor-dog" :src="doctorDog" alt="Perro con bata de doctor representando atención veterinaria">
@@ -94,6 +98,10 @@ async function submit(){
         <strong>Contacto rápido</strong>
         <span>WhatsApp y teléfono visibles para resolver dudas sin perder tiempo.</span>
       </article>
+      <article class="service-pill glass-card">
+        <strong>Novedades reales</strong>
+        <span>Facebook queda conectado para revisar publicaciones y referencias de la veterinaria.</span>
+      </article>
     </section>
     <section class="location-card glass-card">
       <div class="section-title">
@@ -103,7 +111,21 @@ async function submit(){
         </div>
       </div>
       <img :src="happyDogLocation" alt="Mapa y datos de contacto de Happy Dog">
+      <div class="contact-grid">
+        <a class="contact-tile" :href="whatsappUrl" target="_blank" rel="noreferrer">
+          <span>WhatsApp directo</span>
+          <strong>953 280 579</strong>
+        </a>
+        <a class="contact-tile" href="tel:901969153">
+          <span>Teléfono alterno</span>
+          <strong>901 969 153</strong>
+        </a>
+        <a class="contact-tile" :href="facebookUrl" target="_blank" rel="noreferrer">
+          <span>Red social</span>
+          <strong>Facebook Happy Dog</strong>
+        </a>
+      </div>
     </section>
-    <a class="whatsapp-float" href="https://wa.me/51953280579" target="_blank" rel="noreferrer" aria-label="Escribir por WhatsApp">WhatsApp</a>
+    <a class="whatsapp-float" :href="whatsappUrl" target="_blank" rel="noreferrer" aria-label="Escribir por WhatsApp">WhatsApp</a>
   </div>
 </template>
