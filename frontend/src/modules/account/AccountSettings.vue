@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import AdminLayout from '../../layouts/AdminLayout.vue';
 import ReceptionLayout from '../../layouts/ReceptionLayout.vue';
 import VeterinarianLayout from '../../layouts/VeterinarianLayout.vue';
 import { useAuthStore } from '../../stores/auth';
@@ -13,9 +14,10 @@ const error = ref('');
 const success = ref('');
 
 const isVet = computed(() => auth.role === 'VETERINARIAN');
-const Layout = computed(() => isVet.value ? VeterinarianLayout : ReceptionLayout);
-const dashboardPath = computed(() => isVet.value ? '/veterinario' : '/recepcion');
-const title = computed(() => isVet.value ? 'Doctor Veterinario' : 'Recepcion / Administracion');
+const isAdmin = computed(() => auth.role === 'ADMIN');
+const Layout = computed(() => isVet.value ? VeterinarianLayout : isAdmin.value ? AdminLayout : ReceptionLayout);
+const dashboardPath = computed(() => isVet.value ? '/veterinario' : isAdmin.value ? '/admin' : '/recepcion');
+const title = computed(() => isVet.value ? 'Doctor Veterinario' : isAdmin.value ? 'Administracion' : 'Recepcion');
 
 async function submit() {
   error.value = '';

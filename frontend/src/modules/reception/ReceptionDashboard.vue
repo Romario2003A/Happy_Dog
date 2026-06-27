@@ -154,27 +154,18 @@ onMounted(loadData);
 </script>
 
 <template>
-  <ReceptionLayout title="Recepcion / Administracion" subtitle="Agenda, clientes, caja, usuarios y reportes">
+  <ReceptionLayout title="Recepcion" subtitle="Agenda, registro rapido y coordinacion diaria">
     <template #nav>
       <button @click="active='citas'">Citas</button>
       <button @click="active='clientes'">Clientes</button>
-      <button @click="active='caja'">Caja</button>
-      <button @click="active='usuarios'">Usuarios</button>
-      <button @click="active='reportes'">Reportes</button>
+      <button @click="$router.push('/admin')">Administracion</button>
       <button @click="$router.push('/recepcion/cuenta')">Mi cuenta</button>
     </template>
 
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
-    <div v-if="active==='reportes'" class="cards">
-      <div class="glass-card metric"><span>Clientes</span><strong>{{ summary.clients ?? 0 }}</strong></div>
-      <div class="glass-card metric"><span>Pacientes</span><strong>{{ summary.pets ?? 0 }}</strong></div>
-      <div class="glass-card metric"><span>Citas</span><strong>{{ summary.appointments ?? 0 }}</strong></div>
-      <div class="glass-card metric"><span>Stock bajo</span><strong>{{ summary.lowStock ?? 0 }}</strong></div>
-    </div>
-
-    <div v-else-if="active==='citas'" class="reception-grid">
+    <div v-if="active==='citas'" class="reception-grid">
       <section class="glass-card calendar-card">
         <div class="calendar-header">
           <div>
@@ -277,24 +268,16 @@ onMounted(loadData);
 
     <div v-else class="panel-grid">
       <section class="glass-card">
-        <h2>{{ active==='clientes'?'Clientes y mascotas':active==='usuarios'?'Usuarios del sistema':'Caja / POS' }}</h2>
-        <p class="muted-text">Recepcion administra la operacion diaria y la configuracion del sistema.</p>
-        <input v-if="active==='clientes'" v-model="search" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
-        <table v-if="active==='usuarios'">
-          <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th></tr></thead>
-          <tbody>
-            <tr v-if="!users.length"><td colspan="3" class="empty">No hay usuarios registrados todavia.</td></tr>
-            <tr v-for="u in users" :key="u.id"><td>{{ u.fullName }}</td><td>{{ u.email }}</td><td>{{ u.role }}</td></tr>
-          </tbody>
-        </table>
-        <table v-else-if="active==='clientes'">
+        <h2>Clientes y mascotas</h2>
+        <p class="muted-text">Busca clientes para atender llamadas, WhatsApp o consultas rapidas.</p>
+        <input v-model="search" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
+        <table>
           <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th></tr></thead>
           <tbody>
             <tr v-if="!filteredClients.length"><td colspan="3" class="empty">No hay clientes registrados todavia.</td></tr>
             <tr v-for="client in filteredClients" :key="client.id"><td>{{ client.fullName }}</td><td>{{ client.phone || client.email || '-' }}</td><td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td></tr>
           </tbody>
         </table>
-        <div v-else class="empty">Modulo de caja listo para conectar ventas y pagos.</div>
       </section>
     </div>
   </ReceptionLayout>
