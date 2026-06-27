@@ -36,6 +36,7 @@ button.small{padding:8px 10px;font-size:13px}
 .hero-copy{padding:16px}
 .public-grid,.panel-grid{display:grid;grid-template-columns:1.4fr .8fr;gap:24px;max-width:1160px;margin:0 auto}
 .panel-grid.wide{grid-template-columns:1fr 1fr;max-width:none}
+.panel-grid.single{grid-template-columns:1fr;max-width:none}
 .glass-card{padding:24px}
 .portal-card{display:grid;align-content:start;gap:14px}
 .portal-card h2{margin:0}

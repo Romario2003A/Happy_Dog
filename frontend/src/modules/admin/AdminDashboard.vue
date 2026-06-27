@@ -11,10 +11,32 @@ const active = ref('resumen');
 const error = ref('');
 const success = ref('');
 const saving = ref(false);
+const showUserForm = ref(false);
+const showProductForm = ref(false);
 const userForm = ref({ fullName: '', email: '', password: '', role: 'VETERINARIAN' });
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
 
 const lowStockProducts = computed(() => inventory.value.filter(p => Number(p.stock) <= Number(p.minStock)));
+
+function openUsers() {
+  active.value = 'usuarios';
+  showUserForm.value = false;
+}
+
+function openUserCreator() {
+  active.value = 'usuarios';
+  showUserForm.value = true;
+}
+
+function openInventory() {
+  active.value = 'inventario';
+  showProductForm.value = false;
+}
+
+function openProductCreator() {
+  active.value = 'inventario';
+  showProductForm.value = true;
+}
 
 async function loadData() {
   error.value = '';
@@ -41,6 +63,7 @@ async function createUser() {
   try {
     await api.post('/users', userForm.value);
     userForm.value = { fullName: '', email: '', password: '', role: 'VETERINARIAN' };
+    showUserForm.value = false;
     success.value = 'Usuario creado correctamente.';
     await loadData();
   } catch (e) {
@@ -62,6 +85,7 @@ async function createProduct() {
       minStock: Number(productForm.value.minStock),
     });
     productForm.value = { name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 };
+    showProductForm.value = false;
     success.value = 'Producto agregado al inventario.';
     await loadData();
   } catch (e) {
@@ -78,8 +102,8 @@ onMounted(loadData);
   <AdminLayout title="Administracion" subtitle="Control del negocio, usuarios, inventario, caja y reportes">
     <template #nav>
       <button @click="active='resumen'">Resumen</button>
-      <button @click="active='usuarios'">Usuarios</button>
-      <button @click="active='inventario'">Inventario</button>
+      <button @click="openUsers">Usuarios</button>
+      <button @click="openInventory">Inventario</button>
       <button @click="active='clientes'">Clientes</button>
       <button @click="active='caja'">Caja</button>
       <button @click="$router.push('/recepcion')">Recepcion</button>
@@ -96,8 +120,8 @@ onMounted(loadData);
         <p class="muted-text">Administra usuarios, inventario, clientes y reportes sin mezclarlo con la agenda diaria.</p>
       </div>
       <div class="admin-actions">
-        <button @click="active='usuarios'">Crear usuario</button>
-        <button class="secondary" @click="active='inventario'">Agregar producto</button>
+        <button @click="openUserCreator">Crear usuario</button>
+        <button class="secondary" @click="openProductCreator">Agregar producto</button>
       </div>
     </div>
 
@@ -108,9 +132,15 @@ onMounted(loadData);
       <div class="glass-card metric"><span>Stock bajo</span><strong>{{ summary.lowStock ?? lowStockProducts.length }}</strong></div>
     </div>
 
-    <div v-if="active==='usuarios'" class="panel-grid">
+    <div v-if="active==='usuarios'" class="panel-grid" :class="{ single: !showUserForm }">
       <section class="glass-card">
-        <h2>Usuarios del sistema</h2>
+        <div class="section-title">
+          <div>
+            <h2>Usuarios del sistema</h2>
+            <p class="muted-text">Gestiona las cuentas internas que entran a recepcion, veterinario y administracion.</p>
+          </div>
+          <button class="secondary small" @click="showUserForm = true">Crear usuario</button>
+        </div>
         <table>
           <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th></tr></thead>
           <tbody>
@@ -118,8 +148,14 @@ onMounted(loadData);
           </tbody>
         </table>
       </section>
-      <section class="glass-card">
-        <h2>Crear usuario interno</h2>
+      <section v-if="showUserForm" class="glass-card">
+        <div class="section-title">
+          <div>
+            <h2>Crear usuario interno</h2>
+            <p class="muted-text">Crea una cuenta temporal para el personal y luego podra cambiar su contrasena.</p>
+          </div>
+          <button class="ghost small" type="button" @click="showUserForm = false">Cerrar</button>
+        </div>
         <form class="stack" @submit.prevent="createUser">
           <label>Nombre<input v-model="userForm.fullName" required placeholder="Nombre completo"></label>
           <label>Correo<input v-model="userForm.email" type="email" required placeholder="usuario@happydog.com"></label>
@@ -132,13 +168,20 @@ onMounted(loadData);
             </select>
           </label>
           <button :disabled="saving">{{ saving ? 'Guardando...' : 'Crear usuario' }}</button>
+          <button class="secondary" type="button" @click="showUserForm = false">Cancelar</button>
         </form>
       </section>
     </div>
 
-    <div v-else-if="active==='inventario'" class="panel-grid">
+    <div v-else-if="active==='inventario'" class="panel-grid" :class="{ single: !showProductForm }">
       <section class="glass-card">
-        <h2>Inventario</h2>
+        <div class="section-title">
+          <div>
+            <h2>Inventario</h2>
+            <p class="muted-text">Revisa productos, stock y medicamentos disponibles para atenciones.</p>
+          </div>
+          <button class="secondary small" @click="showProductForm = true">Agregar producto</button>
+        </div>
         <table>
           <thead><tr><th>Producto</th><th>Categoria</th><th>Precio</th><th>Stock</th></tr></thead>
           <tbody>
@@ -147,8 +190,14 @@ onMounted(loadData);
           </tbody>
         </table>
       </section>
-      <section class="glass-card">
-        <h2>Agregar producto</h2>
+      <section v-if="showProductForm" class="glass-card">
+        <div class="section-title">
+          <div>
+            <h2>Agregar producto</h2>
+            <p class="muted-text">Registra medicamentos, vacunas, alimento o insumos.</p>
+          </div>
+          <button class="ghost small" type="button" @click="showProductForm = false">Cerrar</button>
+        </div>
         <form class="stack" @submit.prevent="createProduct">
           <label>Producto<input v-model="productForm.name" required placeholder="Vacuna, medicamento, alimento"></label>
           <label>Categoria<input v-model="productForm.category" placeholder="Medicamento"></label>
@@ -156,6 +205,7 @@ onMounted(loadData);
           <label>Stock<input v-model.number="productForm.stock" type="number" min="0" required></label>
           <label>Stock minimo<input v-model.number="productForm.minStock" type="number" min="0"></label>
           <button :disabled="saving">{{ saving ? 'Guardando...' : 'Agregar producto' }}</button>
+          <button class="secondary" type="button" @click="showProductForm = false">Cancelar</button>
         </form>
       </section>
     </div>
