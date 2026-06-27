@@ -269,6 +269,7 @@ onMounted(loadData);
             <button v-if="selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">En espera</button>
             <button v-if="['CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">En consulta</button>
             <button v-if="selectedAppointment.status!=='CANCELLED'" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
+            <button v-if="selectedAppointment.status==='CANCELLED'" class="small" @click="setStatus(selectedAppointment,'PENDING')">Reactivar</button>
           </div>
         </div>
       </section>
