@@ -6,7 +6,7 @@ const auth = useAuthStore();
 <template>
   <div class="app-shell">
     <aside class="sidebar glass-panel">
-      <div class="brand"><div class="logo">V2</div><div><strong>Veterinaria 2.0</strong><small>{{ title }}</small></div></div>
+      <div class="brand"><div class="logo" aria-hidden="true">🐶</div><div><strong>Happy Dog</strong><small>{{ title }}</small></div></div>
       <nav><slot name="nav" /></nav>
       <button class="ghost" @click="auth.logout(); $router.push('/cliente')">Cerrar sesión</button>
     </aside>

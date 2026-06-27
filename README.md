@@ -1,4 +1,4 @@
-# Veterinaria 2.0 Profesional
+# Happy Dog Profesional
 
 Sistema integral para veterinaria: portal cliente, recepción, veterinario y administrador.
 

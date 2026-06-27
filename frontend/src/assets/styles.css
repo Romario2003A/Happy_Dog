@@ -104,7 +104,7 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .sidebar{padding:22px;display:flex;flex-direction:column;gap:22px}
 .brand{display:flex;gap:12px;align-items:center}
 .brand small{display:block;color:var(--muted)}
-.logo{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--blue-dark),var(--blue));color:white;font-weight:900}
+.logo{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--blue-dark),var(--blue));color:white;font-size:22px;font-weight:900}
 .sidebar nav{display:grid;gap:10px}
 .dashboard-main{display:grid;gap:22px;align-content:start}
 .topbar{padding:22px;display:flex;justify-content:space-between;align-items:center}

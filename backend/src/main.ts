@@ -12,7 +12,7 @@ async function bootstrap() {
   app.enableCors({ origin: config.get('CORS_ORIGIN')?.split(',') ?? true, credentials: true });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  const swagger = new DocumentBuilder().setTitle('Veterinaria 2.0 API').setVersion('1.0').addBearerAuth().build();
+  const swagger = new DocumentBuilder().setTitle('Happy Dog API').setVersion('1.0').addBearerAuth().build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
   await app.listen(config.get<number>('PORT') || 3000);
 }
