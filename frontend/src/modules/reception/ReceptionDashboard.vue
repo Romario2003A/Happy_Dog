@@ -49,6 +49,12 @@ function formatTime(value) {
   return new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
+function moveDay(days) {
+  const date = new Date(`${selectedDate.value}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  selectedDate.value = date.toISOString().slice(0, 10);
+}
+
 function hourAppointments(hour) {
   return dayAppointments.value.filter(item => new Date(item.scheduledAt).getHours() === hour);
 }
@@ -176,7 +182,11 @@ onMounted(loadData);
             <h2>Calendario de citas</h2>
             <p class="muted-text">Vista diaria para organizar la atencion como una agenda de recepcion.</p>
           </div>
-          <input v-model="selectedDate" type="date">
+          <div class="date-controls">
+            <button class="small secondary" type="button" @click="moveDay(-1)">Anterior</button>
+            <input v-model="selectedDate" type="date">
+            <button class="small secondary" type="button" @click="moveDay(1)">Siguiente</button>
+          </div>
         </div>
         <input v-model="search" class="search-field" placeholder="Buscar por cliente, telefono, mascota o motivo">
 
@@ -192,9 +202,7 @@ onMounted(loadData);
                 </div>
                 <div class="event-actions">
                   <span class="status">{{ statusLabel(item.status) }}</span>
-                  <button class="small secondary" @click.stop="setStatus(item,'CONFIRMED')">Confirmar</button>
-                  <button class="small secondary" @click.stop="setStatus(item,'WAITING')">En espera</button>
-                  <button class="small secondary" @click.stop="setStatus(item,'CANCELLED')">Cancelar</button>
+                  <button class="small secondary" @click.stop="selectedAppointment=item">Ver</button>
                 </div>
               </article>
               <span v-if="!hourAppointments(hour).length" class="empty-slot">Libre</span>
@@ -257,9 +265,10 @@ onMounted(loadData);
           <p><b>Motivo:</b> {{ selectedAppointment.reason }}</p>
           <p><b>Estado:</b> {{ statusLabel(selectedAppointment.status) }}</p>
           <div class="detail-actions">
-            <button class="small" @click="setStatus(selectedAppointment,'CONFIRMED')">Confirmar</button>
-            <button class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">En consulta</button>
-            <button class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
+            <button v-if="selectedAppointment.status==='PENDING'" class="small" @click="setStatus(selectedAppointment,'CONFIRMED')">Confirmar</button>
+            <button v-if="selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">En espera</button>
+            <button v-if="['CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">En consulta</button>
+            <button v-if="selectedAppointment.status!=='CANCELLED'" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
           </div>
         </div>
       </section>
