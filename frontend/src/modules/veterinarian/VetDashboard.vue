@@ -370,24 +370,49 @@ onMounted(loadData);
       <section class="glass-card">
         <div class="section-title">
           <span class="badge">Nueva atencion</span>
-          <h2>Registro medico</h2>
+          <h2>{{ selectedPet ? 'Registro medico' : 'Iniciar registro medico' }}</h2>
         </div>
-        <form class="form-grid" @submit.prevent="saveRecord">
-          <input v-model="form.reason" required placeholder="Motivo de consulta">
-          <input v-model.number="form.weightKg" type="number" step="0.01" placeholder="Peso kg">
-          <input v-model.number="form.temperatureC" type="number" step="0.1" placeholder="Temperatura C">
-          <input v-model="form.nextControlAt" type="datetime-local" placeholder="Proximo control">
-          <textarea v-model="form.diagnosis" required placeholder="Diagnostico"></textarea>
-          <textarea v-model="form.treatment" placeholder="Tratamiento"></textarea>
-          <textarea v-model="form.observations" placeholder="Observaciones"></textarea>
+        <div v-if="!selectedPet" class="empty-state medical-empty">
+          <strong>Elige primero una mascota</strong>
+          <span>Selecciona una cita lista o busca un paciente para activar el registro, la receta y el historial.</span>
+        </div>
+        <form v-else class="medical-form" @submit.prevent="saveRecord">
+          <section class="medical-section">
+            <div class="section-title compact">
+              <div>
+                <span class="badge">Signos</span>
+                <h3>Datos actuales</h3>
+              </div>
+            </div>
+            <div class="form-grid compact-grid">
+              <input v-model.number="form.weightKg" type="number" step="0.01" placeholder="Peso kg">
+              <input v-model.number="form.temperatureC" type="number" step="0.1" placeholder="Temperatura C">
+              <input v-model="form.nextControlAt" type="datetime-local" placeholder="Proximo control">
+            </div>
+          </section>
 
-          <div class="prescription-box">
+          <section class="medical-section">
+            <div class="section-title compact">
+              <div>
+                <span class="badge">Consulta</span>
+                <h3>Evaluacion medica</h3>
+              </div>
+            </div>
+            <div class="form-grid">
+              <input v-model="form.reason" required placeholder="Motivo de consulta">
+              <textarea v-model="form.diagnosis" required placeholder="Diagnostico"></textarea>
+              <textarea v-model="form.treatment" placeholder="Tratamiento / evolucion"></textarea>
+              <textarea v-model="form.observations" placeholder="Observaciones"></textarea>
+            </div>
+          </section>
+
+          <section class="prescription-box">
             <div class="prescription-head">
               <div>
                 <h3>Receta / inventario</h3>
                 <p class="muted-text">Selecciona medicamento, dosis e indicaciones para entregarlo como PDF.</p>
               </div>
-              <button class="secondary small" type="button" @click="generatePrescriptionPdf">{{ selectedPet ? 'Generar Receta en PDF' : 'Selecciona paciente para PDF' }}</button>
+              <button class="secondary small" type="button" @click="generatePrescriptionPdf">Generar Receta en PDF</button>
             </div>
             <select v-model="prescription.productId">
               <option value="">Sin medicamento</option>
@@ -398,9 +423,10 @@ onMounted(loadData);
             <input v-model.number="prescription.quantity" type="number" min="1" placeholder="Cantidad">
             <input v-model="prescription.dosage" placeholder="Dosis">
             <input v-model="prescription.instructions" placeholder="Indicaciones">
-          </div>
+          </section>
 
-          <button :disabled="!selected || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atencion' : 'Selecciona una cita para atender' }}</button>
+          <button :disabled="!selected || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atencion' : 'Selecciona una cita para guardar atencion' }}</button>
+          <p v-if="!selected" class="muted-text">Puedes revisar historial y generar receta al buscar un paciente, pero para guardar una atencion necesitas una cita seleccionada.</p>
         </form>
       </section>
 
