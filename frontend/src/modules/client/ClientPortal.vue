@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { api } from '../../services/api';
+import clinicHero from '../../assets/images/clinic-hero.png';
 
 const form=ref({fullName:'',phone:'',email:'',petName:'',species:'',breed:'',reason:'',scheduledAt:''});
 const sent=ref(false);
@@ -19,11 +20,12 @@ async function submit(){
 <template>
   <div class="public-page">
     <header class="public-hero glass-panel">
-      <div>
+      <div class="hero-copy">
         <span class="badge">Happy Dog</span>
         <h1>Agenda la atencion de tu mascota sin complicaciones</h1>
         <p>Completa la solicitud y recepcion te confirmara la disponibilidad por telefono o WhatsApp.</p>
       </div>
+      <img :src="clinicHero" alt="Veterinaria atendiendo mascotas en una clinica moderna">
     </header>
     <main class="public-grid">
       <section class="glass-card">

@@ -22,7 +22,9 @@ button.small{padding:8px 10px;font-size:13px}
 .login-card{width:min(440px,92vw);padding:34px}
 .login-card h1,.public-hero h1{font-size:clamp(32px,5vw,56px);margin:12px 0}
 .badge{display:inline-flex;padding:8px 12px;border-radius:999px;background:rgba(15,118,110,.1);color:var(--blue-dark);font-weight:800;font-size:13px}
-.public-hero{padding:50px;max-width:1160px;margin:0 auto 24px}
+.public-hero{padding:34px;max-width:1160px;margin:0 auto 24px;display:grid;grid-template-columns:1fr .9fr;gap:28px;align-items:center;overflow:hidden}
+.public-hero img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:20px;box-shadow:0 22px 60px rgba(19,78,74,.18)}
+.hero-copy{padding:16px}
 .public-grid,.panel-grid{display:grid;grid-template-columns:1.4fr .8fr;gap:24px;max-width:1160px;margin:0 auto}
 .panel-grid.wide{grid-template-columns:1fr 1fr;max-width:none}
 .glass-card{padding:24px}
@@ -103,4 +105,4 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 .status{border-radius:999px;padding:6px 10px;background:rgba(184,135,70,.12);color:#7a5727;font-weight:800;font-size:12px}
 .success{color:#047857;font-weight:700}
 .error{color:#be123c;font-weight:700}
-@media(max-width:900px){.app-shell{grid-template-columns:1fr}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-grid,.panel-grid,.panel-grid.wide,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row{grid-template-columns:1fr}.calendar-header,.calendar-event{flex-direction:column}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}}
+@media(max-width:900px){.app-shell{grid-template-columns:1fr}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.calendar-header,.calendar-event{flex-direction:column}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}}
