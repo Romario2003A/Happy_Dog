@@ -14,23 +14,31 @@ const routes=[
  {path:'/cliente', component:ClientPortal},
  {path:'/cliente/login', component:ClientLogin},
  {path:'/cliente/dashboard', component:ClientDashboard, meta:{requiresAuth:true, roles:['CLIENT'], loginPath:'/cliente/login'}},
- {path:'/recepcion/login', component:RoleLogin, meta:{role:'RECEPTIONIST', title:'Recepcion'}},
- {path:'/veterinario/login', component:RoleLogin, meta:{role:'VETERINARIAN', title:'Doctor Veterinario'}},
- {path:'/admin/login', component:RoleLogin, meta:{role:'ADMIN', title:'Administracion'}},
- {path:'/recepcion', component:ReceptionDashboard, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/recepcion/login'}},
- {path:'/recepcion/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/recepcion/login'}},
- {path:'/veterinario', component:VetDashboard, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/veterinario/login'}},
- {path:'/veterinario/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/veterinario/login'}},
- {path:'/admin', component:AdminDashboard, meta:{requiresAuth:true, roles:['ADMIN'], loginPath:'/admin/login'}},
- {path:'/admin/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['ADMIN'], loginPath:'/admin/login'}}
+ {path:'/personal/login', component:RoleLogin, meta:{title:'Acceso del personal'}},
+ {path:'/recepcion/login', redirect:'/personal/login'},
+ {path:'/veterinario/login', redirect:'/personal/login'},
+ {path:'/admin/login', redirect:'/personal/login'},
+ {path:'/recepcion', component:ReceptionDashboard, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/personal/login'}},
+ {path:'/recepcion/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/personal/login'}},
+ {path:'/veterinario', component:VetDashboard, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/personal/login'}},
+ {path:'/veterinario/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/personal/login'}},
+ {path:'/admin', component:AdminDashboard, meta:{requiresAuth:true, roles:['ADMIN'], loginPath:'/personal/login'}},
+ {path:'/admin/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['ADMIN'], loginPath:'/personal/login'}}
 ];
 
 const router=createRouter({history:createWebHistory(),routes});
 
+function homeByRole(role) {
+ if(role==='CLIENT') return '/cliente/dashboard';
+ if(role==='VETERINARIAN') return '/veterinario';
+ if(role==='ADMIN') return '/admin';
+ return '/recepcion';
+}
+
 router.beforeEach((to)=>{
  const auth=useAuthStore();
- if(to.meta.requiresAuth && !auth.isAuthenticated) return to.meta.loginPath || '/recepcion/login';
- if(to.meta.roles && !to.meta.roles.includes(auth.role)) return to.meta.loginPath || '/cliente/login';
+ if(to.meta.requiresAuth && !auth.isAuthenticated) return to.meta.loginPath || '/personal/login';
+ if(to.meta.roles && !to.meta.roles.includes(auth.role)) return homeByRole(auth.role);
 });
 
 export default router;
