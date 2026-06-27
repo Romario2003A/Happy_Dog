@@ -40,19 +40,35 @@ function openProductCreator() {
 
 async function loadData() {
   error.value = '';
-  try {
-    const [summaryRes, usersRes, inventoryRes, clientsRes] = await Promise.all([
-      api.get('/reports/summary'),
-      api.get('/users'),
-      api.get('/inventory'),
-      api.get('/clients'),
-    ]);
-    summary.value = summaryRes.data;
-    users.value = usersRes.data;
-    inventory.value = inventoryRes.data;
-    clients.value = clientsRes.data;
-  } catch (e) {
-    error.value = 'No se pudo cargar administracion.';
+  const [summaryRes, usersRes, inventoryRes, clientsRes, appointmentsRes, petsRes] = await Promise.allSettled([
+    api.get('/reports/summary'),
+    api.get('/users'),
+    api.get('/inventory'),
+    api.get('/clients'),
+    api.get('/appointments'),
+    api.get('/pets'),
+  ]);
+
+  if (usersRes.status === 'fulfilled') users.value = usersRes.value.data;
+  if (inventoryRes.status === 'fulfilled') inventory.value = inventoryRes.value.data;
+  if (clientsRes.status === 'fulfilled') clients.value = clientsRes.value.data;
+
+  if (summaryRes.status === 'fulfilled') {
+    summary.value = summaryRes.value.data;
+  } else {
+    summary.value = {
+      clients: clientsRes.status === 'fulfilled' ? clientsRes.value.data.length : 0,
+      pets: petsRes.status === 'fulfilled' ? petsRes.value.data.length : 0,
+      appointments: appointmentsRes.status === 'fulfilled' ? appointmentsRes.value.data.length : 0,
+      lowStock: inventoryRes.status === 'fulfilled'
+        ? inventoryRes.value.data.filter(p => Number(p.stock) <= Number(p.minStock)).length
+        : 0,
+    };
+  }
+
+  const failed = [summaryRes, usersRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
+  if (failed) {
+    error.value = 'Algunos datos administrativos no se pudieron cargar. Actualiza la pagina o vuelve a iniciar sesion si falta informacion.';
   }
 }
 
@@ -215,6 +231,7 @@ onMounted(loadData);
       <table>
         <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th></tr></thead>
         <tbody>
+          <tr v-if="!clients.length"><td colspan="3" class="empty">No hay clientes cargados en esta vista.</td></tr>
           <tr v-for="client in clients" :key="client.id"><td>{{ client.fullName }}</td><td>{{ client.phone || client.email || '-' }}</td><td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td></tr>
         </tbody>
       </table>
