@@ -27,24 +27,42 @@ button.secondary,button.ghost{background:rgba(255,255,255,.78);color:var(--blue-
 button.secondary:hover,button.ghost:hover{background:rgba(255,255,255,.92)}
 button.small{padding:8px 10px;font-size:13px}
 .glass-card,.glass-panel{background:linear-gradient(145deg,rgba(255,255,255,.9),rgba(255,255,255,.62));border:1px solid rgba(255,255,255,.75);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.9);backdrop-filter:blur(28px) saturate(145%);-webkit-backdrop-filter:blur(28px) saturate(145%);border-radius:24px}
+.glass-card{transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.glass-card:hover{transform:translateY(-2px);box-shadow:0 28px 90px rgba(21,91,102,.15),inset 0 1px 0 rgba(255,255,255,.9);border-color:rgba(134,214,173,.34)}
 .login-page,.public-page{min-height:100vh;padding:40px}
 .login-page{display:grid;place-items:center}
 .login-card{width:min(440px,92vw);padding:34px}
 .login-logo{display:block;width:min(220px,72vw);height:auto;margin:0 0 18px;border-radius:16px;background:white;border:1px solid var(--line);box-shadow:0 14px 34px rgba(21,91,102,.08)}
 .login-card h1,.public-hero h1{font-size:clamp(32px,5vw,56px);margin:12px 0}
 .badge{display:inline-flex;padding:8px 12px;border-radius:999px;background:rgba(134,214,173,.2);color:var(--blue-dark);font-weight:800;font-size:13px;border:1px solid rgba(21,91,102,.12)}
-.public-hero{padding:34px;max-width:1160px;margin:0 auto 24px;display:grid;grid-template-columns:1fr .9fr;gap:28px;align-items:center;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(232,249,243,.78))}
+.public-hero{position:relative;padding:34px;max-width:1160px;margin:0 auto 24px;display:grid;grid-template-columns:1fr .9fr;gap:28px;align-items:center;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(230,248,241,.8) 58%,rgba(255,252,240,.58))}
+.public-hero:before{content:"";position:absolute;inset:0;border-top:6px solid rgba(134,214,173,.52);pointer-events:none}
 .public-hero h1{color:var(--ink)}
 .public-hero img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:20px;box-shadow:0 24px 70px rgba(6,60,53,.18);border:1px solid rgba(15,143,125,.12)}
 .hero-copy{padding:16px}
 .public-brand{width:min(260px,72vw);padding:10px 12px;border-radius:18px;background:rgba(255,255,255,.76);border:1px solid var(--line);box-shadow:0 14px 34px rgba(21,91,102,.08)}
 .public-brand img{display:block;width:100%;height:auto;aspect-ratio:auto;object-fit:contain;border-radius:12px;box-shadow:none;border:0}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0 14px}
+.button-link{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:12px 18px;border-radius:14px;background:linear-gradient(135deg,var(--blue-dark),var(--blue));color:white;text-decoration:none;font-weight:900;box-shadow:0 16px 34px rgba(21,91,102,.18);transition:transform .18s ease,box-shadow .18s ease}
+.button-link:hover{transform:translateY(-1px);box-shadow:0 20px 42px rgba(21,91,102,.22)}
+.secondary-link{background:rgba(255,255,255,.82);color:var(--blue-dark);border:1px solid var(--line);box-shadow:0 12px 28px rgba(21,91,102,.08)}
+.trust-strip{display:flex;gap:8px;flex-wrap:wrap}
+.trust-strip span{padding:9px 12px;border-radius:999px;background:rgba(255,255,255,.72);border:1px solid var(--line);color:var(--blue-dark);font-weight:800;font-size:13px}
 .public-grid,.panel-grid{display:grid;grid-template-columns:1.4fr .8fr;gap:24px;max-width:1160px;margin:0 auto}
 .panel-grid.wide{grid-template-columns:1fr 1fr;max-width:none}
 .panel-grid.single{grid-template-columns:1fr;max-width:none}
 .glass-card{padding:24px}
+.appointment-request-card{position:relative;overflow:hidden}
+.appointment-request-card:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,var(--blue-dark),var(--mint),var(--sun))}
 .location-card{max-width:1160px;margin:24px auto 0;overflow:hidden}
 .location-card img{display:block;width:100%;height:auto;border-radius:18px;border:1px solid var(--line);box-shadow:0 18px 46px rgba(21,91,102,.12)}
+.service-strip{max-width:1160px;margin:24px auto 0;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.service-pill{padding:18px}
+.service-pill strong,.service-pill span{display:block}
+.service-pill strong{color:var(--blue-dark);font-size:17px;margin-bottom:8px}
+.service-pill span{color:var(--muted);line-height:1.45}
+.whatsapp-float{position:fixed;right:22px;bottom:22px;z-index:20;display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 18px;border-radius:999px;background:linear-gradient(135deg,#128c7e,#25d366);color:white;text-decoration:none;font-weight:900;box-shadow:0 18px 40px rgba(18,140,126,.28);transition:transform .2s ease,box-shadow .2s ease}
+.whatsapp-float:hover{transform:translateY(-2px);box-shadow:0 22px 52px rgba(18,140,126,.34)}
 .portal-card{display:grid;align-content:start;gap:14px}
 .portal-card h2{margin:0}
 .portal-list{display:grid;gap:10px;margin-top:8px;color:var(--muted);font-weight:700}
@@ -171,4 +189,10 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 .status{border-radius:999px;padding:6px 10px;background:rgba(15,143,125,.1);color:var(--blue-dark);font-weight:800;font-size:12px}
 .success{color:#047857;font-weight:700}
 .error{color:#be123c;font-weight:700}
-@media(max-width:900px){.login-page,.public-page{padding:18px}.app-shell,.client-shell{grid-template-columns:1fr;padding:14px;gap:14px}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.doctor-hero,.doctor-stats,.quick-action-grid,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.admin-hero,.calendar-header,.calendar-event{flex-direction:column;align-items:flex-start}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.date-controls{width:100%;flex-wrap:wrap}.date-controls input{min-width:0;max-width:none;flex:1}.week-calendar{grid-template-columns:1fr}.week-day{min-width:0}table{display:block;overflow-x:auto;max-width:100%}}
+@keyframes softRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.public-hero,.public-grid,.service-strip,.location-card{animation:softRise .55s ease both}
+.public-grid{animation-delay:.06s}
+.service-strip{animation-delay:.12s}
+.location-card{animation-delay:.18s}
+@media(max-width:900px){.login-page,.public-page{padding:18px}.app-shell,.client-shell{grid-template-columns:1fr;padding:14px;gap:14px}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.doctor-hero,.doctor-stats,.quick-action-grid,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row,.service-strip{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.admin-hero,.calendar-header,.calendar-event{flex-direction:column;align-items:flex-start}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.date-controls{width:100%;flex-wrap:wrap}.date-controls input{min-width:0;max-width:none;flex:1}.week-calendar{grid-template-columns:1fr}.week-day{min-width:0}table{display:block;overflow-x:auto;max-width:100%}.whatsapp-float{right:14px;bottom:14px;min-height:44px;padding:10px 14px}.hero-actions .button-link{width:100%}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

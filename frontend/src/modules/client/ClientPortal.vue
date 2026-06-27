@@ -28,11 +28,20 @@ async function submit(){
         </div>
         <h1>Agenda la atencion de tu mascota sin complicaciones</h1>
         <p>Completa la solicitud y recepcion te confirmara la disponibilidad por telefono o WhatsApp.</p>
+        <div class="hero-actions">
+          <a class="button-link" href="#solicitar-cita">Agendar cita</a>
+          <a class="button-link secondary-link" href="https://wa.me/51953280579" target="_blank" rel="noreferrer">WhatsApp</a>
+        </div>
+        <div class="trust-strip" aria-label="Servicios principales">
+          <span>Consultas</span>
+          <span>Vacunas</span>
+          <span>Controles</span>
+        </div>
       </div>
       <img :src="clinicHero" alt="Veterinaria atendiendo mascotas en una clinica moderna">
     </header>
     <main class="public-grid">
-      <section class="glass-card">
+      <section id="solicitar-cita" class="glass-card appointment-request-card">
         <div class="section-title">
           <div>
             <span class="badge">Nueva cita</span>
@@ -49,7 +58,7 @@ async function submit(){
           <input v-model="form.breed" placeholder="Raza">
           <input v-model="form.scheduledAt" type="datetime-local" required>
           <textarea v-model="form.reason" required placeholder="Cuentanos que le pasa o que servicio necesitas"></textarea>
-          <button>Enviar solicitud de cita</button>
+          <button>Quiero agendar a mi mascota</button>
         </form>
         <p v-if="sent" class="success">Solicitud recibida. Recepcion revisara la agenda y te confirmara pronto.</p>
       </section>
@@ -65,6 +74,20 @@ async function submit(){
         </div>
       </section>
     </main>
+    <section class="service-strip">
+      <article class="service-pill glass-card">
+        <strong>Atencion cercana</strong>
+        <span>Recepcion confirma cada cita para evitar esperas innecesarias.</span>
+      </article>
+      <article class="service-pill glass-card">
+        <strong>Historial organizado</strong>
+        <span>El doctor puede revisar antecedentes, peso, temperatura y recetas.</span>
+      </article>
+      <article class="service-pill glass-card">
+        <strong>Contacto rapido</strong>
+        <span>WhatsApp y telefono visibles para resolver dudas sin perder tiempo.</span>
+      </article>
+    </section>
     <section class="location-card glass-card">
       <div class="section-title">
         <div>
@@ -74,5 +97,6 @@ async function submit(){
       </div>
       <img :src="happyDogLocation" alt="Mapa y datos de contacto de Happy Dog">
     </section>
+    <a class="whatsapp-float" href="https://wa.me/51953280579" target="_blank" rel="noreferrer" aria-label="Escribir por WhatsApp">WhatsApp</a>
   </div>
 </template>
