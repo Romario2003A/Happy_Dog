@@ -28,7 +28,7 @@ const form = ref({
   nextControlAt: '',
 });
 
-const visibleAppointments = computed(() => appointments.value.filter(a => a.status !== 'ATTENDED' && a.status !== 'CANCELLED'));
+const visibleAppointments = computed(() => appointments.value.filter(a => ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].includes(a.status)));
 const todayAppointments = computed(() => appointments.value.filter(a => a.scheduledAt?.slice(0, 10) === new Date().toISOString().slice(0, 10)));
 const activePatients = computed(() => new Set(appointments.value.filter(a => a.status !== 'CANCELLED').map(a => a.petId)).size);
 const attendedCount = computed(() => appointments.value.filter(a => a.status === 'ATTENDED').length);
@@ -315,7 +315,7 @@ onMounted(loadData);
         </div>
       </div>
       <div class="quick-action-grid">
-        <button @click="petSearch=''; selected=null; selectedStandalonePet=null">Atender cita pendiente</button>
+        <button @click="petSearch=''; selected=null; selectedStandalonePet=null">Ver citas listas</button>
         <button class="secondary" @click="focusPatientSearch">Buscar paciente</button>
         <button class="secondary" @click="$router.push('/veterinario/cuenta')">Mi cuenta</button>
       </div>
@@ -325,9 +325,10 @@ onMounted(loadData);
       <section class="glass-card appointment-list">
         <div class="section-title">
           <span class="badge">Agenda</span>
-          <h2>{{ petSearch ? 'Resultados de pacientes' : 'Citas pendientes' }}</h2>
+          <h2>{{ petSearch ? 'Pacientes encontrados' : 'Citas listas para atender' }}</h2>
         </div>
-        <input ref="patientSearch" v-model="petSearch" class="search-field" placeholder="Buscar paciente o dueno">
+        <p class="muted-text">{{ petSearch ? 'Estos pacientes existen en el sistema. Selecciona uno para revisar historial o emitir una receta desde su ficha.' : 'Aqui aparecen citas confirmadas, en espera o en consulta. Cuando guardas el registro medico, la cita pasa a Atendida y sale de esta lista.' }}</p>
+        <input ref="patientSearch" v-model="petSearch" class="search-field" placeholder="Buscar paciente en historial">
         <div v-if="petSearch" class="patient-search-results">
           <button v-for="pet in filteredPets" :key="pet.id" class="appointment-item" @click="selectPet(pet)">
             <strong>{{ pet.name }}</strong>
@@ -337,7 +338,7 @@ onMounted(loadData);
           <p v-if="!filteredPets.length" class="empty">No se encontraron pacientes con esa busqueda.</p>
         </div>
         <p v-if="loading" class="muted-text">Cargando citas...</p>
-        <p v-else-if="!petSearch && !visibleAppointments.length" class="empty">No hay citas pendientes para atender. Puedes buscar un paciente para revisar su historial.</p>
+        <p v-else-if="!petSearch && !visibleAppointments.length" class="empty">No hay citas listas para atender ahora. Recepcion debe confirmar o pasar una cita a consulta. Si ya guardaste el registro medico, esa cita ya quedo Atendida.</p>
         <button
           v-if="!petSearch"
           v-for="appointment in visibleAppointments"
