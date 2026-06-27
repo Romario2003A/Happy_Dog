@@ -28,7 +28,7 @@ const router=createRouter({history:createWebHistory(),routes});
 router.beforeEach((to)=>{
  const auth=useAuthStore();
  if(to.meta.requiresAuth && !auth.isAuthenticated) return to.meta.loginPath || '/recepcion/login';
- if(to.meta.roles && !to.meta.roles.includes(auth.role)) return auth.role==='CLIENT'?'/cliente/dashboard':'/cliente';
+ if(to.meta.roles && !to.meta.roles.includes(auth.role)) return to.meta.loginPath || '/cliente/login';
 });
 
 export default router;
