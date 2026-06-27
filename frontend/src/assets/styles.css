@@ -120,6 +120,7 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .calendar-header input{max-width:190px}
 .date-controls{display:flex;align-items:center;gap:8px}
 .date-controls input{min-width:170px}
+.agenda-tabs{margin:0 0 16px;grid-template-columns:repeat(3,1fr)}
 .day-calendar{display:grid;gap:10px}
 .calendar-row{display:grid;grid-template-columns:74px 1fr;gap:12px;align-items:stretch}
 .calendar-time{padding-top:14px;color:var(--muted);font-weight:800}
@@ -133,6 +134,20 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .calendar-event[data-status="IN_CONSULTATION"]{border-left:5px solid #2563eb}
 .calendar-event[data-status="ATTENDED"]{border-left:5px solid #64748b}
 .event-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.week-calendar{display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));gap:10px;overflow-x:auto;padding-bottom:4px}
+.week-day{min-width:130px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.58);overflow:hidden}
+.week-day.today{border-color:rgba(15,143,125,.38);box-shadow:0 12px 26px rgba(6,60,53,.08)}
+.week-day-head{width:100%;display:grid;gap:3px;text-align:left;border-radius:0;background:rgba(15,143,125,.06);color:var(--ink);box-shadow:none;padding:12px}
+.week-day-head:hover{background:rgba(15,143,125,.1);box-shadow:none}
+.week-day-head span{text-transform:uppercase;font-size:11px;color:var(--muted);font-weight:900}
+.week-day-head strong{font-size:17px}
+.week-day-head small{color:var(--muted);font-weight:800}
+.week-events{display:grid;gap:8px;padding:10px}
+.week-event,.summary-appointment{display:grid;gap:4px;text-align:left;background:rgba(15,143,125,.07);color:var(--ink);border:1px solid var(--line);box-shadow:none;padding:10px;border-radius:14px}
+.week-event:hover,.summary-appointment:hover{background:rgba(15,143,125,.11);box-shadow:0 12px 24px rgba(6,60,53,.08)}
+.week-event span,.week-event small,.summary-appointment span{color:var(--muted);font-size:12px}
+.upcoming-list{display:grid;gap:12px}
+.upcoming-summary{display:grid;gap:10px}
 .empty-slot{align-self:center;color:rgba(104,118,114,.55);font-weight:700}
 .quick-form{margin-top:16px}
 .metric span{color:var(--muted);font-weight:700}

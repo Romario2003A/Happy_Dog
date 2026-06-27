@@ -15,9 +15,19 @@ const error = ref('');
 const success = ref('');
 const search = ref('');
 const quickMode = ref('new');
+const agendaView = ref('day');
 const selectedAppointment = ref(null);
-const selectedDate = ref(new Date().toISOString().slice(0, 10));
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
+
+function dateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const selectedDate = ref(dateKey());
 const quick = ref({
   clientId: '',
   petId: '',
@@ -31,11 +41,47 @@ const quick = ref({
   reason: '',
 });
 
-const dayAppointments = computed(() => appointments.value.filter(item => {
+const searchedAppointments = computed(() => appointments.value.filter(item => {
   if (!item.scheduledAt) return false;
   const text = `${item.client?.fullName || ''} ${item.client?.phone || ''} ${item.pet?.name || ''} ${item.reason || ''}`.toLowerCase();
-  return item.scheduledAt.slice(0, 10) === selectedDate.value && text.includes(search.value.toLowerCase());
+  return text.includes(search.value.toLowerCase());
 }));
+
+const dayAppointments = computed(() => searchedAppointments.value.filter(item => {
+  return dateKey(item.scheduledAt) === selectedDate.value;
+}));
+
+const weekDays = computed(() => {
+  const base = new Date(`${selectedDate.value}T00:00:00`);
+  const day = base.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const start = new Date(base);
+  start.setDate(base.getDate() + mondayOffset);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const key = dateKey(date);
+    const items = searchedAppointments.value
+      .filter(item => dateKey(item.scheduledAt) === key)
+      .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+
+    return {
+      key,
+      label: new Intl.DateTimeFormat('es-PE', { weekday: 'short' }).format(date),
+      day: new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short' }).format(date),
+      items,
+    };
+  });
+});
+
+const upcomingAppointments = computed(() => {
+  const now = new Date();
+  return searchedAppointments.value
+    .filter(item => new Date(item.scheduledAt) >= now && !['ATTENDED', 'CANCELLED'].includes(item.status))
+    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+    .slice(0, 12);
+});
 
 const filteredClients = computed(() => clients.value.filter(client => {
   const text = `${client.fullName || ''} ${client.phone || ''} ${client.email || ''} ${client.pets?.map(p => p.name).join(' ') || ''}`.toLowerCase();
@@ -49,10 +95,20 @@ function formatTime(value) {
   return new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
+function formatDate(value) {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('es-PE', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value));
+}
+
 function moveDay(days) {
   const date = new Date(`${selectedDate.value}T00:00:00`);
   date.setDate(date.getDate() + days);
-  selectedDate.value = date.toISOString().slice(0, 10);
+  selectedDate.value = dateKey(date);
+}
+
+function setToday() {
+  selectedDate.value = dateKey();
+  agendaView.value = 'day';
 }
 
 function hourAppointments(hour) {
@@ -171,18 +227,26 @@ onMounted(loadData);
           <div>
             <span class="badge">Agenda</span>
             <h2>Calendario de citas</h2>
-            <p class="muted-text">Vista diaria para organizar la atencion como una agenda de recepcion.</p>
+            <p class="muted-text">Opera el dia y revisa lo que viene sin perder citas futuras.</p>
           </div>
           <div class="date-controls">
+            <button class="small secondary" type="button" @click="setToday">Hoy</button>
             <button class="small secondary" type="button" @click="moveDay(-1)">Anterior</button>
             <input v-model="selectedDate" type="date">
             <button class="small secondary" type="button" @click="moveDay(1)">Siguiente</button>
           </div>
         </div>
+
+        <div class="segmented agenda-tabs">
+          <button type="button" :class="{active:agendaView==='day'}" @click="agendaView='day'">Dia</button>
+          <button type="button" :class="{active:agendaView==='week'}" @click="agendaView='week'">Semana</button>
+          <button type="button" :class="{active:agendaView==='upcoming'}" @click="agendaView='upcoming'">Proximas</button>
+        </div>
+
         <input v-model="search" class="search-field" placeholder="Buscar por cliente, telefono, mascota o motivo">
 
         <p v-if="loading" class="muted-text">Cargando agenda...</p>
-        <div v-else class="day-calendar">
+        <div v-else-if="agendaView==='day'" class="day-calendar">
           <div v-for="hour in hours" :key="hour" class="calendar-row">
             <div class="calendar-time">{{ String(hour).padStart(2, '0') }}:00</div>
             <div class="calendar-slot">
@@ -200,6 +264,38 @@ onMounted(loadData);
             </div>
           </div>
         </div>
+
+        <div v-else-if="agendaView==='week'" class="week-calendar">
+          <article v-for="day in weekDays" :key="day.key" class="week-day" :class="{ today: day.key === selectedDate }">
+            <button class="week-day-head" type="button" @click="selectedDate = day.key; agendaView = 'day'">
+              <span>{{ day.label }}</span>
+              <strong>{{ day.day }}</strong>
+              <small>{{ day.items.length }} citas</small>
+            </button>
+            <div class="week-events">
+              <button v-for="item in day.items" :key="item.id" class="week-event" type="button" @click="selectedAppointment=item">
+                <strong>{{ formatTime(item.scheduledAt) }} - {{ item.pet?.name || 'Mascota' }}</strong>
+                <span>{{ item.client?.fullName || 'Cliente' }}</span>
+                <small>{{ statusLabel(item.status) }}</small>
+              </button>
+              <span v-if="!day.items.length" class="empty-slot">Sin citas</span>
+            </div>
+          </article>
+        </div>
+
+        <div v-else class="upcoming-list">
+          <article v-for="item in upcomingAppointments" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectedAppointment=item">
+            <div>
+              <strong>{{ formatDate(item.scheduledAt) }} - {{ formatTime(item.scheduledAt) }}</strong>
+              <span>{{ item.pet?.name || 'Mascota' }} · {{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
+            </div>
+            <div class="event-actions">
+              <span class="status">{{ statusLabel(item.status) }}</span>
+              <button class="small secondary" @click.stop="selectedAppointment=item">Ver</button>
+            </div>
+          </article>
+          <p v-if="!upcomingAppointments.length" class="empty">No hay citas futuras pendientes con este filtro.</p>
+        </div>
       </section>
 
       <section class="glass-card quick-card">
@@ -211,6 +307,23 @@ onMounted(loadData);
         </div>
         <p class="muted-text">Usalo cuando llega un cliente nuevo o llama por WhatsApp para agendar.</p>
         <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar registro rapido' : '+ Registro rapido' }}</button>
+
+        <div class="detail-box upcoming-summary">
+          <span class="badge">Proximas</span>
+          <h3>{{ upcomingAppointments.length }} citas por venir</h3>
+          <button
+            v-for="item in upcomingAppointments.slice(0, 4)"
+            :key="item.id"
+            class="summary-appointment"
+            type="button"
+            @click="selectedAppointment=item; agendaView='upcoming'"
+          >
+            <strong>{{ formatDate(item.scheduledAt) }} · {{ formatTime(item.scheduledAt) }}</strong>
+            <span>{{ item.pet?.name || 'Mascota' }} - {{ item.client?.fullName || 'Cliente' }}</span>
+          </button>
+          <button v-if="upcomingAppointments.length > 4" class="secondary small full" type="button" @click="agendaView='upcoming'">Ver todas</button>
+          <p v-if="!upcomingAppointments.length" class="muted-text">No tienes citas futuras pendientes.</p>
+        </div>
 
         <form v-if="showQuick" class="stack quick-form" @submit.prevent="saveQuickAppointment">
           <div class="segmented">
