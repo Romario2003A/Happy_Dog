@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
+import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -36,6 +37,7 @@ async function submit() {
 <template>
   <div class="login-page">
     <form class="login-card glass-card" @submit.prevent="submit">
+      <img class="login-logo" :src="happyDogLogo" alt="Happy Dog">
       <span class="badge">Acceso seguro</span>
       <h1>Acceso del personal</h1>
       <p>Ingresa con tu correo y contrasena. El sistema reconoce tu rol y abre tu panel automaticamente.</p>

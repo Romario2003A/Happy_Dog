@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
+import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 
 const router=useRouter();
 const auth=useAuthStore();
@@ -27,6 +28,7 @@ async function submit(){
 <template>
   <div class="login-page">
     <section class="login-card glass-panel">
+      <img class="login-logo" :src="happyDogLogo" alt="Happy Dog">
       <span class="badge">Cliente</span>
       <h1>{{ mode==='login'?'Ingreso cliente':'Crear cuenta cliente' }}</h1>
       <form class="stack" @submit.prevent="submit">

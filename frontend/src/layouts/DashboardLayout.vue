@@ -1,5 +1,6 @@
 <script setup>
 import { useAuthStore } from '../stores/auth';
+import happyDogLogo from '../assets/images/happy-dog-logo.jpeg';
 
 defineProps({ title: String, subtitle: String });
 
@@ -9,12 +10,9 @@ const auth = useAuthStore();
 <template>
   <div class="app-shell">
     <aside class="sidebar glass-panel">
-      <div class="brand">
-        <div class="logo" aria-hidden="true">🐶</div>
-        <div>
-          <strong>Happy Dog</strong>
-          <small>{{ title }}</small>
-        </div>
+      <div class="brand brand-with-wordmark">
+        <img class="brand-wordmark" :src="happyDogLogo" alt="Happy Dog">
+        <small>{{ title }}</small>
       </div>
       <nav><slot name="nav" /></nav>
       <button class="ghost" @click="auth.logout(); $router.push('/personal/login')">Cerrar sesion</button>
