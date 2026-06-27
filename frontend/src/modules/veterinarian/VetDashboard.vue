@@ -52,10 +52,6 @@ function greeting() {
   return 'Buenas noches';
 }
 
-function focusPatientSearch() {
-  patientSearch.value?.focus();
-}
-
 function statusLabel(status) {
   const labels = {
     PENDING: 'Pendiente',
@@ -316,7 +312,6 @@ onMounted(loadData);
       </div>
       <div class="quick-action-grid">
         <button @click="petSearch=''; selected=null; selectedStandalonePet=null">Ver citas listas</button>
-        <button class="secondary" @click="focusPatientSearch">Buscar paciente</button>
         <button class="secondary" @click="$router.push('/veterinario/cuenta')">Mi cuenta</button>
       </div>
     </section>
