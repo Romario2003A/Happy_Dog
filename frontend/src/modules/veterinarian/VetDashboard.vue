@@ -38,6 +38,7 @@ const filteredPets = computed(() => pets.value.filter(pet => {
 }).slice(0, 8));
 const selectedPet = computed(() => selected.value?.pet || selectedStandalonePet.value);
 const selectedClient = computed(() => selected.value?.client || selectedStandalonePet.value?.client);
+const selectedProduct = computed(() => products.value.find(product => product.id === prescription.value.productId));
 
 function formatDate(value) {
   if (!value) return 'Sin fecha';
@@ -146,6 +147,107 @@ function buildPrescriptions() {
     dosage: prescription.value.dosage,
     instructions: prescription.value.instructions,
   }];
+}
+
+function escapeHtml(value) {
+  return String(value ?? '-').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  }[char]));
+}
+
+function generatePrescriptionPdf() {
+  if (!selectedPet.value) {
+    error.value = 'Selecciona un paciente antes de generar la receta.';
+    return;
+  }
+
+  const prescriptionRows = selectedProduct.value
+    ? `
+      <tr>
+        <td>${escapeHtml(selectedProduct.value.name)}</td>
+        <td>${escapeHtml(prescription.value.quantity || 1)}</td>
+        <td>${escapeHtml(prescription.value.dosage || '-')}</td>
+        <td>${escapeHtml(prescription.value.instructions || '-')}</td>
+      </tr>
+    `
+    : '<tr><td colspan="4">Sin medicamento seleccionado. Completar indicaciones manuales si corresponde.</td></tr>';
+
+  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!printWindow) {
+    error.value = 'El navegador bloqueo la ventana de impresion. Permite ventanas emergentes para generar el PDF.';
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Receta - ${escapeHtml(selectedPet.value.name || 'Paciente')}</title>
+        <style>
+          body{font-family:Arial,sans-serif;color:#172522;margin:36px}
+          .header{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #155b66;padding-bottom:18px;margin-bottom:22px}
+          .brand{font-size:30px;font-weight:800;color:#155b66}
+          .muted{color:#66736f}
+          .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin:18px 0}
+          .box{border:1px solid #d9e8e3;border-radius:12px;padding:14px;margin:14px 0}
+          h1,h2{margin:0 0 10px}
+          table{width:100%;border-collapse:collapse;margin-top:10px}
+          th,td{border-bottom:1px solid #d9e8e3;text-align:left;padding:10px;vertical-align:top}
+          .signature{margin-top:64px;text-align:right}
+          .signature span{display:inline-block;border-top:1px solid #172522;padding:10px 42px 0}
+          @media print{button{display:none}body{margin:24px}}
+        </style>
+      </head>
+      <body>
+        <section class="header">
+          <div>
+            <div class="brand">Happy Dog</div>
+            <div class="muted">Receta veterinaria</div>
+          </div>
+          <div>
+            <strong>Fecha:</strong> ${escapeHtml(formatDate(new Date()))}<br>
+            <strong>Veterinario:</strong> ${escapeHtml(auth.user?.fullName || 'Doctor veterinario')}
+          </div>
+        </section>
+
+        <section class="box">
+          <h2>Paciente</h2>
+          <div class="grid">
+            <div><strong>Mascota:</strong> ${escapeHtml(selectedPet.value.name || '-')}</div>
+            <div><strong>Especie:</strong> ${escapeHtml(selectedPet.value.species || '-')}</div>
+            <div><strong>Raza:</strong> ${escapeHtml(selectedPet.value.breed || '-')}</div>
+            <div><strong>Dueno:</strong> ${escapeHtml(selectedClient.value?.fullName || '-')}</div>
+            <div><strong>Peso actual:</strong> ${escapeHtml(form.value.weightKg || selectedPet.value.weightKg || '-')} kg</div>
+            <div><strong>Temperatura:</strong> ${escapeHtml(form.value.temperatureC || '-')} C</div>
+          </div>
+        </section>
+
+        <section class="box">
+          <h2>Evaluacion</h2>
+          <p><strong>Motivo:</strong> ${escapeHtml(form.value.reason || selected.value?.reason || '-')}</p>
+          <p><strong>Diagnostico:</strong> ${escapeHtml(form.value.diagnosis || '-')}</p>
+          <p><strong>Evolucion / tratamiento:</strong> ${escapeHtml(form.value.treatment || '-')}</p>
+          <p><strong>Observaciones:</strong> ${escapeHtml(form.value.observations || '-')}</p>
+        </section>
+
+        <section class="box">
+          <h2>Medicacion indicada</h2>
+          <table>
+            <thead><tr><th>Producto</th><th>Cantidad</th><th>Dosis</th><th>Indicaciones</th></tr></thead>
+            <tbody>${prescriptionRows}</tbody>
+          </table>
+        </section>
+
+        <div class="signature"><span>Firma y sello</span></div>
+        <script>window.onload=function(){window.print()}<\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 async function saveRecord() {
@@ -285,7 +387,13 @@ onMounted(loadData);
           <textarea v-model="form.observations" placeholder="Observaciones"></textarea>
 
           <div class="prescription-box">
-            <h3>Receta / inventario</h3>
+            <div class="prescription-head">
+              <div>
+                <h3>Receta / inventario</h3>
+                <p class="muted-text">Selecciona medicamento, dosis e indicaciones para entregarlo como PDF.</p>
+              </div>
+              <button class="secondary small" type="button" :disabled="!selectedPet" @click="generatePrescriptionPdf">Generar Receta en PDF</button>
+            </div>
             <select v-model="prescription.productId">
               <option value="">Sin medicamento</option>
               <option v-for="product in products" :key="product.id" :value="product.id">
@@ -314,6 +422,7 @@ onMounted(loadData);
             <span>{{ record.veterinarian?.fullName || 'Veterinario' }}</span>
           </div>
           <p><b>Motivo:</b> {{ record.reason }}</p>
+          <p v-if="record.weightKg || record.temperatureC"><b>Control:</b> {{ record.weightKg ? record.weightKg + ' kg' : '' }} {{ record.temperatureC ? ' · ' + record.temperatureC + ' C' : '' }}</p>
           <p><b>Diagnostico:</b> {{ record.diagnosis }}</p>
           <p v-if="record.treatment"><b>Tratamiento:</b> {{ record.treatment }}</p>
           <p v-if="record.observations"><b>Observaciones:</b> {{ record.observations }}</p>

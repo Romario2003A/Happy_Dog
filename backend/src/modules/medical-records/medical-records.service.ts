@@ -15,6 +15,9 @@ export class MedicalRecordsService {
         if (product.stock < item.quantity) throw new BadRequestException(`Stock insuficiente: ${product.name}`);
       }
       const record = await tx.medicalRecord.create({ data:{ appointmentId:dto.appointmentId, petId:dto.petId, veterinarianId:dto.veterinarianId, reason:dto.reason, weightKg:dto.weightKg, temperatureC:dto.temperatureC, diagnosis:dto.diagnosis, treatment:dto.treatment, observations:dto.observations, nextControlAt:dto.nextControlAt ? new Date(dto.nextControlAt) : undefined, prescriptions:{ create:(dto.prescriptions ?? []).map(i=>({productId:i.productId, quantity:i.quantity, dosage:i.dosage, instructions:i.instructions})) } }, include:{ prescriptions:true } });
+      if (dto.weightKg !== undefined) {
+        await tx.pet.update({ where:{ id:dto.petId }, data:{ weightKg:dto.weightKg } });
+      }
       for (const item of dto.prescriptions ?? []) {
         await tx.product.update({ where:{ id:item.productId }, data:{ stock:{ decrement:item.quantity } } });
         await tx.inventoryMovement.create({ data:{ productId:item.productId, type:MovementType.PRESCRIPTION, quantity:-item.quantity, reason:'Receta médica', referenceId:record.id } });
