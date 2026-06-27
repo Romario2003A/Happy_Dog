@@ -392,7 +392,7 @@ onMounted(loadData);
                 <h3>Receta / inventario</h3>
                 <p class="muted-text">Selecciona medicamento, dosis e indicaciones para entregarlo como PDF.</p>
               </div>
-              <button class="secondary small" type="button" :disabled="!selectedPet" @click="generatePrescriptionPdf">Generar Receta en PDF</button>
+              <button class="secondary small" type="button" @click="generatePrescriptionPdf">{{ selectedPet ? 'Generar Receta en PDF' : 'Selecciona paciente para PDF' }}</button>
             </div>
             <select v-model="prescription.productId">
               <option value="">Sin medicamento</option>
