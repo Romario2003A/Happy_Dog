@@ -37,6 +37,16 @@ button.small{padding:8px 10px;font-size:13px}
 .portal-list{display:grid;gap:10px;margin-top:8px;color:var(--muted);font-weight:700}
 .portal-list span{padding:12px 14px;border-radius:14px;background:rgba(15,143,125,.06);border:1px solid var(--line)}
 .account-card{max-width:620px}
+.doctor-hero{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;align-items:center;background:linear-gradient(135deg,rgba(6,60,53,.96),rgba(15,143,125,.86));color:white}
+.doctor-hero h2{font-size:clamp(28px,4vw,44px);margin:12px 0}
+.doctor-hero .muted-text{color:rgba(255,255,255,.78)}
+.doctor-hero .badge{background:rgba(255,255,255,.13);color:white;border-color:rgba(255,255,255,.22)}
+.doctor-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.doctor-stats div{padding:16px;border-radius:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16)}
+.doctor-stats span{display:block;color:rgba(255,255,255,.72);font-weight:800;font-size:12px;text-transform:uppercase}
+.doctor-stats strong{display:block;font-size:34px;margin-top:8px}
+.quick-actions{display:grid;gap:12px}
+.quick-action-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .clinical-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:22px}
 .clinical-grid.main{grid-template-columns:1.2fr .8fr}
 .section-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
@@ -121,4 +131,4 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 .status{border-radius:999px;padding:6px 10px;background:rgba(15,143,125,.1);color:var(--blue-dark);font-weight:800;font-size:12px}
 .success{color:#047857;font-weight:700}
 .error{color:#be123c;font-weight:700}
-@media(max-width:900px){.app-shell{grid-template-columns:1fr}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.calendar-header,.calendar-event{flex-direction:column}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}}
+@media(max-width:900px){.app-shell{grid-template-columns:1fr}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.doctor-hero,.doctor-stats,.quick-action-grid,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.calendar-header,.calendar-event{flex-direction:column}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}}

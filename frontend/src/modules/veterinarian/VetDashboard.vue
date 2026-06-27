@@ -16,6 +16,7 @@ const saving = ref(false);
 const error = ref('');
 const success = ref('');
 const petSearch = ref('');
+const patientSearch = ref(null);
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
 const form = ref({
   reason: '',
@@ -28,6 +29,9 @@ const form = ref({
 });
 
 const visibleAppointments = computed(() => appointments.value.filter(a => a.status !== 'ATTENDED' && a.status !== 'CANCELLED'));
+const todayAppointments = computed(() => appointments.value.filter(a => a.scheduledAt?.slice(0, 10) === new Date().toISOString().slice(0, 10)));
+const activePatients = computed(() => new Set(appointments.value.filter(a => a.status !== 'CANCELLED').map(a => a.petId)).size);
+const attendedCount = computed(() => appointments.value.filter(a => a.status === 'ATTENDED').length);
 const filteredPets = computed(() => pets.value.filter(pet => {
   const text = `${pet.name || ''} ${pet.species || ''} ${pet.breed || ''} ${pet.client?.fullName || ''}`.toLowerCase();
   return text.includes(petSearch.value.toLowerCase());
@@ -38,6 +42,17 @@ const selectedClient = computed(() => selected.value?.client || selectedStandalo
 function formatDate(value) {
   if (!value) return 'Sin fecha';
   return new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Buenos dias';
+  if (hour < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
+function focusPatientSearch() {
+  patientSearch.value?.focus();
 }
 
 function statusLabel(status) {
@@ -177,13 +192,40 @@ onMounted(loadData);
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
+    <section class="doctor-hero glass-card">
+      <div>
+        <span class="badge">Consultorio</span>
+        <h2>{{ greeting() }}, {{ auth.user?.fullName || 'Doctor' }}</h2>
+        <p class="muted-text">Gestiona tus atenciones del dia, revisa pacientes y registra historias clinicas desde un solo lugar.</p>
+      </div>
+      <div class="doctor-stats">
+        <div><span>Citas hoy</span><strong>{{ todayAppointments.length }}</strong></div>
+        <div><span>Pacientes activos</span><strong>{{ activePatients }}</strong></div>
+        <div><span>Atenciones cerradas</span><strong>{{ attendedCount }}</strong></div>
+      </div>
+    </section>
+
+    <section class="quick-actions glass-card">
+      <div class="section-title">
+        <div>
+          <span class="badge">Accesos rapidos</span>
+          <h2>Trabajo clinico</h2>
+        </div>
+      </div>
+      <div class="quick-action-grid">
+        <button @click="petSearch=''; selected=null; selectedStandalonePet=null">Atender cita pendiente</button>
+        <button class="secondary" @click="focusPatientSearch">Buscar paciente</button>
+        <button class="secondary" @click="$router.push('/veterinario/cuenta')">Mi cuenta</button>
+      </div>
+    </section>
+
     <div class="clinical-grid">
       <section class="glass-card appointment-list">
         <div class="section-title">
           <span class="badge">Agenda</span>
           <h2>{{ petSearch ? 'Resultados de pacientes' : 'Citas pendientes' }}</h2>
         </div>
-        <input v-model="petSearch" class="search-field" placeholder="Buscar paciente o dueno">
+        <input ref="patientSearch" v-model="petSearch" class="search-field" placeholder="Buscar paciente o dueno">
         <div v-if="petSearch" class="patient-search-results">
           <button v-for="pet in filteredPets" :key="pet.id" class="appointment-item" @click="selectPet(pet)">
             <strong>{{ pet.name }}</strong>
