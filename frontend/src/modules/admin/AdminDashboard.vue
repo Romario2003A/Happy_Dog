@@ -68,7 +68,7 @@ async function loadData() {
 
   const failed = [summaryRes, usersRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
   if (failed) {
-    error.value = 'Algunos datos administrativos no se pudieron cargar. Actualiza la pagina o vuelve a iniciar sesion si falta informacion.';
+    error.value = 'Algunos datos administrativos no se pudieron cargar. Actualiza la página o vuelve a iniciar sesión si falta información.';
   }
 }
 
@@ -115,14 +115,14 @@ onMounted(loadData);
 </script>
 
 <template>
-  <AdminLayout title="Administracion" subtitle="Control del negocio, usuarios, inventario, caja y reportes">
+  <AdminLayout title="Administración" subtitle="Control del negocio, usuarios, inventario, caja y reportes">
     <template #nav>
       <button @click="active='resumen'">Resumen</button>
       <button @click="openUsers">Usuarios</button>
       <button @click="openInventory">Inventario</button>
       <button @click="active='clientes'">Clientes</button>
       <button @click="active='caja'">Caja</button>
-      <button @click="$router.push('/recepcion')">Recepcion</button>
+      <button @click="$router.push('/recepcion')">Recepción</button>
       <button @click="$router.push('/admin/cuenta')">Mi cuenta</button>
     </template>
 
@@ -153,7 +153,7 @@ onMounted(loadData);
         <div class="section-title">
           <div>
             <h2>Usuarios del sistema</h2>
-            <p class="muted-text">Gestiona las cuentas internas que entran a recepcion, veterinario y administracion.</p>
+            <p class="muted-text">Gestiona las cuentas internas que entran a recepción, veterinario y administración.</p>
           </div>
           <button class="secondary small" @click="showUserForm = true">Crear usuario</button>
         </div>
@@ -168,18 +168,18 @@ onMounted(loadData);
         <div class="section-title">
           <div>
             <h2>Crear usuario interno</h2>
-            <p class="muted-text">Crea una cuenta temporal para el personal y luego podra cambiar su contrasena.</p>
+            <p class="muted-text">Crea una cuenta temporal para el personal y luego podrá cambiar su contraseña.</p>
           </div>
           <button class="ghost small" type="button" @click="showUserForm = false">Cerrar</button>
         </div>
         <form class="stack" @submit.prevent="createUser">
           <label>Nombre<input v-model="userForm.fullName" required placeholder="Nombre completo"></label>
           <label>Correo<input v-model="userForm.email" type="email" required placeholder="usuario@happydog.com"></label>
-          <label>Contrasena temporal<input v-model="userForm.password" type="password" required minlength="6" placeholder="Temporal2026!"></label>
+          <label>Contraseña temporal<input v-model="userForm.password" type="password" required minlength="6" placeholder="Temporal2026!"></label>
           <label>Rol
             <select v-model="userForm.role">
               <option value="VETERINARIAN">Veterinario</option>
-              <option value="RECEPTIONIST">Recepcion</option>
+              <option value="RECEPTIONIST">Recepción</option>
               <option value="ADMIN">Administrador</option>
             </select>
           </label>
@@ -244,7 +244,7 @@ onMounted(loadData);
 
     <section v-else class="glass-card">
       <h2>Resumen administrativo</h2>
-      <p class="muted-text">Usa las pestañas para gestionar usuarios, inventario, clientes y caja. La agenda diaria vive en Recepcion.</p>
+      <p class="muted-text">Usa las pestañas para gestionar usuarios, inventario, clientes y caja. La agenda diaria vive en Recepción.</p>
     </section>
   </AdminLayout>
 </template>

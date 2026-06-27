@@ -17,13 +17,13 @@ const isVet = computed(() => auth.role === 'VETERINARIAN');
 const isAdmin = computed(() => auth.role === 'ADMIN');
 const Layout = computed(() => isVet.value ? VeterinarianLayout : isAdmin.value ? AdminLayout : ReceptionLayout);
 const dashboardPath = computed(() => isVet.value ? '/veterinario' : isAdmin.value ? '/admin' : '/recepcion');
-const title = computed(() => isVet.value ? 'Doctor Veterinario' : isAdmin.value ? 'Administracion' : 'Recepcion');
+const title = computed(() => isVet.value ? 'Doctor Veterinario' : isAdmin.value ? 'Administración' : 'Recepción');
 
 async function submit() {
   error.value = '';
   success.value = '';
   if (form.value.newPassword !== form.value.confirmPassword) {
-    error.value = 'La nueva contrasena no coincide.';
+    error.value = 'La nueva contraseña no coincide.';
     return;
   }
   loading.value = true;
@@ -33,9 +33,9 @@ async function submit() {
       newPassword: form.value.newPassword,
     });
     form.value = { currentPassword: '', newPassword: '', confirmPassword: '' };
-    success.value = data.message || 'Contrasena actualizada correctamente.';
+    success.value = data.message || 'Contraseña actualizada correctamente.';
   } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo cambiar la contrasena.';
+    error.value = e.response?.data?.message || 'No se pudo cambiar la contraseña.';
   } finally {
     loading.value = false;
   }
@@ -51,16 +51,16 @@ async function submit() {
 
     <section class="glass-card account-card">
       <span class="badge">Seguridad</span>
-      <h2>Cambiar contrasena</h2>
-      <p class="muted-text">Usa tu contrasena temporal solo para entrar por primera vez. Luego guarda una nueva que solo tu conozcas.</p>
+      <h2>Cambiar contraseña</h2>
+      <p class="muted-text">Usa tu contraseña temporal solo para entrar por primera vez. Luego guarda una nueva que solo tú conozcas.</p>
 
       <form class="stack" @submit.prevent="submit">
-        <label>Contrasena actual<input v-model="form.currentPassword" type="password" required minlength="6" autocomplete="current-password"></label>
-        <label>Nueva contrasena<input v-model="form.newPassword" type="password" required minlength="8" autocomplete="new-password"></label>
-        <label>Confirmar nueva contrasena<input v-model="form.confirmPassword" type="password" required minlength="8" autocomplete="new-password"></label>
+        <label>Contraseña actual<input v-model="form.currentPassword" type="password" required minlength="6" autocomplete="current-password"></label>
+        <label>Nueva contraseña<input v-model="form.newPassword" type="password" required minlength="8" autocomplete="new-password"></label>
+        <label>Confirmar nueva contraseña<input v-model="form.confirmPassword" type="password" required minlength="8" autocomplete="new-password"></label>
         <p v-if="error" class="error">{{ error }}</p>
         <p v-if="success" class="success">{{ success }}</p>
-        <button :disabled="loading">{{ loading ? 'Guardando...' : 'Guardar nueva contrasena' }}</button>
+        <button :disabled="loading">{{ loading ? 'Guardando...' : 'Guardar nueva contraseña' }}</button>
       </form>
     </section>
   </component>

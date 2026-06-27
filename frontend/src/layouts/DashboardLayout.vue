@@ -15,7 +15,7 @@ const auth = useAuthStore();
         <small>{{ title }}</small>
       </div>
       <nav><slot name="nav" /></nav>
-      <button class="ghost" @click="auth.logout(); $router.push('/personal/login')">Cerrar sesion</button>
+      <button class="ghost" @click="auth.logout(); $router.push('/personal/login')">Cerrar sesión</button>
     </aside>
     <main class="dashboard-main">
       <header class="topbar glass-panel">

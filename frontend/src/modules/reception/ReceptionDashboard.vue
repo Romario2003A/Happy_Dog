@@ -145,7 +145,7 @@ async function loadData() {
     users.value = usersRes.data;
     summary.value = summaryRes.data;
   } catch (e) {
-    error.value = 'No se pudo cargar la informacion de recepcion.';
+    error.value = 'No se pudo cargar la información de recepción.';
   } finally {
     loading.value = false;
   }
@@ -201,12 +201,12 @@ async function saveQuickAppointment() {
       scheduledAt: quick.value.scheduledAt,
       reason: quick.value.reason,
     });
-    success.value = 'Cita creada desde recepcion correctamente.';
+    success.value = 'Cita creada desde recepción correctamente.';
     resetQuick();
     showQuick.value = false;
     await loadData();
   } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo agendar desde recepcion.';
+    error.value = e.response?.data?.message || 'No se pudo agendar desde recepción.';
   } finally {
     saving.value = false;
   }
@@ -216,11 +216,11 @@ onMounted(loadData);
 </script>
 
 <template>
-  <ReceptionLayout title="Recepcion" subtitle="Agenda, citas por llamada y coordinacion diaria">
+  <ReceptionLayout title="Recepción" subtitle="Agenda, citas por llamada y coordinación diaria">
     <template #nav>
       <button @click="active='citas'">Citas</button>
       <button @click="active='clientes'">Clientes</button>
-      <button @click="$router.push('/admin')">Administracion</button>
+      <button @click="$router.push('/admin')">Administración</button>
       <button @click="$router.push('/recepcion/cuenta')">Mi cuenta</button>
     </template>
 
@@ -244,12 +244,12 @@ onMounted(loadData);
         </div>
 
         <div class="segmented agenda-tabs">
-          <button type="button" :class="{active:agendaView==='day'}" @click="agendaView='day'">Dia</button>
+          <button type="button" :class="{active:agendaView==='day'}" @click="agendaView='day'">Día</button>
           <button type="button" :class="{active:agendaView==='week'}" @click="agendaView='week'">Semana</button>
-          <button type="button" :class="{active:agendaView==='upcoming'}" @click="agendaView='upcoming'">Proximas</button>
+          <button type="button" :class="{active:agendaView==='upcoming'}" @click="agendaView='upcoming'">Próximas</button>
         </div>
 
-        <input v-model="search" class="search-field" placeholder="Buscar por cliente, telefono, mascota o motivo">
+        <input v-model="search" class="search-field" placeholder="Buscar por cliente, teléfono, mascota o motivo">
 
         <p v-if="loading" class="muted-text">Cargando agenda...</p>
         <div v-else-if="agendaView==='day'" class="day-calendar">
@@ -307,11 +307,11 @@ onMounted(loadData);
       <section class="glass-card quick-card">
         <div class="section-title">
           <div>
-            <span class="badge">Recepcion</span>
-            <h2>Agendar desde recepcion</h2>
+            <span class="badge">Recepción</span>
+            <h2>Agendar desde recepción</h2>
           </div>
         </div>
-        <p class="muted-text">Para citas que llegan por llamada, WhatsApp o atencion presencial.</p>
+        <p class="muted-text">Para citas que llegan por llamada, WhatsApp o atención presencial.</p>
         <div class="use-cases">
           <span>Cliente nuevo</span>
           <span>Cliente existente</span>
@@ -320,7 +320,7 @@ onMounted(loadData);
         <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar formulario' : '+ Nueva cita por llamada o WhatsApp' }}</button>
 
         <div class="detail-box upcoming-summary">
-          <span class="badge">Proximas</span>
+          <span class="badge">Próximas</span>
           <h3>{{ upcomingAppointments.length }} citas por venir</h3>
           <button
             v-for="item in upcomingAppointments.slice(0, 4)"
@@ -358,8 +358,8 @@ onMounted(loadData);
           </template>
 
           <template v-else>
-            <label>Dueno<input v-model="quick.fullName" required placeholder="Nombre completo"></label>
-            <label>Telefono / WhatsApp<input v-model="quick.phone" required placeholder="999 999 999"></label>
+            <label>Dueño<input v-model="quick.fullName" required placeholder="Nombre completo"></label>
+            <label>Teléfono / WhatsApp<input v-model="quick.phone" required placeholder="999 999 999"></label>
             <label>Correo opcional<input v-model="quick.email" type="email" placeholder="correo@ejemplo.com"></label>
             <label>Mascota<input v-model="quick.petName" required placeholder="Nombre de la mascota"></label>
             <label>Especie<input v-model="quick.species" required placeholder="Perro, gato, conejo"></label>
@@ -371,7 +371,7 @@ onMounted(loadData);
                 <option value="FEMALE">Hembra</option>
               </select>
             </label>
-            <label>Edad<input v-model="quick.age" placeholder="Ej. 2 anos"></label>
+            <label>Edad<input v-model="quick.age" placeholder="Ej. 2 años"></label>
             <label>Peso kg<input v-model.number="quick.weightKg" type="number" min="0" step="0.01" placeholder="Ej. 8.5"></label>
           </template>
 
@@ -402,12 +402,12 @@ onMounted(loadData);
     <div v-else class="panel-grid">
       <section class="glass-card">
         <h2>Clientes y mascotas</h2>
-        <p class="muted-text">Busca clientes para atender llamadas, WhatsApp o consultas rapidas.</p>
-        <input v-model="search" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
+        <p class="muted-text">Busca clientes para atender llamadas, WhatsApp o consultas rápidas.</p>
+        <input v-model="search" class="search-field" placeholder="Buscar cliente, teléfono, correo o mascota">
         <table>
           <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th></tr></thead>
           <tbody>
-            <tr v-if="!filteredClients.length"><td colspan="3" class="empty">No hay clientes registrados todavia.</td></tr>
+            <tr v-if="!filteredClients.length"><td colspan="3" class="empty">No hay clientes registrados todavía.</td></tr>
             <tr v-for="client in filteredClients" :key="client.id"><td>{{ client.fullName }}</td><td>{{ client.phone || client.email || '-' }}</td><td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td></tr>
           </tbody>
         </table>

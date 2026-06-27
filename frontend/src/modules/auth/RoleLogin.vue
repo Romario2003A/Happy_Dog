@@ -27,7 +27,7 @@ async function submit() {
     const user = await auth.login(email.value, password.value);
     router.push(pathByRole(user.role));
   } catch (e) {
-    error.value = 'Credenciales invalidas o usuario inactivo.';
+    error.value = 'Credenciales inválidas o usuario inactivo.';
   } finally {
     loading.value = false;
   }
@@ -40,9 +40,9 @@ async function submit() {
       <img class="login-logo" :src="happyDogLogo" alt="Happy Dog">
       <span class="badge">Acceso seguro</span>
       <h1>Acceso del personal</h1>
-      <p>Ingresa con tu correo y contrasena. El sistema reconoce tu rol y abre tu panel automaticamente.</p>
+      <p>Ingresa con tu correo y contraseña. El sistema reconoce tu rol y abre tu panel automáticamente.</p>
       <label>Correo<input v-model="email" type="email" required placeholder="usuario@happydog.com"></label>
-      <label>Contrasena<input v-model="password" type="password" required placeholder="********"></label>
+      <label>Contraseña<input v-model="password" type="password" required placeholder="********"></label>
       <p v-if="error" class="error">{{ error }}</p>
       <button :disabled="loading">{{ loading ? 'Ingresando...' : 'Ingresar' }}</button>
     </form>
