@@ -39,6 +39,7 @@ button.small{padding:8px 10px;font-size:13px}
 .public-hero:before{content:"";position:absolute;inset:0;border-top:6px solid rgba(134,214,173,.52);pointer-events:none}
 .public-hero h1{color:var(--ink)}
 .public-hero img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:20px;box-shadow:0 24px 70px rgba(6,60,53,.18);border:1px solid rgba(15,143,125,.12)}
+.public-hero img.hero-doctor-dog{aspect-ratio:1/1;object-position:center;max-height:520px;background:#0d3034}
 .hero-copy{padding:16px}
 .public-brand{width:min(260px,72vw);padding:10px 12px;border-radius:18px;background:rgba(255,255,255,.76);border:1px solid var(--line);box-shadow:0 14px 34px rgba(21,91,102,.08)}
 .public-brand img{display:block;width:100%;height:auto;aspect-ratio:auto;object-fit:contain;border-radius:12px;box-shadow:none;border:0}

@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { api } from '../../services/api';
-import clinicHero from '../../assets/images/clinic-hero.png';
+import doctorDog from '../../assets/images/doctor-dog.webp';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
 
@@ -38,7 +38,7 @@ async function submit(){
           <span>Controles</span>
         </div>
       </div>
-      <img :src="clinicHero" alt="Veterinaria atendiendo mascotas en una clinica moderna">
+      <img class="hero-doctor-dog" :src="doctorDog" alt="Perro con bata de doctor representando atencion veterinaria">
     </header>
     <main class="public-grid">
       <section id="solicitar-cita" class="glass-card appointment-request-card">
