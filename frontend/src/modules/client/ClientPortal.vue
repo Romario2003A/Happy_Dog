@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { api } from '../../services/api';
 import clinicHero from '../../assets/images/clinic-hero.png';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
+import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
 
 const form=ref({fullName:'',phone:'',email:'',petName:'',species:'',breed:'',reason:'',scheduledAt:''});
 const sent=ref(false);
@@ -64,5 +65,14 @@ async function submit(){
         </div>
       </section>
     </main>
+    <section class="location-card glass-card">
+      <div class="section-title">
+        <div>
+          <span class="badge">Ubicacion y contacto</span>
+          <h2>Visitanos o escribenos por WhatsApp</h2>
+        </div>
+      </div>
+      <img :src="happyDogLocation" alt="Mapa y datos de contacto de Happy Dog">
+    </section>
   </div>
 </template>
