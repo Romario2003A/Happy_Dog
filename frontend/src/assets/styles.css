@@ -188,6 +188,8 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .week-event span,.week-event small,.summary-appointment span{color:var(--muted);font-size:12px}
 .upcoming-list{display:grid;gap:12px}
 .upcoming-summary{display:grid;gap:10px}
+.use-cases{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.use-cases span{padding:8px 10px;border-radius:999px;background:rgba(134,214,173,.18);border:1px solid var(--line);color:var(--blue-dark);font-size:12px;font-weight:800}
 .empty-slot{align-self:center;color:rgba(104,118,114,.55);font-weight:700}
 .quick-form{margin-top:16px}
 .metric span{color:var(--muted);font-weight:700}

@@ -201,12 +201,12 @@ async function saveQuickAppointment() {
       scheduledAt: quick.value.scheduledAt,
       reason: quick.value.reason,
     });
-    success.value = 'Registro rapido creado: cliente, mascota y cita fueron guardados.';
+    success.value = 'Cita creada desde recepcion correctamente.';
     resetQuick();
     showQuick.value = false;
     await loadData();
   } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo crear el registro rapido.';
+    error.value = e.response?.data?.message || 'No se pudo agendar desde recepcion.';
   } finally {
     saving.value = false;
   }
@@ -216,7 +216,7 @@ onMounted(loadData);
 </script>
 
 <template>
-  <ReceptionLayout title="Recepcion" subtitle="Agenda, registro rapido y coordinacion diaria">
+  <ReceptionLayout title="Recepcion" subtitle="Agenda, citas por llamada y coordinacion diaria">
     <template #nav>
       <button @click="active='citas'">Citas</button>
       <button @click="active='clientes'">Clientes</button>
@@ -307,12 +307,17 @@ onMounted(loadData);
       <section class="glass-card quick-card">
         <div class="section-title">
           <div>
-            <span class="badge">Operacion</span>
-            <h2>Registro rapido</h2>
+            <span class="badge">Recepcion</span>
+            <h2>Agendar desde recepcion</h2>
           </div>
         </div>
-        <p class="muted-text">Usalo cuando llega un cliente nuevo o llama por WhatsApp para agendar.</p>
-        <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar registro rapido' : '+ Registro rapido' }}</button>
+        <p class="muted-text">Para citas que llegan por llamada, WhatsApp o atencion presencial.</p>
+        <div class="use-cases">
+          <span>Cliente nuevo</span>
+          <span>Cliente existente</span>
+          <span>Sin cuenta web</span>
+        </div>
+        <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar formulario' : '+ Nueva cita por llamada o WhatsApp' }}</button>
 
         <div class="detail-box upcoming-summary">
           <span class="badge">Proximas</span>
@@ -333,8 +338,8 @@ onMounted(loadData);
 
         <form v-if="showQuick" class="stack quick-form" @submit.prevent="saveQuickAppointment">
           <div class="segmented">
-            <button type="button" :class="{active:quickMode==='new'}" @click="quickMode='new'">Cliente nuevo</button>
-            <button type="button" :class="{active:quickMode==='existing'}" @click="quickMode='existing'">Cliente existente</button>
+            <button type="button" :class="{active:quickMode==='new'}" @click="quickMode='new'">Registrar cliente nuevo</button>
+            <button type="button" :class="{active:quickMode==='existing'}" @click="quickMode='existing'">Agendar cliente existente</button>
           </div>
 
           <template v-if="quickMode==='existing'">
@@ -372,7 +377,7 @@ onMounted(loadData);
 
           <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local"></label>
           <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
-          <button :disabled="saving">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Crear cliente, mascota y cita' : 'Crear cita' }}</button>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Guardar cliente, mascota y cita' : 'Guardar nueva cita' }}</button>
         </form>
 
         <div v-if="selectedAppointment" class="detail-box">
