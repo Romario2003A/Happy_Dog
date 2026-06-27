@@ -5,7 +5,7 @@ import doctorDog from '../../assets/images/doctor-dog.webp';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
 
-const form=ref({fullName:'',phone:'',email:'',petName:'',species:'',breed:'',reason:'',scheduledAt:''});
+const form=ref({fullName:'',phone:'',email:'',petName:'',species:'',breed:'',sex:'UNKNOWN',age:'',weightKg:'',reason:'',scheduledAt:''});
 const sent=ref(false);
 const error=ref('');
 
@@ -56,6 +56,13 @@ async function submit(){
           <input v-model="form.petName" required placeholder="Nombre de la mascota">
           <input v-model="form.species" required placeholder="Especie">
           <input v-model="form.breed" placeholder="Raza">
+          <select v-model="form.sex">
+            <option value="UNKNOWN">Sexo no especificado</option>
+            <option value="MALE">Macho</option>
+            <option value="FEMALE">Hembra</option>
+          </select>
+          <input v-model="form.age" placeholder="Edad aproximada">
+          <input v-model.number="form.weightKg" type="number" min="0" step="0.01" placeholder="Peso kg opcional">
           <input v-model="form.scheduledAt" type="datetime-local" required>
           <textarea v-model="form.reason" required placeholder="Cuentanos que le pasa o que servicio necesitas"></textarea>
           <button>Quiero agendar a mi mascota</button>

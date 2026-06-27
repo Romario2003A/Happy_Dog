@@ -64,6 +64,15 @@ function statusLabel(status) {
   return labels[status] || status;
 }
 
+function sexLabel(sex) {
+  const labels = {
+    MALE: 'Macho',
+    FEMALE: 'Hembra',
+    UNKNOWN: 'No especificado',
+  };
+  return labels[sex] || 'No especificado';
+}
+
 function resetForm(appointment) {
   form.value = {
     reason: appointment?.reason || '',
@@ -355,7 +364,7 @@ onMounted(loadData);
         <div v-if="selectedPet" class="patient-grid">
           <div><span>Especie</span><strong>{{ selectedPet?.species || '-' }}</strong></div>
           <div><span>Raza</span><strong>{{ selectedPet?.breed || '-' }}</strong></div>
-          <div><span>Sexo</span><strong>{{ selectedPet?.sex || '-' }}</strong></div>
+          <div><span>Sexo</span><strong>{{ sexLabel(selectedPet?.sex) }}</strong></div>
           <div><span>Edad</span><strong>{{ selectedPet?.age || '-' }}</strong></div>
           <div><span>Peso</span><strong>{{ selectedPet?.weightKg || '-' }} kg</strong></div>
           <div><span>Dueno</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>

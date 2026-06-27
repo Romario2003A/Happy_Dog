@@ -37,6 +37,9 @@ const quick = ref({
   petName: '',
   species: '',
   breed: '',
+  sex: 'UNKNOWN',
+  age: '',
+  weightKg: '',
   scheduledAt: '',
   reason: '',
 });
@@ -162,7 +165,7 @@ async function setStatus(appointment, status) {
 }
 
 function resetQuick() {
-  quick.value = { clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', scheduledAt: '', reason: '' };
+  quick.value = { clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
 }
 
 async function saveQuickAppointment() {
@@ -183,6 +186,9 @@ async function saveQuickAppointment() {
         name: quick.value.petName,
         species: quick.value.species,
         breed: quick.value.breed || undefined,
+        sex: quick.value.sex || 'UNKNOWN',
+        age: quick.value.age || undefined,
+        weightKg: quick.value.weightKg === '' ? undefined : Number(quick.value.weightKg),
         clientId: client.id,
       });
       clientId = client.id;
@@ -353,6 +359,15 @@ onMounted(loadData);
             <label>Mascota<input v-model="quick.petName" required placeholder="Nombre de la mascota"></label>
             <label>Especie<input v-model="quick.species" required placeholder="Perro, gato, conejo"></label>
             <label>Raza<input v-model="quick.breed" placeholder="Raza o cruce"></label>
+            <label>Sexo
+              <select v-model="quick.sex">
+                <option value="UNKNOWN">No especificado</option>
+                <option value="MALE">Macho</option>
+                <option value="FEMALE">Hembra</option>
+              </select>
+            </label>
+            <label>Edad<input v-model="quick.age" placeholder="Ej. 2 anos"></label>
+            <label>Peso kg<input v-model.number="quick.weightKg" type="number" min="0" step="0.01" placeholder="Ej. 8.5"></label>
           </template>
 
           <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local"></label>
