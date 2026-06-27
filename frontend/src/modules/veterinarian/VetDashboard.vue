@@ -181,7 +181,7 @@ onMounted(loadData);
       <section class="glass-card appointment-list">
         <div class="section-title">
           <span class="badge">Agenda</span>
-          <h2>Citas pendientes</h2>
+          <h2>{{ petSearch ? 'Resultados de pacientes' : 'Citas pendientes' }}</h2>
         </div>
         <input v-model="petSearch" class="search-field" placeholder="Buscar paciente o dueno">
         <div v-if="petSearch" class="patient-search-results">
@@ -190,10 +190,12 @@ onMounted(loadData);
             <span>{{ pet.client?.fullName || 'Sin dueno' }}</span>
             <small>{{ pet.species }} {{ pet.breed ? '- ' + pet.breed : '' }}</small>
           </button>
+          <p v-if="!filteredPets.length" class="empty">No se encontraron pacientes con esa busqueda.</p>
         </div>
         <p v-if="loading" class="muted-text">Cargando citas...</p>
-        <p v-else-if="!visibleAppointments.length" class="empty">No hay citas pendientes para atender.</p>
+        <p v-else-if="!petSearch && !visibleAppointments.length" class="empty">No hay citas pendientes para atender. Puedes buscar un paciente para revisar su historial.</p>
         <button
+          v-if="!petSearch"
           v-for="appointment in visibleAppointments"
           :key="appointment.id"
           class="appointment-item"
@@ -209,7 +211,7 @@ onMounted(loadData);
       <section class="glass-card patient-card">
         <div class="section-title">
           <span class="badge">Paciente</span>
-          <h2>{{ selectedPet?.name || 'Selecciona una cita' }}</h2>
+          <h2>{{ selectedPet?.name || 'Selecciona una cita o busca un paciente' }}</h2>
         </div>
         <div v-if="selectedPet" class="patient-grid">
           <div><span>Especie</span><strong>{{ selectedPet?.species || '-' }}</strong></div>
@@ -262,7 +264,7 @@ onMounted(loadData);
           <span class="badge">Historial</span>
           <h2>Consultas anteriores</h2>
         </div>
-        <p v-if="!selected" class="empty">Selecciona una cita para ver el historial.</p>
+        <p v-if="!selectedPet" class="empty">Selecciona una cita o busca un paciente para ver el historial.</p>
         <p v-else-if="!history.length" class="empty">Esta mascota aun no tiene historial clinico.</p>
         <article v-for="record in history" :key="record.id" class="history-item">
           <div>
