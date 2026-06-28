@@ -94,6 +94,14 @@ export class PetsService {
     return (this.prisma as any).pet.update({ where: { id }, data: dto as any });
   }
 
+  updatePhoto(id: string, photoUrl: string) {
+    return (this.prisma as any).pet.update({
+      where: { id },
+      data: { photoUrl },
+      include: { client: true },
+    });
+  }
+
   remove(id: string) {
     return (this.prisma as any).pet.delete({ where: { id } });
   }

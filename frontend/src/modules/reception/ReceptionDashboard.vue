@@ -226,6 +226,36 @@ async function generatePetIdCard(petId) {
   }
 }
 
+async function uploadPetPhoto(petId, event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  error.value = '';
+  success.value = '';
+
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    error.value = 'Sube una foto en formato JPG, PNG o WebP.';
+    return;
+  }
+
+  if (file.size > 4 * 1024 * 1024) {
+    error.value = 'La foto no debe pesar mas de 4 MB.';
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('photo', file);
+    await api.post(`/pets/${petId}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    success.value = 'Foto de mascota actualizada. El carnet usara esta imagen.';
+    await loadData();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo subir la foto de la mascota.';
+  }
+}
+
 function resetQuick() {
   quick.value = { clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
   duplicateOverride.value = false;
@@ -512,9 +542,15 @@ onMounted(loadData);
               <td>{{ client.phone || client.email || '-' }}</td>
               <td>
                 <div v-if="client.pets?.length" class="pet-actions">
-                  <button v-for="pet in client.pets" :key="pet.id" class="small secondary" @click="generatePetIdCard(pet.id)">
-                    {{ pet.name }} · Carnet
-                  </button>
+                  <div v-for="pet in client.pets" :key="pet.id" class="pet-action-group">
+                    <button class="small secondary" @click="generatePetIdCard(pet.id)">
+                      {{ pet.name }} - Carnet
+                    </button>
+                    <label class="small secondary file-button">
+                      Foto
+                      <input type="file" accept="image/jpeg,image/png,image/webp" @change="uploadPetPhoto(pet.id, $event)">
+                    </label>
+                  </div>
                 </div>
                 <span v-else>-</span>
               </td>
