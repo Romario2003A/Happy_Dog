@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 import { PrismaService } from '../../database/prisma.service';
 import { CreatePetDto } from './dto/create-pet.dto';
 
