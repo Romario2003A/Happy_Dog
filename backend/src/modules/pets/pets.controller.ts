@@ -18,11 +18,6 @@ export class PetsController {
     return this.service.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
-  }
-
   @Get(':id/id-card')
   async idCard(@Param('id') id: string, @Res() res: Response) {
     const pdf = await this.service.generateIdCard(id);
@@ -30,6 +25,11 @@ export class PetsController {
     res.setHeader('Content-Disposition', `inline; filename="carnet-mascota-${id}.pdf"`);
     res.setHeader('Content-Length', pdf.length);
     res.end(pdf);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
   }
 
   @Post()
