@@ -231,6 +231,24 @@ export class PetsService {
     doc.restore();
   }
 
+  private drawFadedPhoto(doc: PDFKit.PDFDocument, pet: PetWithClient, photo: Buffer | null, x: number, y: number, size: number) {
+    doc.save();
+    doc.roundedRect(x, y, size, size, this.mm(1.4)).fill('#F4E7C8').stroke('#9AA89F');
+    doc.opacity(0.58);
+    if (photo) {
+      try {
+        doc.image(photo, x + 1.2, y + 1.2, { width: size - 2.4, height: size - 2.4, fit: [size - 2.4, size - 2.4], align: 'center', valign: 'center' });
+      } catch {
+        this.drawPhotoPlaceholder(doc, pet, x, y, size);
+      }
+    } else {
+      this.drawPhotoPlaceholder(doc, pet, x, y, size);
+    }
+    doc.opacity(0.34).roundedRect(x + 1.2, y + 1.2, size - 2.4, size - 2.4, this.mm(1)).fill('#F3E4C2');
+    doc.opacity(1);
+    doc.restore();
+  }
+
   private drawPhotoPlaceholder(doc: PDFKit.PDFDocument, pet: PetWithClient, x: number, y: number, size: number) {
     doc.roundedRect(x + 2, y + 2, size - 4, size - 4, this.mm(1.5)).fill('#EAF6F1');
     doc.font('Helvetica-Bold').fontSize(22).fillColor('#155B66').text((pet.name || 'M').slice(0, 1).toUpperCase(), x, y + size / 2 - 12, { width: size, align: 'center' });
@@ -330,7 +348,7 @@ export class PetsService {
     doc.font('Helvetica').fontSize(4.4).text('Fecha de Caducidad', this.mm(65.5), this.mm(29.7), { width: this.mm(14) });
     doc.font('Helvetica-Bold').fontSize(5).text('NO CADUCA', this.mm(65.5), this.mm(33.1), { width: this.mm(14), align: 'center' });
 
-    this.drawPhoto(doc, pet, photo, this.mm(68), this.mm(37), this.mm(8));
+    this.drawFadedPhoto(doc, pet, photo, this.mm(68), this.mm(37), this.mm(8));
 
     doc.font('Courier-Bold').fontSize(5.15).fillColor('#1A1A1A').text(`I<PER${petCode.replace(/[^A-Z0-9]/g, '').padEnd(14, '0')}2<<<<<<<<<<<<<<<<<<<<`, this.mm(7), this.mm(43.1), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.25 });
     doc.font('Courier-Bold').fontSize(5.15).text(`${petCode.replace('MAS', '').padEnd(16, '0')}PER<<<<<<<<<<<<<<<<<<<<0`, this.mm(7), this.mm(46.5), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.25 });
