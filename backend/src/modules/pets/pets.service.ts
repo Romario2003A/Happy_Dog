@@ -147,13 +147,54 @@ export class PetsService {
 
   private drawCardBase(doc: PDFKit.PDFDocument) {
     doc.save();
-    doc.rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#F3E4C2');
-    doc.opacity(0.1).rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#FFFFFF');
-    doc.opacity(0.18).circle(this.mm(75), this.mm(8), this.mm(14)).fill('#86D6AD');
-    doc.opacity(0.11).circle(this.mm(8), this.mm(46), this.mm(19)).fill('#155B66');
+    doc.rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#F1E3BD');
+    doc.opacity(0.16).rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#FFFFFF');
+    doc.opacity(0.16).circle(this.mm(75), this.mm(8), this.mm(14)).fill('#86D6AD');
+    doc.opacity(0.1).circle(this.mm(8), this.mm(46), this.mm(19)).fill('#155B66');
     doc.opacity(0.08).circle(this.mm(48), this.mm(52), this.mm(22)).fill('#155B66');
     doc.opacity(1);
+    this.drawSecurityTexture(doc);
+    this.drawWatermarkSeal(doc);
+    doc.opacity(1);
     doc.roundedRect(this.mm(2), this.mm(2), this.mm(81.6), this.mm(50), this.mm(3)).lineWidth(0.9).stroke('#155B66');
+    doc.restore();
+  }
+
+  private drawSecurityTexture(doc: PDFKit.PDFDocument) {
+    doc.save();
+    doc.lineWidth(0.18).opacity(0.2).strokeColor('#73BFA3');
+    for (let row = 0; row < 15; row += 1) {
+      const y = this.mm(7 + row * 3);
+      doc.moveTo(0, y);
+      for (let col = 0; col <= 86; col += 2) {
+        const x = this.mm(col);
+        const wave = Math.sin((col + row * 3) / 4) * this.mm(0.9);
+        doc.lineTo(x, y + wave);
+      }
+      doc.stroke();
+    }
+
+    doc.lineWidth(0.12).opacity(0.16).strokeColor('#155B66');
+    for (let col = -15; col < 95; col += 5) {
+      doc.moveTo(this.mm(col), 0).lineTo(this.mm(col + 38), CARD_HEIGHT).stroke();
+    }
+
+    doc.opacity(0.12).fillColor('#155B66');
+    for (let index = 0; index < 70; index += 1) {
+      const x = this.mm((index * 17) % 86);
+      const y = this.mm((index * 29) % 54);
+      doc.circle(x, y, 0.28).fill();
+    }
+    doc.restore();
+  }
+
+  private drawWatermarkSeal(doc: PDFKit.PDFDocument) {
+    const cx = this.mm(47);
+    const cy = this.mm(29);
+    doc.save();
+    doc.opacity(0.08).lineWidth(0.8).strokeColor('#155B66').circle(cx, cy, this.mm(13)).stroke();
+    doc.opacity(0.08).lineWidth(0.45).circle(cx, cy, this.mm(9)).stroke();
+    doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#155B66').opacity(0.07).text('HAPPY DOG', cx - this.mm(17), cy - this.mm(2.5), { width: this.mm(34), align: 'center' });
     doc.restore();
   }
 
@@ -197,12 +238,15 @@ export class PetsService {
   }
 
   private label(doc: PDFKit.PDFDocument, label: string, value: string, x: number, y: number, width: number) {
-    doc.font('Helvetica').fontSize(4.2).fillColor('#374B47').text(label, x, y, { width });
-    doc.font('Helvetica-Bold').fontSize(6.8).fillColor('#111B19').text(value || '-', x, y + 4.8, { width, ellipsis: true });
+    doc.font('Helvetica').fontSize(3.9).fillColor('#39524D').text(label, x, y, { width });
+    doc.font('Helvetica-Bold').fontSize(6.1).fillColor('#111B19').text(value || '-', x, y + 4.3, { width, ellipsis: true });
   }
 
   private drawFieldBox(doc: PDFKit.PDFDocument, label: string, value: string, x: number, y: number, width: number, height = this.mm(9)) {
-    doc.roundedRect(x, y, width, height, this.mm(1)).lineWidth(0.45).stroke('#45645E');
+    doc.save();
+    doc.opacity(0.28).roundedRect(x, y, width, height, this.mm(0.9)).fill('#F9F1D9');
+    doc.opacity(0.75).roundedRect(x, y, width, height, this.mm(0.9)).lineWidth(0.32).stroke('#45645E');
+    doc.restore();
     this.label(doc, label, value, x + this.mm(1.2), y + this.mm(1.2), width - this.mm(2.4));
   }
 
