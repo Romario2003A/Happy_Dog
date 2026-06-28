@@ -17,6 +17,7 @@ const search = ref('');
 const quickMode = ref('new');
 const agendaView = ref('day');
 const selectedAppointment = ref(null);
+const duplicateOverride = ref(false);
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
 
 function dateKey(value = new Date()) {
@@ -93,6 +94,46 @@ const filteredClients = computed(() => clients.value.filter(client => {
 
 const selectedClientPets = computed(() => clients.value.find(client => client.id === quick.value.clientId)?.pets || []);
 
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function sameDay(a, b) {
+  if (!a || !b) return false;
+  return dateKey(a) === dateKey(b);
+}
+
+const possibleDuplicateAppointments = computed(() => {
+  if (!quick.value.scheduledAt) return [];
+
+  const phone = onlyDigits(quick.value.phone);
+  const email = normalizeText(quick.value.email);
+  const fullName = normalizeText(quick.value.fullName);
+  const petName = normalizeText(quick.value.petName);
+
+  return appointments.value.filter(item => {
+    if (['ATTENDED', 'CANCELLED'].includes(item.status)) return false;
+    if (!sameDay(item.scheduledAt, quick.value.scheduledAt)) return false;
+
+    if (quickMode.value === 'existing') {
+      return item.clientId === quick.value.clientId || item.petId === quick.value.petId;
+    }
+
+    const itemPhone = onlyDigits(item.client?.phone);
+    const itemEmail = normalizeText(item.client?.email);
+    const itemClientName = normalizeText(item.client?.fullName);
+    const itemPetName = normalizeText(item.pet?.name);
+
+    const sameContact = (phone && itemPhone && phone === itemPhone) || (email && itemEmail && email === itemEmail);
+    const sameNames = fullName && petName && itemClientName === fullName && itemPetName === petName;
+    return sameContact || sameNames;
+  }).slice(0, 3);
+});
+
 function formatTime(value) {
   if (!value) return '';
   return new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
@@ -166,6 +207,20 @@ async function setStatus(appointment, status) {
 
 function resetQuick() {
   quick.value = { clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
+  duplicateOverride.value = false;
+}
+
+function useExistingAppointment(appointment) {
+  selectedAppointment.value = appointment;
+  selectedDate.value = dateKey(appointment.scheduledAt);
+  agendaView.value = 'day';
+  showQuick.value = false;
+  success.value = 'Se abrió la cita existente para evitar duplicarla.';
+}
+
+async function saveIgnoringDuplicate() {
+  duplicateOverride.value = true;
+  await saveQuickAppointment();
 }
 
 async function saveQuickAppointment() {
@@ -173,6 +228,12 @@ async function saveQuickAppointment() {
   error.value = '';
   success.value = '';
   try {
+    if (!duplicateOverride.value && possibleDuplicateAppointments.value.length) {
+      selectedAppointment.value = possibleDuplicateAppointments.value[0];
+      error.value = 'Ya existe una cita parecida para ese cliente o mascota en la misma fecha. Revisa la cita existente o crea la nueva solo si realmente corresponde.';
+      return;
+    }
+
     let clientId = quick.value.clientId;
     let petId = quick.value.petId;
 
@@ -209,6 +270,7 @@ async function saveQuickAppointment() {
     error.value = e.response?.data?.message || 'No se pudo agendar desde recepción.';
   } finally {
     saving.value = false;
+    duplicateOverride.value = false;
   }
 }
 
@@ -377,6 +439,21 @@ onMounted(loadData);
 
           <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local"></label>
           <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
+          <div v-if="possibleDuplicateAppointments.length" class="duplicate-alert">
+            <strong>Posible cita duplicada</strong>
+            <span>Ya hay una cita activa parecida en esa fecha. Revisa antes de crear otra.</span>
+            <button
+              v-for="item in possibleDuplicateAppointments"
+              :key="item.id"
+              class="summary-appointment"
+              type="button"
+              @click="useExistingAppointment(item)"
+            >
+              <strong>{{ formatDate(item.scheduledAt) }} · {{ formatTime(item.scheduledAt) }}</strong>
+              <span>{{ item.pet?.name || 'Mascota' }} - {{ item.client?.fullName || 'Cliente' }} - {{ statusLabel(item.status) }}</span>
+            </button>
+            <button class="small secondary" type="button" :disabled="saving" @click="saveIgnoringDuplicate">Crear de todos modos</button>
+          </div>
           <button :disabled="saving">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Guardar cliente, mascota y cita' : 'Guardar nueva cita' }}</button>
         </form>
 

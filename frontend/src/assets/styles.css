@@ -193,6 +193,9 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .week-event span,.week-event small,.summary-appointment span{color:var(--muted);font-size:12px}
 .upcoming-list{display:grid;gap:12px}
 .upcoming-summary{display:grid;gap:10px}
+.duplicate-alert{display:grid;gap:10px;padding:14px;border-radius:18px;background:rgba(245,200,106,.18);border:1px solid rgba(184,135,70,.28);color:var(--ink)}
+.duplicate-alert>strong{color:#7c4a03}
+.duplicate-alert>span{color:var(--muted);line-height:1.4}
 .use-cases{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .use-cases span{padding:8px 10px;border-radius:999px;background:rgba(134,214,173,.18);border:1px solid var(--line);color:var(--blue-dark);font-size:12px;font-weight:800}
 .empty-slot{align-self:center;color:rgba(104,118,114,.55);font-weight:700}
