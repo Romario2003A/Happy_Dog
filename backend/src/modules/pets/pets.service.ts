@@ -277,34 +277,64 @@ export class PetsService {
     doc.restore();
   }
 
+  private drawVerticalBars(doc: PDFKit.PDFDocument, value: string, x: number, y: number, width: number, height: number) {
+    let seed = Array.from(value).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const bars = 26;
+    const step = width / bars;
+
+    doc.save().fillColor('#111111');
+    for (let index = 0; index < bars; index += 1) {
+      seed = (seed * 1664525 + 1013904223 + index) & 0x7fffffff;
+      const barWidth = step * (seed % 4 === 0 ? 1.6 : seed % 3 === 0 ? 1.15 : 0.65);
+      if (seed % 5 !== 0) doc.rect(x + index * step, y, barWidth, height).fill();
+    }
+    doc.font('Helvetica-Bold').fontSize(3.8).fillColor('#1F2A2D').text(value, x - this.mm(5), y + height + this.mm(0.8), { width: width + this.mm(10), height: this.mm(2.5), align: 'center' });
+    doc.restore();
+  }
+
   private drawFront(doc: PDFKit.PDFDocument, pet: PetWithClient, photo: Buffer | null) {
     this.drawCardBase(doc);
-    doc.rect(0, 0, CARD_WIDTH, this.mm(9.2)).fill('#155B66');
-    doc.rect(this.mm(70), 0, this.mm(15.6), this.mm(54)).fill('#DDEFE5');
-    doc.opacity(0.28).rect(this.mm(70), 0, this.mm(15.6), this.mm(54)).fill('#F1E3BD');
-    doc.opacity(1).rect(this.mm(70), 0, this.mm(1.1), this.mm(54)).fill('#86D6AD');
-    doc.font('Helvetica-Bold').fontSize(5.6).fillColor('#155B66').rotate(90, { origin: [this.mm(75.8), this.mm(8)] }).text('DOCUMENTO NACIONAL DE IDENTIDAD MASCOTA', this.mm(75.8), this.mm(8), { width: this.mm(42), align: 'center' });
-    doc.rotate(-90, { origin: [this.mm(75.8), this.mm(8)] });
+    const issueDate = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
+    const petCode = this.petCode(pet);
+    const sex = pet.sex === 'FEMALE' ? 'H' : pet.sex === 'MALE' ? 'M' : '-';
 
-    doc.font('Helvetica-Bold').fontSize(6.8).fillColor('#FFFFFF').text('REPUBLICA DEL PERU', this.mm(4), this.mm(1.9), { width: this.mm(34) });
-    doc.font('Helvetica-Bold').fontSize(5.6).fillColor('#D6FFF0').text('REGISTRO NACIONAL DE MASCOTAS', this.mm(4), this.mm(5.2), { width: this.mm(47) });
-    doc.font('Helvetica-Bold').fontSize(6).fillColor('#86D6AD').text(this.shortCode(pet), this.mm(52), this.mm(3.1), { width: this.mm(16), align: 'right' });
+    doc.roundedRect(this.mm(4), this.mm(3), this.mm(77.6), this.mm(8), this.mm(2)).fill('#F7FAF8');
+    doc.font('Helvetica-Bold').fontSize(8.4).fillColor('#1F2A2D').text('REPUBLICA DEL PERU', this.mm(6), this.mm(5.4), { width: this.mm(27) });
+    doc.font('Helvetica-Bold').fontSize(4.8).fillColor('#1F2A2D').text('REGISTRO NACIONAL DE IDENTIFICACION', this.mm(36), this.mm(4.7), { width: this.mm(28), align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(4.8).fillColor('#1F2A2D').text('DOCUMENTO NACIONAL DE IDENTIDAD', this.mm(36), this.mm(7.1), { width: this.mm(28), align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(5.4).fillColor('#1F2A2D').text('DNI', this.mm(66.5), this.mm(5.2));
+    doc.font('Helvetica-Bold').fontSize(5.4).fillColor('#CF6677').text(petCode.replace('MAS', '').slice(0, 8), this.mm(72), this.mm(5.2), { width: this.mm(9), align: 'right' });
 
-    this.drawPhoto(doc, pet, photo, this.mm(5), this.mm(13), this.mm(22));
-    doc.font('Helvetica-Bold').fontSize(3.8).fillColor('#155B66').text('FOTO', this.mm(5), this.mm(36.6), { width: this.mm(22), align: 'center' });
-    this.drawMiniBrand(doc, this.mm(5), this.mm(42));
+    this.drawPhoto(doc, pet, photo, this.mm(9), this.mm(14), this.mm(22));
 
-    doc.font('Helvetica-Bold').fontSize(4.6).fillColor('#155B66').text('N. DOCUMENTO', this.mm(30), this.mm(12.5), { width: this.mm(20) });
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#111B19').text(this.petCode(pet), this.mm(30), this.mm(16), { width: this.mm(37), ellipsis: true });
+    doc.save().opacity(0.18);
+    this.drawBrand(doc, this.mm(37), this.mm(24), true);
+    doc.restore();
 
-    this.drawFieldBox(doc, 'Primer nombre', pet.name, this.mm(30), this.mm(26), this.mm(18));
-    this.drawFieldBox(doc, 'Especie', pet.species, this.mm(50), this.mm(26), this.mm(17));
-    this.drawFieldBox(doc, 'Raza', pet.breed || 'No especificada', this.mm(30), this.mm(37), this.mm(18));
-    this.drawFieldBox(doc, 'Sexo', this.sexLabel(pet.sex), this.mm(50), this.mm(37), this.mm(17));
+    const ownerParts = (pet.client?.fullName || 'SIN DUENIO').toUpperCase().split(' ');
+    const firstSurname = ownerParts[0] || 'HAPPY';
+    const secondSurname = ownerParts[1] || 'DOG';
+    this.label(doc, 'Primer Apellido', firstSurname, this.mm(34), this.mm(14), this.mm(23));
+    this.label(doc, 'Segundo Apellido', secondSurname, this.mm(34), this.mm(23), this.mm(23));
+    this.label(doc, 'Nombre', pet.name.toUpperCase(), this.mm(34), this.mm(32), this.mm(23));
+    this.label(doc, 'SEXO', sex, this.mm(34), this.mm(41), this.mm(9));
+    this.label(doc, 'ESPECIE', pet.species.toUpperCase(), this.mm(47), this.mm(41), this.mm(17));
 
-    doc.font('Helvetica').fontSize(3.9).fillColor('#374B47').text('Duenio / responsable', this.mm(5), this.mm(50), { width: this.mm(20) });
-    doc.font('Helvetica-Bold').fontSize(4.8).fillColor('#111B19').text(pet.client?.fullName || 'Sin duenio', this.mm(28), this.mm(49.7), { width: this.mm(40), ellipsis: true });
-    this.drawMicroText(doc, 'HAPPYDOG VETERINARIA IDENTIDAD MASCOTA', this.mm(4), this.mm(10), this.mm(64));
+    doc.rect(this.mm(65), this.mm(14), this.mm(15), this.mm(7.5)).lineWidth(0.55).stroke('#1F2A2D');
+    doc.rect(this.mm(65), this.mm(21.5), this.mm(15), this.mm(7.5)).stroke('#1F2A2D');
+    doc.rect(this.mm(65), this.mm(29), this.mm(15), this.mm(7.5)).stroke('#1F2A2D');
+    doc.font('Helvetica').fontSize(4.4).fillColor('#1F2A2D').text('Fecha de Inscripcion', this.mm(65.5), this.mm(14.8), { width: this.mm(14) });
+    doc.font('Helvetica-Bold').fontSize(5).text(issueDate, this.mm(65.5), this.mm(18.2), { width: this.mm(14), align: 'center' });
+    doc.font('Helvetica').fontSize(4.4).text('Fecha de Emision', this.mm(65.5), this.mm(22.2), { width: this.mm(14) });
+    doc.font('Helvetica-Bold').fontSize(5).text(issueDate, this.mm(65.5), this.mm(25.6), { width: this.mm(14), align: 'center' });
+    doc.font('Helvetica').fontSize(4.4).text('Fecha de Caducidad', this.mm(65.5), this.mm(29.7), { width: this.mm(14) });
+    doc.font('Helvetica-Bold').fontSize(5).text('NO CADUCA', this.mm(65.5), this.mm(33.1), { width: this.mm(14), align: 'center' });
+
+    this.drawPhoto(doc, pet, photo, this.mm(68), this.mm(39), this.mm(9));
+
+    doc.font('Courier-Bold').fontSize(5.3).fillColor('#1A1A1A').text(`I<PER${petCode.replace(/[^A-Z0-9]/g, '').padEnd(14, '0')}2<<<<<<<<<<<<<<<<<<<<`, this.mm(7), this.mm(39.8), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.3 });
+    doc.font('Courier-Bold').fontSize(5.3).text(`${petCode.replace('MAS', '').padEnd(16, '0')}PER<<<<<<<<<<<<<<<<<<<<0`, this.mm(7), this.mm(43.7), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.3 });
+    doc.font('Courier-Bold').fontSize(5.3).text(`<<<<<<<<<<<<HAPPYDOG<<<<VETERINARIA<<<<`, this.mm(7), this.mm(47.4), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.3 });
     return;
 
     this.drawCardBase(doc);
@@ -325,27 +355,24 @@ export class PetsService {
 
   private drawBack(doc: PDFKit.PDFDocument, pet: PetWithClient) {
     this.drawCardBase(doc);
-    doc.rect(0, 0, this.mm(9), CARD_HEIGHT).fill('#155B66');
-    doc.font('Helvetica-Bold').fontSize(5.4).fillColor('#FFFFFF').rotate(-90, { origin: [this.mm(4.1), this.mm(49)] }).text('HAPPYDOG<<<<VETERINARIA<<<<MASCOTA', this.mm(4.1), this.mm(49), { width: this.mm(45), align: 'center' });
-    doc.rotate(90, { origin: [this.mm(4.1), this.mm(49)] });
-    this.drawMiniBrand(doc, this.mm(12), this.mm(4));
-
-    doc.font('Helvetica-Bold').fontSize(6.4).fillColor('#155B66').text('CARNET HAPPY DOG', this.mm(34), this.mm(4), { width: this.mm(46), align: 'right' });
-    doc.font('Helvetica').fontSize(4.2).fillColor('#374B47').text('Datos de contacto y validacion', this.mm(34), this.mm(8), { width: this.mm(46), align: 'right' });
-
-    this.drawFieldBox(doc, 'Contacto del duenio', pet.client?.phone || pet.client?.email || 'No registrado', this.mm(12), this.mm(15), this.mm(29));
-    this.drawFieldBox(doc, 'Color', pet.color || 'No registrado', this.mm(43), this.mm(15), this.mm(17));
-    this.drawFieldBox(doc, 'Edad', pet.age || 'No registrada', this.mm(62), this.mm(15), this.mm(17));
-    this.drawFieldBox(doc, 'Peso', pet.weightKg ? `${pet.weightKg} kg` : 'No registrado', this.mm(12), this.mm(26), this.mm(17));
-    this.drawFieldBox(doc, 'Esterilizado', pet.sterilized ? 'Si' : 'No', this.mm(31), this.mm(26), this.mm(17));
-    this.drawFieldBox(doc, 'Emision', new Intl.DateTimeFormat('es-PE').format(new Date()), this.mm(50), this.mm(26), this.mm(29));
-
     const realisticCode = this.petCode(pet);
-    doc.font('Helvetica-Bold').fontSize(4.8).fillColor('#155B66').text('CODIGO DE IDENTIFICACION', this.mm(12), this.mm(37.5), { width: this.mm(67) });
-    this.drawPdf417Like(doc, realisticCode, this.mm(12), this.mm(41), this.mm(38), this.mm(9));
-    this.drawCode39(doc, realisticCode, this.mm(52), this.mm(41), this.mm(27), this.mm(7.8));
-    doc.font('Helvetica-Bold').fontSize(4.6).fillColor('#111B19').text(realisticCode, this.mm(12), this.mm(50.2), { width: this.mm(67), align: 'center' });
-    this.drawMicroText(doc, 'HAPPY DOG CAYMA IDENTIDAD VETERINARIA', this.mm(12), this.mm(12), this.mm(66));
+
+    doc.rect(this.mm(5), this.mm(4), this.mm(49), this.mm(14)).lineWidth(0.55).stroke('#1F2A2D');
+    for (let i = 1; i < 4; i += 1) doc.moveTo(this.mm(5 + i * 12.25), this.mm(4)).lineTo(this.mm(5 + i * 12.25), this.mm(18)).stroke();
+    doc.moveTo(this.mm(5), this.mm(11)).lineTo(this.mm(54), this.mm(11)).stroke();
+
+    doc.save().opacity(0.35);
+    this.drawBrand(doc, this.mm(63), this.mm(5), true);
+    doc.restore();
+
+    this.label(doc, 'Departamento', 'AREQUIPA', this.mm(5), this.mm(19.5), this.mm(20));
+    this.label(doc, 'Provincia', 'AREQUIPA', this.mm(28), this.mm(19.5), this.mm(20));
+    this.label(doc, 'Distrito', 'CAYMA', this.mm(51), this.mm(19.5), this.mm(20));
+    this.label(doc, 'Direccion', pet.client?.address || 'AV. AREQUIPA 113 FC. BOLOGNESI CAYMA', this.mm(5), this.mm(29), this.mm(68));
+    this.label(doc, 'Observaciones', pet.color || pet.breed || 'Sin observaciones', this.mm(5), this.mm(36), this.mm(45));
+
+    this.drawPdf417Like(doc, realisticCode, this.mm(5), this.mm(39.8), this.mm(58), this.mm(10));
+    this.drawVerticalBars(doc, realisticCode, this.mm(70), this.mm(29), this.mm(8), this.mm(18));
     return;
 
     this.drawCardBase(doc);
