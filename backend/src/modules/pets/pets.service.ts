@@ -280,8 +280,9 @@ export class PetsService {
   private drawFront(doc: PDFKit.PDFDocument, pet: PetWithClient, photo: Buffer | null) {
     this.drawCardBase(doc);
     doc.rect(0, 0, CARD_WIDTH, this.mm(9.2)).fill('#155B66');
-    doc.rect(this.mm(70), 0, this.mm(15.6), this.mm(54)).fill('#F8FAF7');
-    doc.rect(this.mm(70), 0, this.mm(1.1), this.mm(54)).fill('#86D6AD');
+    doc.rect(this.mm(70), 0, this.mm(15.6), this.mm(54)).fill('#DDEFE5');
+    doc.opacity(0.28).rect(this.mm(70), 0, this.mm(15.6), this.mm(54)).fill('#F1E3BD');
+    doc.opacity(1).rect(this.mm(70), 0, this.mm(1.1), this.mm(54)).fill('#86D6AD');
     doc.font('Helvetica-Bold').fontSize(5.6).fillColor('#155B66').rotate(90, { origin: [this.mm(75.8), this.mm(8)] }).text('DOCUMENTO NACIONAL DE IDENTIDAD MASCOTA', this.mm(75.8), this.mm(8), { width: this.mm(42), align: 'center' });
     doc.rotate(-90, { origin: [this.mm(75.8), this.mm(8)] });
 
