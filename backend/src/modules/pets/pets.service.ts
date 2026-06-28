@@ -299,11 +299,11 @@ export class PetsService {
     const sex = pet.sex === 'FEMALE' ? 'H' : pet.sex === 'MALE' ? 'M' : '-';
 
     doc.roundedRect(this.mm(4), this.mm(3), this.mm(77.6), this.mm(8), this.mm(2)).fill('#F7FAF8');
-    doc.font('Helvetica-Bold').fontSize(8.4).fillColor('#1F2A2D').text('REPUBLICA DEL PERU', this.mm(6), this.mm(5.4), { width: this.mm(27) });
-    doc.font('Helvetica-Bold').fontSize(4.8).fillColor('#1F2A2D').text('REGISTRO NACIONAL DE IDENTIFICACION', this.mm(36), this.mm(4.7), { width: this.mm(28), align: 'center' });
-    doc.font('Helvetica-Bold').fontSize(4.8).fillColor('#1F2A2D').text('DOCUMENTO NACIONAL DE IDENTIDAD', this.mm(36), this.mm(7.1), { width: this.mm(28), align: 'center' });
-    doc.font('Helvetica-Bold').fontSize(5.4).fillColor('#1F2A2D').text('DNI', this.mm(66.5), this.mm(5.2));
-    doc.font('Helvetica-Bold').fontSize(5.4).fillColor('#CF6677').text(petCode.replace('MAS', '').slice(0, 8), this.mm(72), this.mm(5.2), { width: this.mm(9), align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(6.9).fillColor('#1F2A2D').text('REPUBLICA DEL PERU', this.mm(6), this.mm(5.7), { width: this.mm(30), height: this.mm(3), ellipsis: true });
+    doc.font('Helvetica-Bold').fontSize(3.9).fillColor('#1F2A2D').text('REGISTRO NACIONAL DE IDENTIFICACION', this.mm(37), this.mm(4.8), { width: this.mm(25), height: this.mm(2.4), align: 'center', ellipsis: true });
+    doc.font('Helvetica-Bold').fontSize(3.9).fillColor('#1F2A2D').text('DOCUMENTO NACIONAL DE IDENTIDAD', this.mm(37), this.mm(7.4), { width: this.mm(25), height: this.mm(2.4), align: 'center', ellipsis: true });
+    doc.font('Helvetica-Bold').fontSize(5).fillColor('#1F2A2D').text('DNI', this.mm(65.5), this.mm(5.4), { width: this.mm(6), height: this.mm(3) });
+    doc.font('Helvetica-Bold').fontSize(4.7).fillColor('#CF6677').text(petCode.replace('MAS', '').slice(0, 8), this.mm(71), this.mm(5.4), { width: this.mm(9.5), height: this.mm(3), align: 'right' });
 
     this.drawPhoto(doc, pet, photo, this.mm(9), this.mm(14), this.mm(22));
 
@@ -317,8 +317,8 @@ export class PetsService {
     this.label(doc, 'Primer Apellido', firstSurname, this.mm(34), this.mm(14), this.mm(23));
     this.label(doc, 'Segundo Apellido', secondSurname, this.mm(34), this.mm(23), this.mm(23));
     this.label(doc, 'Nombre', pet.name.toUpperCase(), this.mm(34), this.mm(32), this.mm(23));
-    this.label(doc, 'SEXO', sex, this.mm(34), this.mm(41), this.mm(9));
-    this.label(doc, 'ESPECIE', pet.species.toUpperCase(), this.mm(47), this.mm(41), this.mm(17));
+    this.label(doc, 'SEXO', sex, this.mm(34), this.mm(38), this.mm(9));
+    this.label(doc, 'ESPECIE', pet.species.toUpperCase(), this.mm(47), this.mm(38), this.mm(17));
 
     doc.rect(this.mm(65), this.mm(14), this.mm(15), this.mm(7.5)).lineWidth(0.55).stroke('#1F2A2D');
     doc.rect(this.mm(65), this.mm(21.5), this.mm(15), this.mm(7.5)).stroke('#1F2A2D');
@@ -330,11 +330,11 @@ export class PetsService {
     doc.font('Helvetica').fontSize(4.4).text('Fecha de Caducidad', this.mm(65.5), this.mm(29.7), { width: this.mm(14) });
     doc.font('Helvetica-Bold').fontSize(5).text('NO CADUCA', this.mm(65.5), this.mm(33.1), { width: this.mm(14), align: 'center' });
 
-    this.drawPhoto(doc, pet, photo, this.mm(68), this.mm(39), this.mm(9));
+    this.drawPhoto(doc, pet, photo, this.mm(68), this.mm(37), this.mm(8));
 
-    doc.font('Courier-Bold').fontSize(5.3).fillColor('#1A1A1A').text(`I<PER${petCode.replace(/[^A-Z0-9]/g, '').padEnd(14, '0')}2<<<<<<<<<<<<<<<<<<<<`, this.mm(7), this.mm(39.8), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.3 });
-    doc.font('Courier-Bold').fontSize(5.3).text(`${petCode.replace('MAS', '').padEnd(16, '0')}PER<<<<<<<<<<<<<<<<<<<<0`, this.mm(7), this.mm(43.7), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.3 });
-    doc.font('Courier-Bold').fontSize(5.3).text(`<<<<<<<<<<<<HAPPYDOG<<<<VETERINARIA<<<<`, this.mm(7), this.mm(47.4), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.3 });
+    doc.font('Courier-Bold').fontSize(5.15).fillColor('#1A1A1A').text(`I<PER${petCode.replace(/[^A-Z0-9]/g, '').padEnd(14, '0')}2<<<<<<<<<<<<<<<<<<<<`, this.mm(7), this.mm(43.1), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.25 });
+    doc.font('Courier-Bold').fontSize(5.15).text(`${petCode.replace('MAS', '').padEnd(16, '0')}PER<<<<<<<<<<<<<<<<<<<<0`, this.mm(7), this.mm(46.5), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.25 });
+    doc.font('Courier-Bold').fontSize(5.15).text(`<<<<<<<<<<<<HAPPYDOG<<<<VETERINARIA<<<<`, this.mm(7), this.mm(49.8), { width: this.mm(72), height: this.mm(2.4), characterSpacing: 0.25 });
     return;
 
     this.drawCardBase(doc);
