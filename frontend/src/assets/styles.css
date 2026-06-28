@@ -209,6 +209,7 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .metric strong{display:block;font-size:34px;margin-top:8px}
 table{width:100%;border-collapse:collapse}
 th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
+.pet-actions{display:flex;flex-wrap:wrap;gap:8px}
 .empty{text-align:center;color:var(--muted);padding:28px}
 .empty-state{display:grid;gap:8px;place-items:center;text-align:center;color:var(--muted);padding:28px;border:1px dashed rgba(21,91,102,.2);border-radius:18px;background:rgba(255,255,255,.45)}
 .empty-state strong{color:var(--ink);font-size:17px}

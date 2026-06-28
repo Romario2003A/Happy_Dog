@@ -205,6 +205,27 @@ async function setStatus(appointment, status) {
   }
 }
 
+async function generatePetIdCard(petId) {
+  if (!petId) return;
+  error.value = '';
+  success.value = '';
+  try {
+    const { data } = await api.get(`/pets/${petId}/id-card`, { responseType: 'blob' });
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+    const opened = window.open(url, '_blank');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `carnet-mascota-${petId}.pdf`;
+      link.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    success.value = 'Carnet de mascota generado en PDF.';
+  } catch (e) {
+    error.value = 'No se pudo generar el carnet de la mascota.';
+  }
+}
+
 function resetQuick() {
   quick.value = { clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
   duplicateOverride.value = false;
@@ -471,6 +492,7 @@ onMounted(loadData);
             <button v-if="['CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">En consulta</button>
             <button v-if="selectedAppointment.status!=='CANCELLED'" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
             <button v-if="selectedAppointment.status==='CANCELLED'" class="small" @click="setStatus(selectedAppointment,'PENDING')">Reactivar</button>
+            <button class="small secondary" @click="generatePetIdCard(selectedAppointment.petId)">Carnet mascota</button>
           </div>
         </div>
       </section>
@@ -485,7 +507,18 @@ onMounted(loadData);
           <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th></tr></thead>
           <tbody>
             <tr v-if="!filteredClients.length"><td colspan="3" class="empty">No hay clientes registrados todavía.</td></tr>
-            <tr v-for="client in filteredClients" :key="client.id"><td>{{ client.fullName }}</td><td>{{ client.phone || client.email || '-' }}</td><td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td></tr>
+            <tr v-for="client in filteredClients" :key="client.id">
+              <td>{{ client.fullName }}</td>
+              <td>{{ client.phone || client.email || '-' }}</td>
+              <td>
+                <div v-if="client.pets?.length" class="pet-actions">
+                  <button v-for="pet in client.pets" :key="pet.id" class="small secondary" @click="generatePetIdCard(pet.id)">
+                    {{ pet.name }} · Carnet
+                  </button>
+                </div>
+                <span v-else>-</span>
+              </td>
+            </tr>
           </tbody>
         </table>
       </section>
