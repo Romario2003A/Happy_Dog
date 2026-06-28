@@ -28,9 +28,13 @@ const form = ref({
   nextControlAt: '',
 });
 
-const visibleAppointments = computed(() => appointments.value.filter(a => ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].includes(a.status)));
-const todayAppointments = computed(() => appointments.value.filter(a => a.scheduledAt?.slice(0, 10) === new Date().toISOString().slice(0, 10)));
-const activePatients = computed(() => new Set(appointments.value.filter(a => a.status !== 'CANCELLED').map(a => a.petId)).size);
+const readyStatuses = ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'];
+const visibleAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status)));
+const pendingAppointments = computed(() => appointments.value
+  .filter(a => a.status === 'PENDING')
+  .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+  .slice(0, 5));
+const todayAppointments = computed(() => appointments.value.filter(a => dateKey(a.scheduledAt) === dateKey()));
 const attendedCount = computed(() => appointments.value.filter(a => a.status === 'ATTENDED').length);
 const filteredPets = computed(() => pets.value.filter(pet => {
   const text = `${pet.name || ''} ${pet.species || ''} ${pet.breed || ''} ${pet.client?.fullName || ''}`.toLowerCase();
@@ -39,6 +43,14 @@ const filteredPets = computed(() => pets.value.filter(pet => {
 const selectedPet = computed(() => selected.value?.pet || selectedStandalonePet.value);
 const selectedClient = computed(() => selected.value?.client || selectedStandalonePet.value?.client);
 const selectedProduct = computed(() => products.value.find(product => product.id === prescription.value.productId));
+
+function dateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function formatDate(value) {
   if (!value) return 'Sin fecha';
@@ -307,7 +319,7 @@ onMounted(loadData);
       </div>
       <div class="doctor-stats">
         <div><span>Citas hoy</span><strong>{{ todayAppointments.length }}</strong></div>
-        <div><span>Pacientes activos</span><strong>{{ activePatients }}</strong></div>
+        <div><span>Listas para atender</span><strong>{{ visibleAppointments.length }}</strong></div>
         <div><span>Atenciones cerradas</span><strong>{{ attendedCount }}</strong></div>
       </div>
     </section>
@@ -324,6 +336,20 @@ onMounted(loadData);
           <strong>Sin citas por atender ahora</strong>
           <span>Cuando recepción confirme una cita, aparecerá en esta lista.</span>
         </div>
+        <div v-if="!visibleAppointments.length && pendingAppointments.length" class="pending-note">
+          <strong>{{ pendingAppointments.length }} cita{{ pendingAppointments.length === 1 ? '' : 's' }} pendiente{{ pendingAppointments.length === 1 ? '' : 's' }} de recepción</strong>
+          <span>Existen solicitudes registradas, pero todavía no están confirmadas para atención médica.</span>
+          <article
+            v-for="appointment in pendingAppointments"
+            :key="appointment.id"
+            class="appointment-item pending-preview"
+          >
+            <strong>{{ appointment.pet?.name || 'Mascota sin nombre' }}</strong>
+            <span>{{ appointment.client?.fullName || 'Cliente sin nombre' }}</span>
+            <small>{{ formatDate(appointment.scheduledAt) }} - {{ statusLabel(appointment.status) }}</small>
+          </article>
+        </div>
+
         <button
           v-for="appointment in visibleAppointments"
           :key="appointment.id"
