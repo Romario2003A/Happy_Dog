@@ -74,10 +74,10 @@ async function submit() {
       </section>
 
       <section class="glass-card portal-card">
-        <span class="badge">Clientes registrados</span>
-        <h2>Ya tengo cuenta</h2>
-        <p>Entra a tu portal para revisar tus mascotas, citas, fotos y carnet.</p>
-        <button class="secondary" @click="$router.push('/cliente/login')">Abrir portal</button>
+        <span class="badge">Carnet para mascotas</span>
+        <h2>Registra a tu mascota</h2>
+        <p>Crea tu cuenta o entra al portal para completar sus datos, subir su foto y generar su carnet.</p>
+        <button class="secondary" @click="$router.push('/cliente/login')">Crear o entrar al portal</button>
       </section>
     </main>
 
