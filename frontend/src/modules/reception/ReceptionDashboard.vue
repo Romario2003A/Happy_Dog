@@ -472,7 +472,21 @@ onMounted(loadData);
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
-    <div v-if="active==='citas'" class="reception-grid">
+    <template v-if="active==='citas'">
+      <section class="glass-card reception-focus-card">
+        <div>
+          <span class="badge">Prioridad de recepci&oacute;n</span>
+          <h2>Organiza el d&iacute;a desde aqu&iacute;</h2>
+          <p>Primero revisa la agenda, luego registra llamadas o WhatsApp y confirma lo que est&aacute; por venir.</p>
+        </div>
+        <div class="focus-actions">
+          <button type="button" @click="agendaView='day'">Ver agenda de hoy</button>
+          <button class="secondary" type="button" @click="showQuick=true">Agendar llamada</button>
+          <button class="secondary" type="button" @click="agendaView='upcoming'">Ver pr&oacute;ximas</button>
+        </div>
+      </section>
+
+    <div class="reception-grid">
       <section class="glass-card calendar-card">
         <div class="calendar-header">
           <div>
@@ -658,6 +672,7 @@ onMounted(loadData);
         </div>
       </section>
     </div>
+    </template>
 
     <div v-else-if="active==='carnets'" class="panel-grid single">
       <section class="glass-card">
