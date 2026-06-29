@@ -23,8 +23,8 @@ async function uploadPetPhoto(petId,event){
   if(!file) return;
   error.value='';
   success.value='';
-  if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
-    error.value='Sube una foto en formato JPG, PNG o WebP.';
+  if(!['image/jpeg','image/png'].includes(file.type)){
+    error.value='Sube una foto en formato JPG o PNG para que salga en el carnet.';
     return;
   }
   if(file.size>4*1024*1024){
@@ -63,8 +63,9 @@ onMounted(loadData);
       <section class="glass-card">
         <h2>Mis mascotas</h2>
         <p class="muted-text">Sube una foto clara de tu mascota. El sistema la ajusta automaticamente al carnet.</p>
-        <table><tbody><tr v-if="!pets.length"><td class="empty">Sin mascotas registradas.</td></tr><tr v-for="p in pets" :key="p.id"><td>{{ p.name }}</td><td>{{ p.species }}</td><td><span v-if="p.photoUrl" class="status">Con foto</span><span v-else class="status">Sin foto</span></td><td><label class="small secondary file-button">Subir foto<input type="file" accept="image/jpeg,image/png,image/webp" @change="uploadPetPhoto(p.id,$event)"></label></td></tr></tbody></table>
+        <table><tbody><tr v-if="!pets.length"><td class="empty">Sin mascotas registradas.</td></tr><tr v-for="p in pets" :key="p.id"><td>{{ p.name }}</td><td>{{ p.species }}</td><td><span v-if="p.photoUrl" class="status">Con foto</span><span v-else class="status">Sin foto</span></td><td><label class="small secondary file-button">Subir foto<input type="file" accept="image/jpeg,image/png" @change="uploadPetPhoto(p.id,$event)"></label></td></tr></tbody></table>
       </section>
     </div>
   </ClientLayout>
 </template>
+

@@ -233,8 +233,8 @@ async function uploadPetPhoto(petId, event) {
   error.value = '';
   success.value = '';
 
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    error.value = 'Sube una foto en formato JPG, PNG o WebP.';
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    error.value = 'Sube una foto en formato JPG o PNG para que salga en el carnet.';
     return;
   }
 
@@ -548,7 +548,7 @@ onMounted(loadData);
                     </button>
                     <label class="small secondary file-button">
                       Foto
-                      <input type="file" accept="image/jpeg,image/png,image/webp" @change="uploadPetPhoto(pet.id, $event)">
+                      <input type="file" accept="image/jpeg,image/png" @change="uploadPetPhoto(pet.id, $event)">
                     </label>
                   </div>
                 </div>
@@ -561,3 +561,4 @@ onMounted(loadData);
     </div>
   </ReceptionLayout>
 </template>
+
