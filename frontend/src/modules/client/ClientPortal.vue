@@ -44,7 +44,6 @@ async function submit() {
         <div class="public-brand">
           <img :src="happyDogLogo" alt="Happy Dog">
         </div>
-        <span class="badge">Veterinaria Happy Dog</span>
         <h1>Citas veterinarias sin complicaciones</h1>
         <p>Solicita atenci&oacute;n para tu mascota y recepci&oacute;n confirmar&aacute; el horario por tel&eacute;fono o WhatsApp.</p>
       </div>
