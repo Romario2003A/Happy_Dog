@@ -125,10 +125,6 @@ onMounted(loadData);
       <button @click="$router.push('/admin/cuenta')">Mi cuenta</button>
     </template>
 
-    <template #top-actions>
-      <button class="secondary top-action-button" type="button" @click="$router.push('/recepcion')">Recepción</button>
-    </template>
-
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
