@@ -12,7 +12,7 @@ const form = ref({
   phone: '',
   email: '',
   petName: '',
-  species: '',
+  species: 'No especificada',
   breed: '',
   sex: 'UNKNOWN',
   age: '',
@@ -26,7 +26,10 @@ const error = ref('');
 async function submit() {
   error.value = '';
   try {
-    await api.post('/public/appointment-request', form.value);
+    await api.post('/public/appointment-request', {
+      ...form.value,
+      phone: String(form.value.phone || '').replace(/\s+/g, ''),
+    });
     sent.value = true;
   } catch (e) {
     sent.value = true;
@@ -58,24 +61,14 @@ async function submit() {
             <h2>Solicitar atenci&oacute;n</h2>
           </div>
         </div>
-        <p class="muted-text">No necesitas una cuenta para pedir una cita. Solo deja tus datos y te contactaremos.</p>
-        <form class="form-grid" @submit.prevent="submit">
-          <input v-model="form.fullName" required placeholder="Nombre del dueño">
-          <input v-model="form.phone" required placeholder="Tel&eacute;fono / WhatsApp">
-          <input v-model="form.email" type="email" placeholder="Correo opcional">
+        <p class="muted-text">D&eacute;janos tus datos y te confirmamos la cita por WhatsApp.</p>
+        <form class="form-grid quick-request-form" @submit.prevent="submit">
+          <input v-model="form.fullName" required placeholder="Nombre del due&ntilde;o">
+          <input v-model="form.phone" required inputmode="tel" autocomplete="tel" placeholder="WhatsApp">
           <input v-model="form.petName" required placeholder="Nombre de la mascota">
-          <input v-model="form.species" required placeholder="Especie">
-          <input v-model="form.breed" placeholder="Raza">
-          <select v-model="form.sex">
-            <option value="UNKNOWN">Sexo no especificado</option>
-            <option value="MALE">Macho</option>
-            <option value="FEMALE">Hembra</option>
-          </select>
-          <input v-model="form.age" placeholder="Edad aproximada">
-          <input v-model.number="form.weightKg" type="number" min="0" step="0.01" placeholder="Peso kg opcional">
           <input v-model="form.scheduledAt" type="datetime-local" required>
-          <textarea v-model="form.reason" required placeholder="Cu&eacute;ntanos qu&eacute; le pasa o qu&eacute; servicio necesitas"></textarea>
-          <button>Enviar solicitud</button>
+          <textarea v-model="form.reason" required placeholder="Motivo de la visita"></textarea>
+          <button>Enviar y esperar confirmaci&oacute;n</button>
         </form>
         <p v-if="sent" class="success">Solicitud recibida. Recepci&oacute;n revisar&aacute; la agenda y te confirmar&aacute; pronto.</p>
       </section>
