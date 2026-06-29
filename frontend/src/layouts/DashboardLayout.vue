@@ -23,7 +23,10 @@ const auth = useAuthStore();
           <h1>{{ title }}</h1>
           <p>{{ subtitle }}</p>
         </div>
-        <div class="user-pill">{{ auth.user?.fullName || 'Usuario' }}</div>
+        <div class="topbar-actions">
+          <slot name="top-actions" />
+          <div class="user-pill">{{ auth.user?.fullName || 'Usuario' }}</div>
+        </div>
       </header>
       <slot />
     </main>

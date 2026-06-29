@@ -439,8 +439,11 @@ onMounted(loadData);
       <button @click="active='citas'">Citas</button>
       <button @click="active='clientes'">Clientes</button>
       <button @click="active='carnets'">Carnets</button>
-      <button @click="$router.push('/admin')">Administración</button>
       <button @click="$router.push('/recepcion/cuenta')">Mi cuenta</button>
+    </template>
+
+    <template #top-actions>
+      <button class="secondary top-action-button" type="button" @click="$router.push('/admin')">Administración</button>
     </template>
 
     <p v-if="error" class="error">{{ error }}</p>

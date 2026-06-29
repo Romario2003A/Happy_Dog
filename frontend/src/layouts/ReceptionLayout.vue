@@ -5,6 +5,7 @@ const props = defineProps({ title:String, subtitle:String });
 <template>
   <DashboardLayout :title="title" :subtitle="subtitle">
     <template #nav><slot name="nav" /></template>
+    <template #top-actions><slot name="top-actions" /></template>
     <slot />
   </DashboardLayout>
 </template>

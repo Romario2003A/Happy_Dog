@@ -161,6 +161,8 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .topbar{padding:22px;display:flex;justify-content:space-between;align-items:center}
 .topbar h1{margin:0}
 .topbar p,.muted-text,.public-hero p{color:var(--muted)}
+.topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.top-action-button{min-height:42px;padding:10px 14px}
 .user-pill{padding:10px 14px;border-radius:999px;background:rgba(15,143,125,.08);border:1px solid var(--line);backdrop-filter:blur(14px)}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .reception-grid{display:grid;grid-template-columns:1.5fr .8fr;gap:22px}
