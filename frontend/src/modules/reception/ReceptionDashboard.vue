@@ -434,7 +434,7 @@ onMounted(loadData);
 </script>
 
 <template>
-  <ReceptionLayout title="Recepción" subtitle="Agenda, citas por llamada y coordinación diaria">
+  <ReceptionLayout title="Recepción" subtitle="Agenda, citas por llamada y coordinación diaria" hide-user-pill>
     <template #nav>
       <button @click="active='citas'">Citas</button>
       <button @click="active='clientes'">Clientes</button>
