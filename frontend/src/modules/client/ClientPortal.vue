@@ -77,7 +77,7 @@ async function submit() {
         <span class="badge">Beneficio Happy Dog</span>
         <h2>Tu mascota con ficha y carnet</h2>
         <p>Reg&iacute;strate para acceder a sus datos, fotos, citas e historial. Adem&aacute;s, te entregamos su carnet personalizado.</p>
-        <button class="secondary" @click="$router.push('/cliente/login')">Registrar mi mascota</button>
+        <button class="secondary" @click="$router.push('/cliente/login')">Entrar o registrarme</button>
       </section>
     </main>
 
