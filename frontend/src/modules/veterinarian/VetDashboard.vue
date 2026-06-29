@@ -18,13 +18,40 @@ const success = ref('');
 const petSearch = ref('');
 const patientSearch = ref(null);
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
+const examOptions = [
+  { key: 'ecografia', label: 'Ecografía' },
+  { key: 'rayosX', label: 'Rayos X' },
+  { key: 'hemograma', label: 'Hemograma' },
+  { key: 'test', label: 'Test' },
+  { key: 'heces', label: 'Examen de heces' },
+  { key: 'orina', label: 'Examen de orina' },
+  { key: 'tgoTgpFas', label: 'TGO, TGP y FAS' },
+  { key: 'citologia', label: 'Citología' },
+  { key: 'raspadoPiel', label: 'Raspado de piel' },
+  { key: 'ureaCrea', label: 'Urea y crea' },
+  { key: 'otros', label: 'Otros' },
+];
+
+function emptyExams() {
+  return examOptions.reduce((acc, option) => ({ ...acc, [option.key]: false }), {});
+}
+
 const form = ref({
   reason: '',
   weightKg: null,
   temperatureC: null,
-  diagnosis: '',
+  fc: '',
+  fr: '',
+  mucosas: '',
+  anamnesis: '',
+  presumptiveDx: '',
+  definitiveDx: '',
+  prognosis: '',
+  exams: emptyExams(),
+  examOther: '',
   treatment: '',
-  observations: '',
+  frequency: '',
+  recommendations: '',
   nextControlAt: '',
 });
 
@@ -90,9 +117,18 @@ function resetForm(appointment) {
     reason: appointment?.reason || '',
     weightKg: appointment?.pet?.weightKg ?? null,
     temperatureC: null,
-    diagnosis: '',
+    fc: '',
+    fr: '',
+    mucosas: '',
+    anamnesis: '',
+    presumptiveDx: '',
+    definitiveDx: '',
+    prognosis: '',
+    exams: emptyExams(),
+    examOther: '',
     treatment: '',
-    observations: '',
+    frequency: '',
+    recommendations: '',
     nextControlAt: '',
   };
   prescription.value = { productId: '', quantity: 1, dosage: '', instructions: '' };
@@ -164,6 +200,42 @@ function buildPrescriptions() {
     dosage: prescription.value.dosage,
     instructions: prescription.value.instructions,
   }];
+}
+
+function checkedExams() {
+  return examOptions
+    .filter(option => form.value.exams?.[option.key])
+    .map(option => option.label);
+}
+
+function buildDiagnosisText() {
+  const diagnosis = [
+    form.value.presumptiveDx && `DX presuntivo: ${form.value.presumptiveDx}`,
+    form.value.definitiveDx && `DX definitivo: ${form.value.definitiveDx}`,
+  ].filter(Boolean).join('\n');
+  return diagnosis || '';
+}
+
+function buildTreatmentText() {
+  return [
+    form.value.treatment && `Tratamiento: ${form.value.treatment}`,
+    form.value.frequency && `Frecuencia: ${form.value.frequency}`,
+    form.value.recommendations && `Recomendaciones: ${form.value.recommendations}`,
+  ].filter(Boolean).join('\n');
+}
+
+function buildObservationNotes() {
+  const exams = checkedExams();
+  return [
+    form.value.fc && `FC: ${form.value.fc}`,
+    form.value.fr && `FR: ${form.value.fr}`,
+    form.value.mucosas && `Mucosas: ${form.value.mucosas}`,
+    form.value.anamnesis && `Anamnesis: ${form.value.anamnesis}`,
+    exams.length && `Exámenes complementarios: ${exams.join(', ')}`,
+    form.value.examOther && `Otros exámenes: ${form.value.examOther}`,
+    form.value.prognosis && `Pronóstico: ${form.value.prognosis}`,
+    form.value.nextControlAt && `Próximo control: ${formatDate(form.value.nextControlAt)}`,
+  ].filter(Boolean).join('\n');
 }
 
 function escapeHtml(value) {
@@ -246,9 +318,9 @@ function generatePrescriptionPdf() {
         <section class="box">
           <h2>Evaluación</h2>
           <p><strong>Motivo:</strong> ${escapeHtml(form.value.reason || selected.value?.reason || '-')}</p>
-          <p><strong>Diagnóstico:</strong> ${escapeHtml(form.value.diagnosis || '-')}</p>
-          <p><strong>Evolución / tratamiento:</strong> ${escapeHtml(form.value.treatment || '-')}</p>
-          <p><strong>Observaciones:</strong> ${escapeHtml(form.value.observations || '-')}</p>
+          <p><strong>Diagnóstico:</strong> ${escapeHtml(buildDiagnosisText() || '-')}</p>
+          <p><strong>Evolución / tratamiento:</strong> ${escapeHtml(buildTreatmentText() || '-')}</p>
+          <p><strong>Observaciones:</strong> ${escapeHtml(buildObservationNotes() || '-')}</p>
         </section>
 
         <section class="box">
@@ -269,6 +341,11 @@ function generatePrescriptionPdf() {
 
 async function saveRecord() {
   if (!selected.value) return;
+  const diagnosis = buildDiagnosisText();
+  if (!diagnosis) {
+    error.value = 'Completa al menos un diagnóstico presuntivo o definitivo.';
+    return;
+  }
   saving.value = true;
   error.value = '';
   success.value = '';
@@ -280,9 +357,9 @@ async function saveRecord() {
       reason: form.value.reason,
       weightKg: form.value.weightKg === null || form.value.weightKg === '' ? undefined : Number(form.value.weightKg),
       temperatureC: form.value.temperatureC === null || form.value.temperatureC === '' ? undefined : Number(form.value.temperatureC),
-      diagnosis: form.value.diagnosis,
-      treatment: form.value.treatment,
-      observations: form.value.observations,
+      diagnosis,
+      treatment: buildTreatmentText(),
+      observations: buildObservationNotes(),
       nextControlAt: form.value.nextControlAt || undefined,
       prescriptions: buildPrescriptions(),
     });
@@ -412,7 +489,82 @@ onMounted(loadData);
           <span>Selecciona una cita lista o busca un paciente para activar el registro, la receta y el historial.</span>
         </div>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
-          <section class="medical-section">
+          <section class="clinical-sheet">
+            <div class="sheet-top">
+              <div class="sheet-code">FECHA: {{ dateKey() }}</div>
+              <div class="sheet-brand">
+                <strong>Happy Dog</strong>
+                <span>Clínica veterinaria</span>
+              </div>
+              <div class="sheet-code">CÓDIGO: {{ selectedPet?.id?.slice(0, 8).toUpperCase() }}</div>
+            </div>
+
+            <h3 class="sheet-title">Historia clínica</h3>
+            <div class="sheet-subtitle">Datos del propietario</div>
+            <div class="clinical-table owner-grid">
+              <div><span>Nombre:</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
+              <div><span>Telf:</span><strong>{{ selectedClient?.phone || '-' }}</strong></div>
+              <div><span>Dirección:</span><strong>{{ selectedClient?.address || '-' }}</strong></div>
+              <div><span>DNI:</span><strong>{{ selectedClient?.dni || '-' }}</strong></div>
+            </div>
+
+            <div class="sheet-subtitle">Datos de la mascota</div>
+            <div class="clinical-table pet-grid">
+              <div><span>Nombre:</span><strong>{{ selectedPet?.name || '-' }}</strong></div>
+              <div><span>Especie:</span><strong>{{ selectedPet?.species || '-' }}</strong></div>
+              <div><span>Raza:</span><strong>{{ selectedPet?.breed || '-' }}</strong></div>
+              <div><span>Sexo:</span><strong>{{ sexLabel(selectedPet?.sex) }}</strong></div>
+              <div><span>Edad:</span><strong>{{ selectedPet?.age || '-' }}</strong></div>
+              <div><span>Peso base:</span><strong>{{ selectedPet?.weightKg || '-' }} kg</strong></div>
+              <div><span>Color:</span><strong>{{ selectedPet?.color || '-' }}</strong></div>
+              <div><span>Esterilizado:</span><strong>{{ selectedPet?.sterilized ? 'Sí' : 'No' }}</strong></div>
+              <div><span>Procedencia:</span><strong>-</strong></div>
+            </div>
+
+            <div class="vitals-grid">
+              <label>Motivo<input v-model="form.reason" required placeholder="Motivo de consulta"></label>
+              <label>Fecha<input v-model="form.nextControlAt" type="datetime-local"></label>
+              <label>Peso<input v-model.number="form.weightKg" type="number" step="0.01" placeholder="kg"></label>
+              <label>T°<input v-model.number="form.temperatureC" type="number" step="0.1" placeholder="C"></label>
+              <label>FC<input v-model="form.fc" placeholder="lpm"></label>
+              <label>FR<input v-model="form.fr" placeholder="rpm"></label>
+              <label>Mucosas<input v-model="form.mucosas" placeholder="Rosadas, pálidas..."></label>
+            </div>
+
+            <label class="clinical-line tall">
+              <span>Anamnesis</span>
+              <textarea v-model="form.anamnesis" placeholder="Qué comenta el dueño, evolución, apetito, ánimo, vómitos, diarrea, etc."></textarea>
+            </label>
+
+            <div class="exam-section">
+              <span class="clinical-label">Exámenes complementarios</span>
+              <label v-for="option in examOptions" :key="option.key" class="exam-option">
+                <input v-model="form.exams[option.key]" type="checkbox">
+                <span>{{ option.label }}</span>
+              </label>
+              <input v-model="form.examOther" class="exam-other" placeholder="Detalle de otros exámenes">
+            </div>
+
+            <div class="diagnosis-grid">
+              <label>DX presuntivo<textarea v-model="form.presumptiveDx" placeholder="Diagnóstico presuntivo"></textarea></label>
+              <label>DX definitivo<textarea v-model="form.definitiveDx" placeholder="Diagnóstico definitivo"></textarea></label>
+              <label>Pronóstico<textarea v-model="form.prognosis" placeholder="Reservado, favorable..."></textarea></label>
+            </div>
+
+            <label class="clinical-line tall">
+              <span>Tratamiento</span>
+              <textarea v-model="form.treatment" placeholder="Procedimientos, medicación aplicada y evolución durante consulta"></textarea>
+            </label>
+
+            <div class="frequency-row">
+              <label>Frecuencia<input v-model="form.frequency" placeholder="Cada 12 h, cada 24 h, por 5 días..."></label>
+              <label>Recomendaciones<textarea v-model="form.recommendations" placeholder="Cuidados en casa, dieta, reposo, señales de alerta"></textarea></label>
+            </div>
+
+            <div class="doctor-sign">Médico: {{ auth.user?.fullName || 'Doctor veterinario' }}</div>
+          </section>
+
+          <section v-if="false" class="medical-section">
             <div class="section-title compact">
               <div>
                 <span class="badge">Signos</span>
@@ -426,7 +578,7 @@ onMounted(loadData);
             </div>
           </section>
 
-          <section class="medical-section">
+          <section v-if="false" class="medical-section">
             <div class="section-title compact">
               <div>
                 <span class="badge">Consulta</span>
