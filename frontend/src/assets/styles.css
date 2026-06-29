@@ -84,6 +84,10 @@ button.small{padding:8px 10px;font-size:13px}
 .whatsapp-float:hover{transform:translateY(-2px);box-shadow:0 22px 52px rgba(18,140,126,.34)}
 .portal-card{display:grid;align-content:start;gap:14px}
 .portal-card h2{margin:0}
+.pet-benefit-card{position:relative;overflow:hidden;background:linear-gradient(150deg,rgba(255,255,255,.94),rgba(239,252,246,.78) 52%,rgba(255,244,212,.72));border-color:rgba(245,200,106,.32)}
+.pet-benefit-card:before{content:"";position:absolute;right:-46px;top:-46px;width:132px;height:132px;border-radius:50%;background:rgba(245,200,106,.22)}
+.pet-benefit-card .badge{background:rgba(255,246,216,.92);border-color:rgba(245,200,106,.42);color:#8a6716}
+.pet-benefit-card h2,.pet-benefit-card p,.pet-benefit-card button{position:relative}
 .portal-list{display:grid;gap:10px;margin-top:8px;color:var(--muted);font-weight:700}
 .portal-list span{padding:12px 14px;border-radius:14px;background:rgba(15,143,125,.06);border:1px solid var(--line)}
 .account-card{max-width:620px}

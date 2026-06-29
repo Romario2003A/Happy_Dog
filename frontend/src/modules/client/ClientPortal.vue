@@ -73,11 +73,11 @@ async function submit() {
         <p v-if="sent" class="success">Solicitud recibida. Recepci&oacute;n revisar&aacute; la agenda y te confirmar&aacute; pronto.</p>
       </section>
 
-      <section class="glass-card portal-card">
-        <span class="badge">Carnet para mascotas</span>
-        <h2>Registra a tu mascota</h2>
-        <p>Crea tu cuenta o entra al portal para completar sus datos, subir su foto y generar su carnet.</p>
-        <button class="secondary" @click="$router.push('/cliente/login')">Crear o entrar al portal</button>
+      <section class="glass-card portal-card pet-benefit-card">
+        <span class="badge">Beneficio Happy Dog</span>
+        <h2>Tu mascota con ficha y carnet</h2>
+        <p>Reg&iacute;strate para acceder a sus datos, fotos, citas e historial. Adem&aacute;s, te entregamos su carnet personalizado.</p>
+        <button class="secondary" @click="$router.push('/cliente/login')">Registrar mi mascota</button>
       </section>
     </main>
 
