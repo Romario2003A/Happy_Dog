@@ -88,21 +88,6 @@ async function submit() {
       </section>
     </main>
 
-    <section class="service-strip">
-      <article class="service-pill glass-card">
-        <strong>Confirmaci&oacute;n clara</strong>
-        <span>Recepci&oacute;n valida cada cita antes de atender.</span>
-      </article>
-      <article class="service-pill glass-card">
-        <strong>Historial organizado</strong>
-        <span>El doctor revisa antecedentes y registra la atenci&oacute;n.</span>
-      </article>
-      <article class="service-pill glass-card">
-        <strong>Carnet para mascotas</strong>
-        <span>Los datos y fotos ayudan a generar el carnet impreso.</span>
-      </article>
-    </section>
-
     <section class="location-card glass-card">
       <div class="section-title">
         <div>
