@@ -44,10 +44,6 @@ async function submit() {
         <span class="badge">Veterinaria Happy Dog</span>
         <h1>Citas veterinarias sin complicaciones</h1>
         <p>Solicita atenci&oacute;n para tu mascota y recepci&oacute;n confirmar&aacute; el horario por tel&eacute;fono o WhatsApp.</p>
-        <div class="hero-actions">
-          <a class="button-link" href="#solicitar-cita">Solicitar cita</a>
-          <button class="secondary" type="button" @click="$router.push('/cliente/login')">Ingresar al portal</button>
-        </div>
       </div>
       <div class="hero-media">
         <img class="hero-doctor-dog" :src="doctorDog" alt="Perro con bata de doctor representando atencion veterinaria">
