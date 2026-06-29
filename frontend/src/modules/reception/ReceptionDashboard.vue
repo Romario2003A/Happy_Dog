@@ -97,6 +97,17 @@ const filteredClients = computed(() => clients.value.filter(client => {
 const selectedClientPets = computed(() => clients.value.find(client => client.id === quick.value.clientId)?.pets || []);
 
 const allPets = computed(() => clients.value.flatMap(client => (client.pets || []).map(pet => ({ ...pet, client }))));
+const cardStats = computed(() => {
+  const pets = allPets.value;
+  return {
+    pending: pets.filter(pet => pet.cardStatus !== 'PRINTED').length,
+    ready: pets.filter(pet => pet.cardStatus !== 'PRINTED' && pet.photoUrl).length,
+    missingPhoto: pets.filter(pet => pet.cardStatus !== 'PRINTED' && !pet.photoUrl).length,
+    printed: pets.filter(pet => pet.cardStatus === 'PRINTED').length,
+    reprint: pets.filter(pet => pet.cardStatus === 'REPRINT_REQUESTED').length,
+    recentUploads: pets.filter(pet => pet.photoUrl && pet.cardStatus !== 'PRINTED').length,
+  };
+});
 
 const filteredCardPets = computed(() => {
   const query = search.value.toLowerCase();
@@ -631,7 +642,6 @@ onMounted(loadData);
             <button v-if="['CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">En consulta</button>
             <button v-if="selectedAppointment.status!=='CANCELLED'" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
             <button v-if="selectedAppointment.status==='CANCELLED'" class="small" @click="setStatus(selectedAppointment,'PENDING')">Reactivar</button>
-            <button class="small secondary" @click="generatePetIdCard(selectedAppointment.petId)">Carnet mascota</button>
           </div>
         </div>
       </section>
@@ -642,8 +652,8 @@ onMounted(loadData);
         <div class="section-title">
           <div>
             <span class="badge">Carnets</span>
-            <h2>Control de impresion</h2>
-            <p class="muted-text">Imprime en lote y marca los carnets entregados para evitar duplicados.</p>
+            <h2>Centro de carnets</h2>
+            <p class="muted-text">Un solo lugar para revisar fotos subidas, generar PDFs y marcar carnets entregados.</p>
           </div>
           <div class="detail-actions">
             <button class="small secondary" type="button" @click="selectVisibleCardPets">Seleccionar visibles</button>
@@ -653,18 +663,41 @@ onMounted(loadData);
           </div>
         </div>
 
+        <div class="card-workflow">
+          <article>
+            <span>Listos para imprimir</span>
+            <strong>{{ cardStats.ready }}</strong>
+            <small>Con foto y sin marcar como impreso</small>
+          </article>
+          <article>
+            <span>Falta foto</span>
+            <strong>{{ cardStats.missingPhoto }}</strong>
+            <small>Recepción debe pedir o subir imagen</small>
+          </article>
+          <article>
+            <span>Reimpresiones</span>
+            <strong>{{ cardStats.reprint }}</strong>
+            <small>Solicitudes especiales</small>
+          </article>
+          <article>
+            <span>Ya entregados</span>
+            <strong>{{ cardStats.printed }}</strong>
+            <small>No imprimir otra vez salvo pedido</small>
+          </article>
+        </div>
+
         <div class="segmented card-tabs">
-          <button type="button" :class="{active:cardFilter==='pending'}" @click="cardFilter='pending'">Pendientes</button>
+          <button type="button" :class="{active:cardFilter==='pending'}" @click="cardFilter='pending'">Por resolver</button>
           <button type="button" :class="{active:cardFilter==='ready'}" @click="cardFilter='ready'">Listos</button>
-          <button type="button" :class="{active:cardFilter==='missingPhoto'}" @click="cardFilter='missingPhoto'">Sin foto</button>
-          <button type="button" :class="{active:cardFilter==='printed'}" @click="cardFilter='printed'">Impresos</button>
+          <button type="button" :class="{active:cardFilter==='missingPhoto'}" @click="cardFilter='missingPhoto'">Falta foto</button>
+          <button type="button" :class="{active:cardFilter==='printed'}" @click="cardFilter='printed'">Entregados</button>
           <button type="button" :class="{active:cardFilter==='all'}" @click="cardFilter='all'">Todos</button>
         </div>
 
         <div class="card-print-summary">
           <strong>{{ selectedCardPetIds.length }} seleccionados</strong>
           <span>{{ filteredCardPets.length }} mascotas en esta vista</span>
-          <span>{{ allPets.filter(pet => pet.cardStatus === 'PRINTED').length }} carnets ya impresos</span>
+          <span>{{ cardStats.ready }} listos con foto</span>
         </div>
 
         <input v-model="search" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
@@ -738,17 +771,7 @@ onMounted(loadData);
               <td>{{ client.fullName }}</td>
               <td>{{ client.phone || client.email || '-' }}</td>
               <td>
-                <div v-if="client.pets?.length" class="pet-actions">
-                  <div v-for="pet in client.pets" :key="pet.id" class="pet-action-group">
-                    <button class="small secondary" @click="generatePetIdCard(pet.id)">
-                      {{ pet.name }} - Carnet
-                    </button>
-                    <label class="small secondary file-button">
-                      Foto
-                      <input type="file" accept="image/jpeg,image/png" @change="uploadPetPhoto(pet.id, $event)">
-                    </label>
-                  </div>
-                </div>
+                <span v-if="client.pets?.length">{{ client.pets.map(pet => pet.name).join(', ') }}</span>
                 <span v-else>-</span>
               </td>
             </tr>
