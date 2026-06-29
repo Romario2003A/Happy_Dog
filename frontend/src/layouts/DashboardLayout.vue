@@ -2,7 +2,7 @@
 import { useAuthStore } from '../stores/auth';
 import happyDogLogo from '../assets/images/happy-dog-logo.jpeg';
 
-defineProps({ title: String, subtitle: String });
+defineProps({ title: String, subtitle: String, hideUserPill: Boolean });
 
 const auth = useAuthStore();
 </script>
@@ -25,7 +25,7 @@ const auth = useAuthStore();
         </div>
         <div class="topbar-actions">
           <slot name="top-actions" />
-          <div class="user-pill">{{ auth.user?.fullName || 'Usuario' }}</div>
+          <div v-if="!hideUserPill" class="user-pill">{{ auth.user?.fullName || 'Usuario' }}</div>
         </div>
       </header>
       <slot />
