@@ -122,8 +122,11 @@ onMounted(loadData);
       <button @click="openInventory">Inventario</button>
       <button @click="active='clientes'">Clientes</button>
       <button @click="active='caja'">Caja</button>
-      <button @click="$router.push('/recepcion')">Recepción</button>
       <button @click="$router.push('/admin/cuenta')">Mi cuenta</button>
+    </template>
+
+    <template #top-actions>
+      <button class="secondary top-action-button" type="button" @click="$router.push('/recepcion')">Recepción</button>
     </template>
 
     <p v-if="error" class="error">{{ error }}</p>
@@ -248,3 +251,4 @@ onMounted(loadData);
     </section>
   </AdminLayout>
 </template>
+
