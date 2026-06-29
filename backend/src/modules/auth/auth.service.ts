@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service';
@@ -26,16 +26,37 @@ export class AuthService {
   }
   async registerClient(dto: RegisterClientDto) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const client = await this.prisma.client.create({
-      data: {
-        fullName: dto.fullName,
-        documentNumber: dto.documentNumber,
-        phone: dto.phone,
-        email: dto.email,
-        passwordHash,
-        address: dto.address,
-      },
-    });
+    const email = dto.email.trim().toLowerCase();
+    const phone = dto.phone?.replace(/\D/g, '') || undefined;
+    const existingClient = await this.prisma.client.findUnique({ where: { email } });
+
+    if (existingClient?.passwordHash) {
+      throw new ConflictException('Ya existe una cuenta con este correo.');
+    }
+
+    const client = existingClient
+      ? await this.prisma.client.update({
+        where: { id: existingClient.id },
+        data: {
+          fullName: dto.fullName,
+          documentNumber: dto.documentNumber,
+          phone,
+          email,
+          passwordHash,
+          address: dto.address,
+          active: true,
+        },
+      })
+      : await this.prisma.client.create({
+        data: {
+          fullName: dto.fullName,
+          documentNumber: dto.documentNumber,
+          phone,
+          email,
+          passwordHash,
+          address: dto.address,
+        },
+      });
     const payload = { sub: client.id, email: client.email, role: 'CLIENT', fullName: client.fullName };
     return { accessToken: await this.jwt.signAsync(payload), user: { id: client.id, fullName: client.fullName, email: client.email, role: 'CLIENT' } };
   }
@@ -64,3 +85,4 @@ export class AuthService {
     return { message: 'Contrasena actualizada correctamente' };
   }
 }
+
