@@ -16,6 +16,8 @@ const success = ref('');
 const search = ref('');
 const quickMode = ref('new');
 const agendaView = ref('day');
+const cardFilter = ref('pending');
+const selectedCardPetIds = ref([]);
 const selectedAppointment = ref(null);
 const duplicateOverride = ref(false);
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
@@ -94,6 +96,24 @@ const filteredClients = computed(() => clients.value.filter(client => {
 
 const selectedClientPets = computed(() => clients.value.find(client => client.id === quick.value.clientId)?.pets || []);
 
+const allPets = computed(() => clients.value.flatMap(client => (client.pets || []).map(pet => ({ ...pet, client }))));
+
+const filteredCardPets = computed(() => {
+  const query = search.value.toLowerCase();
+  return allPets.value.filter(pet => {
+    const text = `${pet.name || ''} ${pet.species || ''} ${pet.breed || ''} ${pet.client?.fullName || ''} ${pet.client?.phone || ''} ${pet.client?.email || ''}`.toLowerCase();
+    if (query && !text.includes(query)) return false;
+    if (cardFilter.value === 'pending') return pet.cardStatus !== 'PRINTED';
+    if (cardFilter.value === 'ready') return pet.cardStatus !== 'PRINTED' && Boolean(pet.photoUrl);
+    if (cardFilter.value === 'missingPhoto') return pet.cardStatus !== 'PRINTED' && !pet.photoUrl;
+    if (cardFilter.value === 'printed') return pet.cardStatus === 'PRINTED';
+    if (cardFilter.value === 'reprint') return pet.cardStatus === 'REPRINT_REQUESTED';
+    return true;
+  });
+});
+
+const selectedCardPets = computed(() => allPets.value.filter(pet => selectedCardPetIds.value.includes(pet.id)));
+
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -171,6 +191,36 @@ function statusLabel(status) {
   return labels[status] || status;
 }
 
+function cardStatusLabel(status) {
+  const labels = {
+    PENDING: 'Pendiente',
+    PRINTED: 'Impresa',
+    REPRINT_REQUESTED: 'Reimpresion',
+  };
+  return labels[status] || 'Pendiente';
+}
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
+function toggleCardPet(petId, checked) {
+  if (checked) {
+    if (!selectedCardPetIds.value.includes(petId)) selectedCardPetIds.value = [...selectedCardPetIds.value, petId];
+    return;
+  }
+  selectedCardPetIds.value = selectedCardPetIds.value.filter(id => id !== petId);
+}
+
+function selectVisibleCardPets() {
+  selectedCardPetIds.value = filteredCardPets.value.map(pet => pet.id);
+}
+
+function clearSelectedCardPets() {
+  selectedCardPetIds.value = [];
+}
+
 async function loadData() {
   loading.value = true;
   error.value = '';
@@ -209,6 +259,10 @@ async function generatePetIdCard(petId) {
   if (!petId) return;
   error.value = '';
   success.value = '';
+  const pet = allPets.value.find(item => item.id === petId);
+  if (pet?.cardStatus === 'PRINTED' && !window.confirm(`${pet.name} ya tiene carnet marcado como impreso. ¿Generar una reimpresion?`)) {
+    return;
+  }
   try {
     const { data } = await api.get(`/pets/${petId}/id-card`, { responseType: 'blob' });
     const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
@@ -221,8 +275,59 @@ async function generatePetIdCard(petId) {
     }
     setTimeout(() => URL.revokeObjectURL(url), 60000);
     success.value = 'Carnet de mascota generado en PDF.';
+    await loadData();
   } catch (e) {
     error.value = 'No se pudo generar el carnet de la mascota.';
+  }
+}
+
+async function generatePetIdCardsBatch() {
+  if (!selectedCardPetIds.value.length) {
+    error.value = 'Selecciona al menos una mascota para generar el lote.';
+    return;
+  }
+
+  const printedPets = selectedCardPets.value.filter(pet => pet.cardStatus === 'PRINTED');
+  if (printedPets.length && !window.confirm(`${printedPets.length} carnet(s) ya figuran como impresos. ¿Generar reimpresion de todos modos?`)) {
+    return;
+  }
+
+  error.value = '';
+  success.value = '';
+  try {
+    const { data } = await api.post('/pets/id-cards-batch', { petIds: selectedCardPetIds.value }, { responseType: 'blob' });
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+    const opened = window.open(url, '_blank');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'carnets-happy-dog.pdf';
+      link.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    success.value = `PDF generado con ${selectedCardPetIds.value.length} carnet(s).`;
+    await loadData();
+  } catch (e) {
+    error.value = 'No se pudo generar el lote de carnets.';
+  }
+}
+
+async function markSelectedCardsPrinted() {
+  if (!selectedCardPetIds.value.length) {
+    error.value = 'Selecciona al menos una mascota para marcar como impresa.';
+    return;
+  }
+  if (!window.confirm(`Vas a marcar ${selectedCardPetIds.value.length} carnet(s) como impresos. ¿Confirmas?`)) return;
+
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post('/pets/mark-cards-printed', { petIds: selectedCardPetIds.value });
+    success.value = 'Carnets marcados como impresos.';
+    selectedCardPetIds.value = [];
+    await loadData();
+  } catch (e) {
+    error.value = 'No se pudo marcar los carnets como impresos.';
   }
 }
 
@@ -333,6 +438,7 @@ onMounted(loadData);
     <template #nav>
       <button @click="active='citas'">Citas</button>
       <button @click="active='clientes'">Clientes</button>
+      <button @click="active='carnets'">Carnets</button>
       <button @click="$router.push('/admin')">Administración</button>
       <button @click="$router.push('/recepcion/cuenta')">Mi cuenta</button>
     </template>
@@ -525,6 +631,94 @@ onMounted(loadData);
             <button class="small secondary" @click="generatePetIdCard(selectedAppointment.petId)">Carnet mascota</button>
           </div>
         </div>
+      </section>
+    </div>
+
+    <div v-else-if="active==='carnets'" class="panel-grid single">
+      <section class="glass-card">
+        <div class="section-title">
+          <div>
+            <span class="badge">Carnets</span>
+            <h2>Control de impresion</h2>
+            <p class="muted-text">Imprime en lote y marca los carnets entregados para evitar duplicados.</p>
+          </div>
+          <div class="detail-actions">
+            <button class="small secondary" type="button" @click="selectVisibleCardPets">Seleccionar visibles</button>
+            <button class="small secondary" type="button" @click="clearSelectedCardPets">Limpiar</button>
+            <button class="small" type="button" @click="generatePetIdCardsBatch">Generar lote PDF</button>
+            <button class="small secondary" type="button" @click="markSelectedCardsPrinted">Marcar impresos</button>
+          </div>
+        </div>
+
+        <div class="segmented card-tabs">
+          <button type="button" :class="{active:cardFilter==='pending'}" @click="cardFilter='pending'">Pendientes</button>
+          <button type="button" :class="{active:cardFilter==='ready'}" @click="cardFilter='ready'">Listos</button>
+          <button type="button" :class="{active:cardFilter==='missingPhoto'}" @click="cardFilter='missingPhoto'">Sin foto</button>
+          <button type="button" :class="{active:cardFilter==='printed'}" @click="cardFilter='printed'">Impresos</button>
+          <button type="button" :class="{active:cardFilter==='all'}" @click="cardFilter='all'">Todos</button>
+        </div>
+
+        <div class="card-print-summary">
+          <strong>{{ selectedCardPetIds.length }} seleccionados</strong>
+          <span>{{ filteredCardPets.length }} mascotas en esta vista</span>
+          <span>{{ allPets.filter(pet => pet.cardStatus === 'PRINTED').length }} carnets ya impresos</span>
+        </div>
+
+        <input v-model="search" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
+        <table>
+          <thead>
+            <tr>
+              <th class="checkbox-cell"></th>
+              <th>Mascota</th>
+              <th>Cliente</th>
+              <th>Foto</th>
+              <th>Estado</th>
+              <th>Ultima impresion</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!filteredCardPets.length">
+              <td colspan="7" class="empty">No hay mascotas con este filtro.</td>
+            </tr>
+            <tr v-for="pet in filteredCardPets" :key="pet.id">
+              <td class="checkbox-cell">
+                <input type="checkbox" :checked="selectedCardPetIds.includes(pet.id)" @change="toggleCardPet(pet.id, $event.target.checked)">
+              </td>
+              <td>
+                <strong>{{ pet.name }}</strong>
+                <small>{{ pet.species }} {{ pet.breed ? `- ${pet.breed}` : '' }}</small>
+              </td>
+              <td>
+                <strong>{{ pet.client?.fullName || '-' }}</strong>
+                <small>{{ pet.client?.phone || pet.client?.email || 'Sin contacto' }}</small>
+              </td>
+              <td><span class="status">{{ pet.photoUrl ? 'Lista' : 'Falta foto' }}</span></td>
+              <td>
+                <span class="status">{{ cardStatusLabel(pet.cardStatus) }}</span>
+                <small>{{ pet.cardPrintCount || 0 }} impresion(es)</small>
+              </td>
+              <td>{{ formatDateTime(pet.cardPrintedAt) }}</td>
+              <td>
+                <div class="pet-actions">
+                  <button class="small secondary" type="button" @click="generatePetIdCard(pet.id)">PDF</button>
+                  <label class="small secondary file-button">
+                    Foto
+                    <input type="file" accept="image/jpeg,image/png" @change="uploadPetPhoto(pet.id, $event)">
+                  </label>
+                  <button
+                    v-if="pet.cardStatus !== 'PRINTED'"
+                    class="small secondary"
+                    type="button"
+                    @click="selectedCardPetIds=[pet.id]; markSelectedCardsPrinted()"
+                  >
+                    Marcar impreso
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </section>
     </div>
 

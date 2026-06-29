@@ -29,6 +29,27 @@ export class PetsController {
     res.end(pdf);
   }
 
+  @Post('id-cards-batch')
+  async idCardsBatch(@Body('petIds') petIds: string[], @Res() res: Response) {
+    if (!Array.isArray(petIds) || !petIds.length) {
+      throw new BadRequestException('Selecciona al menos una mascota.');
+    }
+    const pdf = await this.service.generateIdCards(petIds);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="carnets-happy-dog.pdf"');
+    res.setHeader('Content-Length', pdf.length);
+    res.end(pdf);
+  }
+
+  @Post('mark-cards-printed')
+  markCardsPrinted(@Body('petIds') petIds: string[], @Req() req: Request) {
+    if (!Array.isArray(petIds) || !petIds.length) {
+      throw new BadRequestException('Selecciona al menos una mascota.');
+    }
+    const user = (req as any).user;
+    return this.service.markCardsPrinted(petIds, user?.fullName || user?.email || 'Usuario Happy Dog');
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
@@ -45,6 +66,11 @@ export class PetsController {
     if (!file) throw new BadRequestException('Selecciona una foto de la mascota.');
     const photoUrl = publicUploadUrl(req, `/uploads/pets/${file.filename}`);
     return this.service.updatePhoto(id, photoUrl);
+  }
+
+  @Post(':id/request-card-reprint')
+  requestCardReprint(@Param('id') id: string) {
+    return this.service.requestCardReprint(id);
   }
 
   @Patch(':id')

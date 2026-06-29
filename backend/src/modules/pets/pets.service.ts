@@ -65,6 +65,11 @@ type PetWithClient = {
   weightKg?: number | null;
   sterilized?: boolean | null;
   photoUrl?: string | null;
+  cardStatus?: string | null;
+  cardPrintedAt?: Date | null;
+  cardLastGeneratedAt?: Date | null;
+  cardPrintCount?: number | null;
+  cardPrintedBy?: string | null;
   createdAt?: Date;
   client?: {
     fullName?: string | null;
@@ -110,13 +115,81 @@ export class PetsService {
     const pet = await this.findOne(id) as PetWithClient | null;
     if (!pet) throw new NotFoundException('Mascota no encontrada.');
 
+    await (this.prisma as any).pet.update({
+      where: { id },
+      data: { cardLastGeneratedAt: new Date() },
+    });
+
+    return this.generateCardsPdf([pet]);
+  }
+
+  async generateIdCards(ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (!uniqueIds.length) throw new NotFoundException('Selecciona al menos una mascota.');
+
+    const pets = await (this.prisma as any).pet.findMany({
+      where: { id: { in: uniqueIds } },
+      include: { client: true },
+    }) as PetWithClient[];
+
+    const orderedPets = uniqueIds
+      .map(id => pets.find(pet => pet.id === id))
+      .filter(Boolean) as PetWithClient[];
+
+    if (!orderedPets.length) throw new NotFoundException('No se encontraron mascotas para imprimir.');
+
+    await (this.prisma as any).pet.updateMany({
+      where: { id: { in: orderedPets.map(pet => pet.id) } },
+      data: { cardLastGeneratedAt: new Date() },
+    });
+
+    return this.generateCardsPdf(orderedPets);
+  }
+
+  async markCardsPrinted(ids: string[], printedBy = 'Happy Dog') {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (!uniqueIds.length) throw new NotFoundException('Selecciona al menos una mascota.');
+
+    const pets = await (this.prisma as any).pet.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true },
+    });
+    const foundIds = pets.map((pet: { id: string }) => pet.id);
+    if (!foundIds.length) throw new NotFoundException('No se encontraron mascotas para marcar.');
+
+    const now = new Date();
+    await Promise.all(foundIds.map(id => (this.prisma as any).pet.update({
+      where: { id },
+      data: {
+        cardStatus: 'PRINTED',
+        cardPrintedAt: now,
+        cardPrintedBy: printedBy,
+        cardPrintCount: { increment: 1 },
+      },
+    })));
+
+    return { updated: foundIds.length };
+  }
+
+  async requestCardReprint(id: string) {
+    const pet = await this.findOne(id);
+    if (!pet) throw new NotFoundException('Mascota no encontrada.');
+
+    return (this.prisma as any).pet.update({
+      where: { id },
+      data: { cardStatus: 'REPRINT_REQUESTED' },
+      include: { client: true },
+    });
+  }
+
+  private generateCardsPdf(pets: PetWithClient[]) {
     return new Promise<Buffer>(async (resolve, reject) => {
       const chunks: Buffer[] = [];
       const doc = new PDFDocument({
         size: [CARD_WIDTH, CARD_HEIGHT],
         margin: 0,
         info: {
-          Title: `Carnet Happy Dog - ${pet.name}`,
+          Title: pets.length === 1 ? `Carnet Happy Dog - ${pets[0].name}` : 'Carnets Happy Dog',
           Author: 'Happy Dog',
         },
       });
@@ -125,10 +198,14 @@ export class PetsService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      const photo = await this.loadPhoto(pet.photoUrl);
-      this.drawFront(doc, pet, photo);
-      doc.addPage({ size: [CARD_WIDTH, CARD_HEIGHT], margin: 0 });
-      this.drawBack(doc, pet);
+      for (const [index, pet] of pets.entries()) {
+        if (index > 0) doc.addPage({ size: [CARD_WIDTH, CARD_HEIGHT], margin: 0 });
+        const photo = await this.loadPhoto(pet.photoUrl);
+        this.drawFront(doc, pet, photo);
+        doc.addPage({ size: [CARD_WIDTH, CARD_HEIGHT], margin: 0 });
+        this.drawBack(doc, pet);
+      }
+
       doc.end();
     });
   }

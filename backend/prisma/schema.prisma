@@ -30,6 +30,12 @@ enum PetSex {
   UNKNOWN
 }
 
+enum PetCardStatus {
+  PENDING
+  PRINTED
+  REPRINT_REQUESTED
+}
+
 enum SaleStatus {
   PENDING
   PAID
@@ -96,6 +102,11 @@ model Pet {
   weightKg Float?
   sterilized Boolean @default(false)
   photoUrl String?
+  cardStatus PetCardStatus @default(PENDING)
+  cardPrintedAt DateTime?
+  cardLastGeneratedAt DateTime?
+  cardPrintCount Int @default(0)
+  cardPrintedBy String?
   clientId String
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   appointments Appointment[]
@@ -104,6 +115,7 @@ model Pet {
   updatedAt DateTime @updatedAt
   @@index([clientId])
   @@index([name])
+  @@index([cardStatus])
 }
 
 model Service {
@@ -250,3 +262,5 @@ model ClinicalFile {
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
+
+
