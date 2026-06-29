@@ -7,6 +7,8 @@ const summary = ref({});
 const users = ref([]);
 const inventory = ref([]);
 const clients = ref([]);
+const appointments = ref([]);
+const pets = ref([]);
 const active = ref('resumen');
 const error = ref('');
 const success = ref('');
@@ -17,6 +19,13 @@ const userForm = ref({ fullName: '', email: '', password: '', role: 'VETERINARIA
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
 
 const lowStockProducts = computed(() => inventory.value.filter(p => Number(p.stock) <= Number(p.minStock)));
+const clientPetsCount = computed(() => clients.value.reduce((total, client) => total + (client.pets?.length || 0), 0));
+const adminStats = computed(() => ({
+  clients: clients.value.length || summary.value.clients || 0,
+  pets: pets.value.length || clientPetsCount.value || summary.value.pets || 0,
+  appointments: appointments.value.length || summary.value.appointments || 0,
+  lowStock: inventory.value.length ? lowStockProducts.value.length : (summary.value.lowStock || 0),
+}));
 
 function openUsers() {
   active.value = 'usuarios';
@@ -52,6 +61,8 @@ async function loadData() {
   if (usersRes.status === 'fulfilled') users.value = usersRes.value.data;
   if (inventoryRes.status === 'fulfilled') inventory.value = inventoryRes.value.data;
   if (clientsRes.status === 'fulfilled') clients.value = clientsRes.value.data;
+  if (appointmentsRes.status === 'fulfilled') appointments.value = appointmentsRes.value.data;
+  if (petsRes.status === 'fulfilled') pets.value = petsRes.value.data;
 
   if (summaryRes.status === 'fulfilled') {
     summary.value = summaryRes.value.data;
@@ -145,10 +156,10 @@ onMounted(loadData);
     </div>
 
     <div class="cards">
-      <div class="glass-card metric"><span>Clientes</span><strong>{{ summary.clients ?? 0 }}</strong></div>
-      <div class="glass-card metric"><span>Pacientes</span><strong>{{ summary.pets ?? 0 }}</strong></div>
-      <div class="glass-card metric"><span>Citas</span><strong>{{ summary.appointments ?? 0 }}</strong></div>
-      <div class="glass-card metric"><span>Stock bajo</span><strong>{{ summary.lowStock ?? lowStockProducts.length }}</strong></div>
+      <div class="glass-card metric"><span>Clientes</span><strong>{{ adminStats.clients }}</strong></div>
+      <div class="glass-card metric"><span>Pacientes</span><strong>{{ adminStats.pets }}</strong></div>
+      <div class="glass-card metric"><span>Citas</span><strong>{{ adminStats.appointments }}</strong></div>
+      <div class="glass-card metric"><span>Stock bajo</span><strong>{{ adminStats.lowStock }}</strong></div>
     </div>
 
     <div v-if="active==='usuarios'" class="panel-grid" :class="{ single: !showUserForm }">
