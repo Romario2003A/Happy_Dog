@@ -83,7 +83,6 @@ async function submit() {
     <section class="location-card glass-card">
       <div class="section-title">
         <div>
-          <span class="badge">Ubicaci&oacute;n y contacto</span>
           <h2>Vis&iacute;tanos o escr&iacute;benos por WhatsApp</h2>
         </div>
       </div>
