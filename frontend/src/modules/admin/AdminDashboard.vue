@@ -155,7 +155,7 @@ onMounted(loadData);
       </div>
     </div>
 
-    <div class="cards">
+    <div v-if="active==='resumen'" class="cards">
       <div class="glass-card metric"><span>Clientes</span><strong>{{ adminStats.clients }}</strong></div>
       <div class="glass-card metric"><span>Pacientes</span><strong>{{ adminStats.pets }}</strong></div>
       <div class="glass-card metric"><span>Citas</span><strong>{{ adminStats.appointments }}</strong></div>
