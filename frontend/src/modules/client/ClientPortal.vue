@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { api } from '../../services/api';
-import doctorDog from '../../assets/images/doctor-dog.webp';
+import doctorDog from '../../assets/images/happy-dog-doctor-painting.webp';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
 
@@ -42,24 +42,15 @@ async function submit() {
           <img :src="happyDogLogo" alt="Happy Dog">
         </div>
         <span class="badge">Veterinaria Happy Dog</span>
-        <h1>Agenda la atenci&oacute;n de tu mascota sin vueltas</h1>
-        <p>Solicita una cita en minutos. Recepci&oacute;n confirma el horario por tel&eacute;fono o WhatsApp.</p>
+        <h1>Citas veterinarias sin complicaciones</h1>
+        <p>Solicita atenci&oacute;n para tu mascota y recepci&oacute;n confirmar&aacute; el horario por tel&eacute;fono o WhatsApp.</p>
         <div class="hero-actions">
           <a class="button-link" href="#solicitar-cita">Solicitar cita</a>
           <button class="secondary" type="button" @click="$router.push('/cliente/login')">Ingresar al portal</button>
         </div>
-        <div class="trust-strip" aria-label="Servicios principales">
-          <span>Consultas</span>
-          <span>Vacunas</span>
-          <span>Controles</span>
-        </div>
       </div>
       <div class="hero-media">
         <img class="hero-doctor-dog" :src="doctorDog" alt="Perro con bata de doctor representando atencion veterinaria">
-        <div class="hero-contact-card">
-          <strong>Atenci&oacute;n en Cayma</strong>
-          <span>WhatsApp 953 280 579</span>
-        </div>
       </div>
     </header>
 
