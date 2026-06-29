@@ -89,10 +89,15 @@ const upcomingAppointments = computed(() => {
     .slice(0, 12);
 });
 
-const filteredClients = computed(() => clients.value.filter(client => {
-  const text = `${client.fullName || ''} ${client.phone || ''} ${client.email || ''} ${client.pets?.map(p => p.name).join(' ') || ''}`.toLowerCase();
-  return text.includes(search.value.toLowerCase());
-}));
+const filteredClients = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  if (query.length < 2) return [];
+
+  return clients.value.filter(client => {
+    const text = `${client.fullName || ''} ${client.phone || ''} ${client.email || ''} ${client.pets?.map(p => p.name).join(' ') || ''}`.toLowerCase();
+    return text.includes(query);
+  }).slice(0, 20);
+});
 
 const selectedClientPets = computed(() => clients.value.find(client => client.id === quick.value.clientId)?.pets || []);
 
@@ -230,6 +235,13 @@ function selectVisibleCardPets() {
 
 function clearSelectedCardPets() {
   selectedCardPetIds.value = [];
+}
+
+function setActive(tab) {
+  active.value = tab;
+  error.value = '';
+  success.value = '';
+  search.value = '';
 }
 
 async function loadData() {
@@ -447,9 +459,9 @@ onMounted(loadData);
 <template>
   <ReceptionLayout title="Recepción" subtitle="Agenda, citas por llamada y coordinación diaria" hide-user-pill>
     <template #nav>
-      <button @click="active='citas'">Citas</button>
-      <button @click="active='clientes'">Clientes</button>
-      <button @click="active='carnets'">Carnets</button>
+      <button @click="setActive('citas')">Citas</button>
+      <button @click="setActive('clientes')">Clientes</button>
+      <button @click="setActive('carnets')">Carnets</button>
       <button @click="$router.push('/recepcion/cuenta')">Mi cuenta</button>
     </template>
 
@@ -761,12 +773,16 @@ onMounted(loadData);
     <div v-else class="panel-grid">
       <section class="glass-card">
         <h2>Clientes y mascotas</h2>
-        <p class="muted-text">Busca clientes para atender llamadas, WhatsApp o consultas rápidas.</p>
-        <input v-model="search" class="search-field" placeholder="Buscar cliente, teléfono, correo o mascota">
+        <p class="muted-text">Busca por nombre, teléfono, correo o mascota. La lista aparece desde 2 caracteres para no saturar recepción.</p>
+        <input v-model="search" class="search-field" placeholder="Ej. Romario, 993, Sasha">
+        <div v-if="search.trim().length < 2" class="empty-state compact">
+          <strong>Busca un cliente para empezar</strong>
+          <span>No mostramos todos los clientes juntos porque en producción esta lista puede crecer demasiado.</span>
+        </div>
         <table>
           <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th></tr></thead>
           <tbody>
-            <tr v-if="!filteredClients.length"><td colspan="3" class="empty">No hay clientes registrados todavía.</td></tr>
+            <tr v-if="search.trim().length >= 2 && !filteredClients.length"><td colspan="3" class="empty">No hay coincidencias con esa búsqueda.</td></tr>
             <tr v-for="client in filteredClients" :key="client.id">
               <td>{{ client.fullName }}</td>
               <td>{{ client.phone || client.email || '-' }}</td>
