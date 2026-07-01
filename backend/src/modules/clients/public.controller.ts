@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
 import { AppointmentStatus, PetSex } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
@@ -9,8 +9,15 @@ export class PublicController {
   @Post('appointment-request')
   async request(@Body() body: any) {
     const email = String(body.email || '').trim() || undefined;
-    const phone = String(body.phone || '').trim() || undefined;
+    const phone = String(body.phone || '').replace(/\D+/g, '') || undefined;
+    const fullName = String(body.fullName || '').trim();
     const petName = String(body.petName || '').trim();
+    const reason = String(body.reason || '').trim();
+    const scheduledAt = new Date(body.scheduledAt);
+
+    if (!fullName || !phone || !petName || !reason || Number.isNaN(scheduledAt.getTime())) {
+      throw new BadRequestException('Completa nombre, WhatsApp, mascota, fecha y motivo de la visita.');
+    }
 
     let client = await this.prisma.client.findFirst({
       where: {
@@ -25,7 +32,7 @@ export class PublicController {
     if (!client) {
       client = await this.prisma.client.create({
         data: {
-          fullName: body.fullName,
+          fullName,
           phone,
           email,
         },
@@ -39,7 +46,7 @@ export class PublicController {
       pet = await this.prisma.pet.create({
         data: {
           name: petName,
-          species: body.species,
+          species: String(body.species || '').trim() || 'No especificada',
           breed: body.breed || undefined,
           sex: Object.values(PetSex).includes(body.sex) ? body.sex : PetSex.UNKNOWN,
           age: body.age || undefined,
@@ -53,8 +60,8 @@ export class PublicController {
       data: {
         clientId: client.id,
         petId: pet.id,
-        reason: body.reason,
-        scheduledAt: new Date(body.scheduledAt),
+        reason,
+        scheduledAt,
         status: AppointmentStatus.PENDING,
       },
     });

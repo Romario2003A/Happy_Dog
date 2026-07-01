@@ -22,17 +22,39 @@ const form = ref({
 });
 const sent = ref(false);
 const error = ref('');
+const loading = ref(false);
 
 async function submit() {
   error.value = '';
+  sent.value = false;
+  const phone = String(form.value.phone || '').replace(/\D+/g, '');
+
+  if (phone.length < 7) {
+    error.value = 'Ingresa un WhatsApp valido para poder confirmarte la cita.';
+    return;
+  }
+
+  if (!form.value.scheduledAt) {
+    error.value = 'Selecciona fecha y hora para la cita.';
+    return;
+  }
+
+  loading.value = true;
   try {
     await api.post('/public/appointment-request', {
       ...form.value,
-      phone: String(form.value.phone || '').replace(/\s+/g, ''),
+      fullName: form.value.fullName.trim(),
+      phone,
+      petName: form.value.petName.trim(),
+      reason: form.value.reason.trim(),
+      species: form.value.species || 'No especificada',
+      sex: form.value.sex || 'UNKNOWN',
     });
     sent.value = true;
   } catch (e) {
-    sent.value = true;
+    error.value = e.response?.data?.message || 'No se pudo enviar la solicitud. Revisa los datos e intenta nuevamente.';
+  } finally {
+    loading.value = false;
   }
 }
 </script>
@@ -63,12 +85,13 @@ async function submit() {
         <p class="muted-text">D&eacute;janos tus datos y te confirmamos la cita por WhatsApp.</p>
         <form class="form-grid quick-request-form" @submit.prevent="submit">
           <input v-model="form.fullName" required placeholder="Nombre del due&ntilde;o">
-          <input v-model="form.phone" required inputmode="tel" autocomplete="tel" placeholder="WhatsApp">
+          <input v-model="form.phone" required inputmode="tel" autocomplete="tel" placeholder="WhatsApp" @input="form.phone = form.phone.replace(/\s+/g, '')">
           <input v-model="form.petName" required placeholder="Nombre de la mascota">
           <input v-model="form.scheduledAt" type="datetime-local" required>
           <textarea v-model="form.reason" required placeholder="Motivo de la visita"></textarea>
-          <button>Enviar y esperar confirmaci&oacute;n</button>
+          <button :disabled="loading">{{ loading ? 'Enviando...' : 'Enviar y esperar confirmaci&oacute;n' }}</button>
         </form>
+        <p v-if="error" class="error">{{ error }}</p>
         <p v-if="sent" class="success">Solicitud recibida. Recepci&oacute;n revisar&aacute; la agenda y te confirmar&aacute; pronto.</p>
       </section>
 
