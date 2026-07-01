@@ -9,6 +9,20 @@ const pets=ref([]);
 const error=ref('');
 const success=ref('');
 const photoInputs=ref({});
+const newPetPhotoInput=ref(null);
+const showPetForm=ref(false);
+const savingPet=ref(false);
+const newPet=ref({
+  name:'',
+  species:'Perro',
+  breed:'',
+  sex:'UNKNOWN',
+  color:'',
+  age:'',
+  weightKg:'',
+  sterilized:false,
+  photo:null,
+});
 
 const activeAppointments=computed(()=>appointments.value
   .filter(a=>!['CANCELLED','ATTENDED'].includes(a.status))
@@ -35,12 +49,9 @@ async function uploadPetPhoto(petId,event){
   if(!file) return;
   error.value='';
   success.value='';
-  if(!['image/jpeg','image/png'].includes(file.type)){
-    error.value='Sube una foto en formato JPG o PNG para que salga en el carnet.';
-    return;
-  }
-  if(file.size>4*1024*1024){
-    error.value='La foto no debe pesar mas de 4 MB.';
+  const validation=validatePhoto(file);
+  if(validation){
+    error.value=validation;
     return;
   }
   try{
@@ -51,6 +62,78 @@ async function uploadPetPhoto(petId,event){
     await loadData();
   }catch(e){
     error.value=e.response?.data?.message || 'No se pudo subir la foto.';
+  }
+}
+
+function validatePhoto(file){
+  if(!file) return '';
+  if(!['image/jpeg','image/png'].includes(file.type)) return 'Sube una foto en formato JPG o PNG para que salga en el carnet.';
+  if(file.size>4*1024*1024) return 'La foto no debe pesar mas de 4 MB.';
+  return '';
+}
+
+function handleNewPetPhoto(event){
+  const file=event.target.files?.[0] || null;
+  const validation=validatePhoto(file);
+  error.value='';
+  if(validation){
+    newPet.value.photo=null;
+    event.target.value='';
+    error.value=validation;
+    return;
+  }
+  newPet.value.photo=file;
+}
+
+function resetPetForm(){
+  newPet.value={
+    name:'',
+    species:'Perro',
+    breed:'',
+    sex:'UNKNOWN',
+    color:'',
+    age:'',
+    weightKg:'',
+    sterilized:false,
+    photo:null,
+  };
+  if(newPetPhotoInput.value) newPetPhotoInput.value.value='';
+}
+
+async function createPet(){
+  error.value='';
+  success.value='';
+  if(!newPet.value.name.trim() || !newPet.value.species.trim()){
+    error.value='Completa nombre y especie de la mascota.';
+    return;
+  }
+  savingPet.value=true;
+  try{
+    const { data: pet } = await api.post('/client-portal/pets',{
+      name:newPet.value.name.trim(),
+      species:newPet.value.species.trim(),
+      breed:newPet.value.breed.trim() || undefined,
+      sex:newPet.value.sex,
+      color:newPet.value.color.trim() || undefined,
+      age:newPet.value.age.trim() || undefined,
+      weightKg:newPet.value.weightKg === '' ? undefined : Number(newPet.value.weightKg),
+      sterilized:newPet.value.sterilized,
+    });
+
+    if(newPet.value.photo){
+      const formData=new FormData();
+      formData.append('photo',newPet.value.photo);
+      await api.post(`/client-portal/pets/${pet.id}/photo`,formData,{headers:{'Content-Type':'multipart/form-data'}});
+    }
+
+    success.value='Mascota registrada correctamente.';
+    resetPetForm();
+    showPetForm.value=false;
+    await loadData();
+  }catch(e){
+    error.value=e.response?.data?.message || 'No se pudo registrar la mascota.';
+  }finally{
+    savingPet.value=false;
   }
 }
 
@@ -132,11 +215,36 @@ onMounted(loadData);
             <span class="badge">Mascotas</span>
             <h2>Ficha y carnet</h2>
           </div>
-          <span class="status">{{ petsWithPrintableCard }} listos</span>
+          <button class="small secondary" type="button" @click="showPetForm=!showPetForm">
+            {{ showPetForm ? 'Cerrar' : 'Agregar mascota' }}
+          </button>
         </div>
+        <form v-if="showPetForm" class="client-pet-form" @submit.prevent="createPet">
+          <input v-model="newPet.name" required placeholder="Nombre de la mascota">
+          <input v-model="newPet.species" required placeholder="Especie">
+          <input v-model="newPet.breed" placeholder="Raza">
+          <select v-model="newPet.sex">
+            <option value="UNKNOWN">Sexo no especificado</option>
+            <option value="MALE">Macho</option>
+            <option value="FEMALE">Hembra</option>
+          </select>
+          <input v-model="newPet.age" placeholder="Edad aproximada">
+          <input v-model="newPet.color" placeholder="Color">
+          <input v-model="newPet.weightKg" type="number" step="0.01" min="0" placeholder="Peso kg opcional">
+          <label class="check-row">
+            <input v-model="newPet.sterilized" type="checkbox">
+            <span>Esterilizado</span>
+          </label>
+          <label class="pet-photo-uploader">
+            <input ref="newPetPhotoInput" type="file" accept="image/jpeg,image/png" @change="handleNewPetPhoto">
+            <strong>{{ newPet.photo ? 'Foto seleccionada' : 'Subir foto para carnet' }}</strong>
+            <span>JPG o PNG, maximo 4 MB. La imagen se ajusta automaticamente.</span>
+          </label>
+          <button :disabled="savingPet">{{ savingPet ? 'Guardando...' : 'Guardar mascota' }}</button>
+        </form>
         <div v-if="!pets.length" class="friendly-empty">
           <strong>Aun no hay mascotas registradas</strong>
-          <span>Solicita una cita o pide a recepcion que agregue la ficha.</span>
+          <span>Agrega tu mascota y sube su foto para preparar el carnet.</span>
         </div>
         <div v-else class="client-pet-list">
           <article v-for="p in pets" :key="p.id" class="client-pet-card">

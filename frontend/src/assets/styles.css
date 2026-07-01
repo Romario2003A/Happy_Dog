@@ -213,6 +213,15 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .friendly-empty{display:grid;place-items:center;text-align:center;gap:8px;min-height:150px;padding:20px;border:1px dashed rgba(21,91,102,.18);border-radius:18px;background:rgba(255,255,255,.48);color:var(--muted)}
 .friendly-empty strong{color:var(--ink)}
 .client-pet-list{display:grid;gap:12px}
+.client-pet-form{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:0 0 16px;padding:16px;border-radius:20px;background:linear-gradient(145deg,rgba(255,255,255,.84),rgba(239,252,246,.72));border:1px solid var(--line)}
+.client-pet-form button{grid-column:1/-1;justify-self:start;min-width:220px}
+.check-row{display:flex;align-items:center;gap:10px;margin:0;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72);color:var(--ink)}
+.check-row input{width:auto;accent-color:var(--blue)}
+.pet-photo-uploader{grid-column:1/-1;display:grid;gap:5px;margin:0;padding:16px;border:1px dashed rgba(21,91,102,.24);border-radius:18px;background:rgba(255,255,255,.62);cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .18s ease}
+.pet-photo-uploader:hover{transform:translateY(-1px);border-color:rgba(15,143,125,.45);background:rgba(255,255,255,.82)}
+.pet-photo-uploader input{display:none}
+.pet-photo-uploader strong{color:var(--blue-dark)}
+.pet-photo-uploader span{color:var(--muted);font-weight:600}
 .client-pet-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px;border-radius:20px;background:rgba(255,255,255,.68);border:1px solid var(--line);box-shadow:0 12px 28px rgba(21,91,102,.06)}
 .pet-photo{width:72px;height:72px;border-radius:18px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(135deg,rgba(21,91,102,.12),rgba(134,214,173,.18));border:3px solid rgba(255,255,255,.9);box-shadow:0 10px 24px rgba(21,91,102,.09);color:var(--blue-dark);font-size:30px;font-weight:900}
 .pet-photo img{width:100%;height:100%;object-fit:cover}
@@ -328,5 +337,5 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 @media(max-width:1100px){.sheet-top,.owner-grid,.pet-grid,.vitals-grid,.diagnosis-grid,.frequency-row{grid-template-columns:1fr}.sheet-top .sheet-code:last-child{text-align:left}.clinical-table div,.clinical-table div:nth-child(2n),.pet-grid div:nth-child(2n),.pet-grid div:nth-child(3n){border-right:0}.exam-section{grid-template-columns:1fr 1fr}}
 @media(max-width:900px){.login-page,.public-page{padding:18px}.app-shell,.client-shell{grid-template-columns:1fr;padding:14px;gap:14px}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.doctor-hero,.doctor-stats,.quick-action-grid,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row,.contact-grid,.card-workflow{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.admin-hero,.calendar-header,.calendar-event{flex-direction:column;align-items:flex-start}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.date-controls{width:100%;flex-wrap:wrap}.date-controls input{min-width:0;max-width:none;flex:1}.week-calendar{grid-template-columns:1fr}.week-day{min-width:0}table{display:block;overflow-x:auto;max-width:100%}.whatsapp-float{right:14px;bottom:14px;min-height:44px;padding:10px 14px}.hero-actions .button-link{width:100%}}
 @media(max-width:900px){.client-dashboard-hero,.client-dashboard-grid{grid-template-columns:1fr}.client-summary-strip{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:620px){.client-summary-strip{grid-template-columns:1fr}.client-pet-card{grid-template-columns:auto 1fr}.client-pet-card button{grid-column:1/-1;width:100%}.client-appointment-list article{align-items:flex-start;flex-direction:column}}
+@media(max-width:620px){.client-summary-strip,.client-pet-form{grid-template-columns:1fr}.client-pet-card{grid-template-columns:auto 1fr}.client-pet-card button,.client-pet-form button{grid-column:1/-1;width:100%}.client-appointment-list article{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

@@ -1,6 +1,6 @@
-import { BadRequestException, Controller, Get, NotFoundException, Param, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Role } from '@prisma/client';
+import { PetSex, Role } from '@prisma/client';
 import { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -23,6 +23,37 @@ export class ClientPortalController {
   @Get('pets')
   pets(@CurrentUser('id') clientId: string) {
     return this.prisma.pet.findMany({ where: { clientId }, orderBy: { createdAt: 'desc' } });
+  }
+
+  @Post('pets')
+  createPet(@CurrentUser('id') clientId: string, @Body() body: any) {
+    const name = String(body.name || '').trim();
+    const species = String(body.species || '').trim();
+    if (!name || !species) {
+      throw new BadRequestException('Completa nombre y especie de la mascota.');
+    }
+
+    const weightKg = body.weightKg === '' || body.weightKg === undefined || body.weightKg === null
+      ? undefined
+      : Number(body.weightKg);
+
+    if (weightKg !== undefined && Number.isNaN(weightKg)) {
+      throw new BadRequestException('El peso debe ser un numero valido.');
+    }
+
+    return this.prisma.pet.create({
+      data: {
+        name,
+        species,
+        breed: String(body.breed || '').trim() || undefined,
+        sex: Object.values(PetSex).includes(body.sex) ? body.sex : PetSex.UNKNOWN,
+        color: String(body.color || '').trim() || undefined,
+        age: String(body.age || '').trim() || undefined,
+        weightKg,
+        sterilized: Boolean(body.sterilized),
+        clientId,
+      },
+    });
   }
 
   @Get('appointments')
