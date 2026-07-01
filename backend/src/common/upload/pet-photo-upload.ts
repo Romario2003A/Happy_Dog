@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Request } from 'express';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 
@@ -32,5 +32,10 @@ export function publicUploadUrl(req: Request, path: string) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0];
   const protocol = forwardedProto || req.protocol || 'http';
   return `${protocol}://${req.get('host')}${path}`;
+}
+
+export function uploadedFileDataUrl(file: Express.Multer.File) {
+  const buffer = file.buffer || readFileSync(file.path);
+  return `data:${file.mimetype};base64,${buffer.toString('base64')}`;
 }
 

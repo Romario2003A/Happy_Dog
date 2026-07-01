@@ -5,7 +5,7 @@ import { Request, Response } from 'express';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { petPhotoUploadOptions, publicUploadUrl } from '../../common/upload/pet-photo-upload';
+import { petPhotoUploadOptions, uploadedFileDataUrl } from '../../common/upload/pet-photo-upload';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { PetsService } from './pets.service';
 
@@ -62,9 +62,9 @@ export class PetsController {
 
   @Post(':id/photo')
   @UseInterceptors(FileInterceptor('photo', petPhotoUploadOptions))
-  uploadPhoto(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Req() req: Request) {
+  uploadPhoto(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Selecciona una foto de la mascota.');
-    const photoUrl = publicUploadUrl(req, `/uploads/pets/${file.filename}`);
+    const photoUrl = uploadedFileDataUrl(file);
     return this.service.updatePhoto(id, photoUrl);
   }
 

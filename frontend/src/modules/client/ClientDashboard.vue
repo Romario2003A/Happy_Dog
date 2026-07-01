@@ -9,6 +9,7 @@ const pets=ref([]);
 const error=ref('');
 const success=ref('');
 const photoInputs=ref({});
+const brokenPhotos=ref({});
 const newPetPhotoInput=ref(null);
 const showPetForm=ref(false);
 const savingPet=ref(false);
@@ -32,7 +33,7 @@ const recentAppointments=computed(()=>[...appointments.value]
   .sort((a,b)=>new Date(b.scheduledAt)-new Date(a.scheduledAt))
   .slice(0,4));
 const petsPendingPhoto=computed(()=>pets.value.filter(p=>!p.photoUrl).length);
-const petsWithPrintableCard=computed(()=>pets.value.filter(p=>p.photoUrl && p.cardStatus!=='PRINTED').length);
+const petsWithPrintableCard=computed(()=>pets.value.filter(p=>displayPetPhoto(p) && p.cardStatus!=='PRINTED').length);
 const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
 
 async function loadData(){
@@ -58,6 +59,7 @@ async function uploadPetPhoto(petId,event){
     const formData=new FormData();
     formData.append('photo',file);
     await api.post(`/client-portal/pets/${petId}/photo`,formData,{headers:{'Content-Type':'multipart/form-data'}});
+    brokenPhotos.value[petId]=false;
     success.value='Foto actualizada correctamente.';
     await loadData();
   }catch(e){
@@ -149,9 +151,18 @@ function statusLabel(status){
 
 function cardStatusLabel(pet){
   if(!pet.photoUrl) return 'Falta foto';
+  if(brokenPhotos.value[pet.id]) return 'Vuelve a subir foto';
   if(pet.cardStatus==='PRINTED') return 'Carnet entregado';
   if(pet.cardStatus==='REPRINT_REQUESTED') return 'Reimpresion solicitada';
   return 'Listo para carnet';
+}
+
+function displayPetPhoto(pet){
+  return Boolean(pet.photoUrl && !brokenPhotos.value[pet.id]);
+}
+
+function markPhotoBroken(petId){
+  brokenPhotos.value[petId]=true;
 }
 
 function triggerPhotoInput(petId){
@@ -249,7 +260,7 @@ onMounted(loadData);
         <div v-else class="client-pet-list">
           <article v-for="p in pets" :key="p.id" class="client-pet-card">
             <div class="pet-photo">
-              <img v-if="p.photoUrl" :src="p.photoUrl" :alt="p.name">
+              <img v-if="displayPetPhoto(p)" :src="p.photoUrl" :alt="p.name" @error="markPhotoBroken(p.id)">
               <span v-else>{{ p.name?.charAt(0) || 'M' }}</span>
             </div>
             <div class="pet-info">

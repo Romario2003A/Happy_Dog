@@ -1,12 +1,11 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PetSex, Role } from '@prisma/client';
-import { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { petPhotoUploadOptions, publicUploadUrl } from '../../common/upload/pet-photo-upload';
+import { petPhotoUploadOptions, uploadedFileDataUrl } from '../../common/upload/pet-photo-upload';
 import { PrismaService } from '../../database/prisma.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,12 +70,11 @@ export class ClientPortalController {
     @CurrentUser('id') clientId: string,
     @Param('id') petId: string,
     @UploadedFile() file: Express.Multer.File,
-    @Req() req: Request,
   ) {
     if (!file) throw new BadRequestException('Selecciona una foto de la mascota.');
     const pet = await this.prisma.pet.findFirst({ where: { id: petId, clientId } });
     if (!pet) throw new NotFoundException('Mascota no encontrada.');
-    const photoUrl = publicUploadUrl(req, `/uploads/pets/${file.filename}`);
+    const photoUrl = uploadedFileDataUrl(file);
     return this.prisma.pet.update({ where: { id: petId }, data: { photoUrl } });
   }
 }

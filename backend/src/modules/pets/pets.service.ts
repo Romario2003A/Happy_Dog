@@ -518,7 +518,11 @@ export class PetsService {
   }
 
   private async loadPhoto(photoUrl?: string | null) {
-    if (!photoUrl || !/^https?:\/\//i.test(photoUrl)) return null;
+    if (!photoUrl) return null;
+    if (/^data:image\/(?:png|jpe?g);base64,/i.test(photoUrl)) {
+      return Buffer.from(photoUrl.split(',')[1], 'base64');
+    }
+    if (!/^https?:\/\//i.test(photoUrl)) return null;
     try {
       const response = await fetch(photoUrl);
       if (!response.ok) return null;
