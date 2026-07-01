@@ -620,7 +620,7 @@ onMounted(loadData);
             <label>Peso kg<input v-model.number="quick.weightKg" type="number" min="0" step="0.01" placeholder="Ej. 8.5"></label>
           </template>
 
-          <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local"></label>
+          <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local" step="1"></label>
           <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
           <div v-if="possibleDuplicateAppointments.length" class="duplicate-alert">
             <strong>Posible cita duplicada</strong>

@@ -87,7 +87,7 @@ async function submit() {
           <input v-model="form.fullName" required placeholder="Nombre del due&ntilde;o">
           <input v-model="form.phone" required inputmode="tel" autocomplete="tel" placeholder="WhatsApp" @input="form.phone = form.phone.replace(/\s+/g, '')">
           <input v-model="form.petName" required placeholder="Nombre de la mascota">
-          <input v-model="form.scheduledAt" type="datetime-local" required>
+          <input v-model="form.scheduledAt" type="datetime-local" step="1" required>
           <textarea v-model="form.reason" required placeholder="Motivo de la visita"></textarea>
           <button :disabled="loading">{{ loading ? 'Enviando...' : 'Enviar y esperar confirmaci&oacute;n' }}</button>
         </form>
