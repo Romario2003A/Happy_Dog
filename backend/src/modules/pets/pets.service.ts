@@ -306,7 +306,10 @@ export class PetsService {
     doc.roundedRect(x, y, size, size, this.mm(2)).fill('#FFFFFF').stroke('#155B66');
     if (photo) {
       try {
-        doc.image(photo, x + 2, y + 2, { width: size - 4, height: size - 4, fit: [size - 4, size - 4], align: 'center', valign: 'center' });
+        doc.save();
+        doc.roundedRect(x + 2, y + 2, size - 4, size - 4, this.mm(1.5)).clip();
+        doc.image(photo, x + 2, y + 2, { cover: [size - 4, size - 4], align: 'center', valign: 'center' });
+        doc.restore();
       } catch {
         this.drawPhotoPlaceholder(doc, pet, x, y, size);
       }
@@ -322,7 +325,10 @@ export class PetsService {
     doc.opacity(0.58);
     if (photo) {
       try {
-        doc.image(photo, x + 1.2, y + 1.2, { width: size - 2.4, height: size - 2.4, fit: [size - 2.4, size - 2.4], align: 'center', valign: 'center' });
+        doc.save();
+        doc.roundedRect(x + 1.2, y + 1.2, size - 2.4, size - 2.4, this.mm(1)).clip();
+        doc.image(photo, x + 1.2, y + 1.2, { cover: [size - 2.4, size - 2.4], align: 'center', valign: 'center' });
+        doc.restore();
       } catch {
         this.drawPhotoPlaceholder(doc, pet, x, y, size);
       }
