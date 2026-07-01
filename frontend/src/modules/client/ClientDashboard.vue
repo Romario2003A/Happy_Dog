@@ -1,8 +1,12 @@
 <script setup>
 import { computed, ref,onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import ClientLayout from '../../layouts/ClientLayout.vue';
 import { api } from '../../services/api';
+import { useAuthStore } from '../../stores/auth';
 
+const router=useRouter();
+const auth=useAuthStore();
 const profile=ref(null);
 const appointments=ref([]);
 const pets=ref([]);
@@ -38,10 +42,19 @@ const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
 
 async function loadData(){
   try{
-    profile.value=(await api.get('/client-portal/me')).data;
-    pets.value=(await api.get('/client-portal/pets')).data;
-    appointments.value=(await api.get('/client-portal/appointments')).data;
-  }catch(e){}
+    const [profileResponse,petsResponse,appointmentsResponse]=await Promise.all([
+      api.get('/client-portal/me'),
+      api.get('/client-portal/pets'),
+      api.get('/client-portal/appointments'),
+    ]);
+    if(!profileResponse.data) throw new Error('CLIENT_PROFILE_NOT_FOUND');
+    profile.value=profileResponse.data;
+    pets.value=petsResponse.data;
+    appointments.value=appointmentsResponse.data;
+  }catch(e){
+    auth.logout();
+    router.replace('/cliente/login');
+  }
 }
 
 async function uploadPetPhoto(petId,event){
