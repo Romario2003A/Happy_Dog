@@ -11,14 +11,14 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(helmet({ crossOriginResourcePolicy: false }));
   app.enableCors({ origin: config.get('CORS_ORIGIN')?.split(',') ?? true, credentials: true });
-  app.use('/uploads', express.static(join(process.cwd(), 'uploads'), {
-    setHeaders: (res) => {
-      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    },
-  }));
+  app.use('/uploads', (_req, res, next) => {
+    res.removeHeader('Cross-Origin-Resource-Policy');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+  }, express.static(join(process.cwd(), 'uploads')));
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   const swagger = new DocumentBuilder().setTitle('Happy Dog API').setVersion('1.0').addBearerAuth().build();
