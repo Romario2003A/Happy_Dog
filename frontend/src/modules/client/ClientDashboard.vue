@@ -1,5 +1,5 @@
 <script setup>
-import { ref,onMounted } from 'vue';
+import { computed, ref,onMounted } from 'vue';
 import ClientLayout from '../../layouts/ClientLayout.vue';
 import { api } from '../../services/api';
 
@@ -8,6 +8,18 @@ const appointments=ref([]);
 const pets=ref([]);
 const error=ref('');
 const success=ref('');
+const photoInputs=ref({});
+
+const activeAppointments=computed(()=>appointments.value
+  .filter(a=>!['CANCELLED','ATTENDED'].includes(a.status))
+  .sort((a,b)=>new Date(a.scheduledAt)-new Date(b.scheduledAt)));
+const nextAppointment=computed(()=>activeAppointments.value.find(a=>new Date(a.scheduledAt)>=new Date()) || activeAppointments.value[0]);
+const recentAppointments=computed(()=>[...appointments.value]
+  .sort((a,b)=>new Date(b.scheduledAt)-new Date(a.scheduledAt))
+  .slice(0,4));
+const petsPendingPhoto=computed(()=>pets.value.filter(p=>!p.photoUrl).length);
+const petsWithPrintableCard=computed(()=>pets.value.filter(p=>p.photoUrl && p.cardStatus!=='PRINTED').length);
+const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
 
 async function loadData(){
   try{
@@ -42,28 +54,135 @@ async function uploadPetPhoto(petId,event){
   }
 }
 
+function formatDate(value){
+  if(!value) return '-';
+  return new Date(value).toLocaleString('es-PE',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function statusLabel(status){
+  const labels={PENDING:'Pendiente',CONFIRMED:'Confirmada',IN_PROGRESS:'En consulta',ATTENDED:'Atendida',CANCELLED:'Cancelada'};
+  return labels[status] || status || '-';
+}
+
+function cardStatusLabel(pet){
+  if(!pet.photoUrl) return 'Falta foto';
+  if(pet.cardStatus==='PRINTED') return 'Carnet entregado';
+  if(pet.cardStatus==='REPRINT_REQUESTED') return 'Reimpresion solicitada';
+  return 'Listo para carnet';
+}
+
+function triggerPhotoInput(petId){
+  photoInputs.value[petId]?.click();
+}
+
 onMounted(loadData);
 </script>
 <template>
-  <ClientLayout title="Mi portal" subtitle="Tus mascotas, citas y datos registrados">
-    <template #nav><button @click="$router.push('/cliente')">Solicitar cita</button></template>
+  <ClientLayout title="Portal cliente" subtitle="Mascotas, citas y carnet en un solo lugar">
+    <template #nav><button class="secondary" @click="$router.push('/cliente')">Nueva cita</button></template>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
-    <div class="cards">
-      <div class="glass-card metric"><span>Mascotas</span><strong>{{ pets.length }}</strong></div>
-      <div class="glass-card metric"><span>Citas</span><strong>{{ appointments.length }}</strong></div>
-      <div class="glass-card metric"><span>Estado</span><strong>{{ profile?.active===false?'Inactivo':'Activo' }}</strong></div>
-      <div class="glass-card metric"><span>Contacto</span><strong>{{ profile?.phone || '-' }}</strong></div>
-    </div>
-    <div class="panel-grid">
-      <section class="glass-card">
-        <h2>Mis citas</h2>
-        <table><thead><tr><th>Mascota</th><th>Fecha</th><th>Estado</th></tr></thead><tbody><tr v-if="!appointments.length"><td colspan="3" class="empty">Aun no tienes citas registradas.</td></tr><tr v-for="a in appointments" :key="a.id"><td>{{ a.pet?.name }}</td><td>{{ new Date(a.scheduledAt).toLocaleString() }}</td><td><span class="status">{{ a.status }}</span></td></tr></tbody></table>
+
+    <section class="client-dashboard-hero glass-card">
+      <div>
+        <span class="badge">Happy Dog</span>
+        <h2>{{ clientName }}, aqui esta todo listo para tu mascota</h2>
+        <p class="muted-text">Revisa tus citas, actualiza fotos para el carnet y ten la informacion de tus mascotas ordenada.</p>
+      </div>
+      <div class="client-summary-strip">
+        <article>
+          <strong>{{ pets.length }}</strong>
+          <span>Mascotas</span>
+        </article>
+        <article>
+          <strong>{{ activeAppointments.length }}</strong>
+          <span>Citas activas</span>
+        </article>
+        <article>
+          <strong>{{ petsPendingPhoto }}</strong>
+          <span>Fotos pendientes</span>
+        </article>
+      </div>
+    </section>
+
+    <div class="client-dashboard-grid">
+      <section class="glass-card next-appointment-card">
+        <div class="section-title compact">
+          <div>
+            <span class="badge">Proxima cita</span>
+            <h2>Agenda</h2>
+          </div>
+          <button class="small secondary" @click="$router.push('/cliente')">Agendar</button>
+        </div>
+        <div v-if="nextAppointment" class="next-appointment">
+          <strong>{{ nextAppointment.pet?.name || 'Mascota' }}</strong>
+          <span>{{ formatDate(nextAppointment.scheduledAt) }}</span>
+          <p>{{ nextAppointment.reason || 'Consulta veterinaria' }}</p>
+          <span class="status">{{ statusLabel(nextAppointment.status) }}</span>
+        </div>
+        <div v-else class="friendly-empty">
+          <strong>No tienes citas activas</strong>
+          <span>Cuando recepcion confirme una cita, aparecera aqui.</span>
+        </div>
       </section>
-      <section class="glass-card">
-        <h2>Mis mascotas</h2>
-        <p class="muted-text">Sube una foto clara de tu mascota. El sistema la ajusta automaticamente al carnet.</p>
-        <table><tbody><tr v-if="!pets.length"><td class="empty">Sin mascotas registradas.</td></tr><tr v-for="p in pets" :key="p.id"><td>{{ p.name }}</td><td>{{ p.species }}</td><td><span v-if="p.photoUrl" class="status">Con foto</span><span v-else class="status">Sin foto</span></td><td><label class="small secondary file-button">Subir foto<input type="file" accept="image/jpeg,image/png" @change="uploadPetPhoto(p.id,$event)"></label></td></tr></tbody></table>
+
+      <section class="glass-card pet-overview-card">
+        <div class="section-title compact">
+          <div>
+            <span class="badge">Mascotas</span>
+            <h2>Ficha y carnet</h2>
+          </div>
+          <span class="status">{{ petsWithPrintableCard }} listos</span>
+        </div>
+        <div v-if="!pets.length" class="friendly-empty">
+          <strong>Aun no hay mascotas registradas</strong>
+          <span>Solicita una cita o pide a recepcion que agregue la ficha.</span>
+        </div>
+        <div v-else class="client-pet-list">
+          <article v-for="p in pets" :key="p.id" class="client-pet-card">
+            <div class="pet-photo">
+              <img v-if="p.photoUrl" :src="p.photoUrl" :alt="p.name">
+              <span v-else>{{ p.name?.charAt(0) || 'M' }}</span>
+            </div>
+            <div class="pet-info">
+              <strong>{{ p.name }}</strong>
+              <span>{{ p.species || 'Mascota' }}<template v-if="p.breed"> - {{ p.breed }}</template></span>
+              <small>{{ cardStatusLabel(p) }}</small>
+            </div>
+            <input
+              :ref="el=>{ if(el) photoInputs[p.id]=el }"
+              class="sr-only"
+              type="file"
+              accept="image/jpeg,image/png"
+              @change="uploadPetPhoto(p.id,$event)"
+            >
+            <button class="small secondary" @click="triggerPhotoInput(p.id)">
+              {{ p.photoUrl ? 'Cambiar foto' : 'Subir foto' }}
+            </button>
+          </article>
+        </div>
+      </section>
+
+      <section class="glass-card client-history-card">
+        <div class="section-title compact">
+          <div>
+            <span class="badge">Historial</span>
+            <h2>Ultimas citas</h2>
+          </div>
+        </div>
+        <div v-if="!recentAppointments.length" class="friendly-empty">
+          <strong>Sin historial todavia</strong>
+          <span>Tus visitas atendidas y solicitudes apareceran en esta lista.</span>
+        </div>
+        <div v-else class="client-appointment-list">
+          <article v-for="a in recentAppointments" :key="a.id">
+            <div>
+              <strong>{{ a.pet?.name || 'Mascota' }}</strong>
+              <span>{{ formatDate(a.scheduledAt) }}</span>
+            </div>
+            <span class="status">{{ statusLabel(a.status) }}</span>
+          </article>
+        </div>
       </section>
     </div>
   </ClientLayout>

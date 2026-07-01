@@ -196,6 +196,36 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .client-shell{min-height:100vh;padding:24px;display:grid;gap:22px}
 .client-top{padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px}
 .client-top nav,.user-actions{display:flex;align-items:center;gap:10px}
+.client-dashboard-hero{display:grid;grid-template-columns:1fr auto;align-items:center;gap:22px;overflow:hidden;position:relative;background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(237,249,243,.82) 62%,rgba(255,246,219,.72))}
+.client-dashboard-hero:before{content:"";position:absolute;inset:0 auto auto 0;width:220px;height:5px;background:linear-gradient(90deg,var(--blue-dark),var(--mint),var(--sun))}
+.client-dashboard-hero h2{font-size:clamp(30px,4vw,44px);line-height:1.05;margin:12px 0 10px;max-width:720px}
+.client-dashboard-hero p{max-width:600px;margin:0}
+.client-summary-strip{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
+.client-summary-strip article{min-width:120px;padding:16px;border-radius:18px;background:rgba(255,255,255,.7);border:1px solid var(--line);box-shadow:0 12px 28px rgba(21,91,102,.07)}
+.client-summary-strip strong{display:block;font-size:34px;color:var(--blue-dark)}
+.client-summary-strip span{display:block;margin-top:4px;color:var(--muted);font-size:12px;font-weight:900;text-transform:uppercase}
+.client-dashboard-grid{display:grid;grid-template-columns:.74fr 1.26fr;gap:22px;align-items:start}
+.next-appointment-card,.pet-overview-card,.client-history-card{align-content:start}
+.client-history-card{grid-column:1/-1}
+.next-appointment{display:grid;gap:8px;padding:18px;border-radius:20px;background:linear-gradient(135deg,rgba(15,143,125,.1),rgba(255,255,255,.75));border:1px solid rgba(15,143,125,.18)}
+.next-appointment strong{font-size:26px}
+.next-appointment p{margin:0;color:var(--muted)}
+.friendly-empty{display:grid;place-items:center;text-align:center;gap:8px;min-height:150px;padding:20px;border:1px dashed rgba(21,91,102,.18);border-radius:18px;background:rgba(255,255,255,.48);color:var(--muted)}
+.friendly-empty strong{color:var(--ink)}
+.client-pet-list{display:grid;gap:12px}
+.client-pet-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px;border-radius:20px;background:rgba(255,255,255,.68);border:1px solid var(--line);box-shadow:0 12px 28px rgba(21,91,102,.06)}
+.pet-photo{width:72px;height:72px;border-radius:18px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(135deg,rgba(21,91,102,.12),rgba(134,214,173,.18));border:3px solid rgba(255,255,255,.9);box-shadow:0 10px 24px rgba(21,91,102,.09);color:var(--blue-dark);font-size:30px;font-weight:900}
+.pet-photo img{width:100%;height:100%;object-fit:cover}
+.pet-info{display:grid;gap:3px;min-width:0}
+.pet-info strong{font-size:20px}
+.pet-info span,.pet-info small{color:var(--muted)}
+.pet-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pet-info small{font-weight:800}
+.client-appointment-list{display:grid;gap:10px}
+.client-appointment-list article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.62);border:1px solid var(--line)}
+.client-appointment-list article div{display:grid;gap:3px}
+.client-appointment-list article span:not(.status){color:var(--muted)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .page-heading h1{margin:0}
 .page-heading p{color:var(--muted)}
 .full{width:100%;margin-top:14px}
@@ -297,4 +327,6 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 .location-card{animation-delay:.12s}
 @media(max-width:1100px){.sheet-top,.owner-grid,.pet-grid,.vitals-grid,.diagnosis-grid,.frequency-row{grid-template-columns:1fr}.sheet-top .sheet-code:last-child{text-align:left}.clinical-table div,.clinical-table div:nth-child(2n),.pet-grid div:nth-child(2n),.pet-grid div:nth-child(3n){border-right:0}.exam-section{grid-template-columns:1fr 1fr}}
 @media(max-width:900px){.login-page,.public-page{padding:18px}.app-shell,.client-shell{grid-template-columns:1fr;padding:14px;gap:14px}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.doctor-hero,.doctor-stats,.quick-action-grid,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row,.contact-grid,.card-workflow{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.admin-hero,.calendar-header,.calendar-event{flex-direction:column;align-items:flex-start}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.date-controls{width:100%;flex-wrap:wrap}.date-controls input{min-width:0;max-width:none;flex:1}.week-calendar{grid-template-columns:1fr}.week-day{min-width:0}table{display:block;overflow-x:auto;max-width:100%}.whatsapp-float{right:14px;bottom:14px;min-height:44px;padding:10px 14px}.hero-actions .button-link{width:100%}}
+@media(max-width:900px){.client-dashboard-hero,.client-dashboard-grid{grid-template-columns:1fr}.client-summary-strip{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:620px){.client-summary-strip{grid-template-columns:1fr}.client-pet-card{grid-template-columns:auto 1fr}.client-pet-card button{grid-column:1/-1;width:100%}.client-appointment-list article{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
