@@ -36,7 +36,7 @@ const nextAppointment=computed(()=>activeAppointments.value.find(a=>new Date(a.s
 const recentAppointments=computed(()=>[...appointments.value]
   .sort((a,b)=>new Date(b.scheduledAt)-new Date(a.scheduledAt))
   .slice(0,4));
-const petsPendingPhoto=computed(()=>pets.value.filter(p=>!p.photoUrl).length);
+const petsPendingPhoto=computed(()=>pets.value.filter(p=>!displayPetPhoto(p)).length);
 const petsWithPrintableCard=computed(()=>pets.value.filter(p=>displayPetPhoto(p) && p.cardStatus!=='PRINTED').length);
 const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
 
@@ -164,6 +164,7 @@ function statusLabel(status){
 
 function cardStatusLabel(pet){
   if(!pet.photoUrl) return 'Falta foto';
+  if(isLegacyUploadPhoto(pet.photoUrl)) return 'Foto antigua: vuelve a subirla';
   if(brokenPhotos.value[pet.id]) return 'Vuelve a subir foto';
   if(pet.cardStatus==='PRINTED') return 'Carnet entregado';
   if(pet.cardStatus==='REPRINT_REQUESTED') return 'Reimpresion solicitada';
@@ -171,7 +172,11 @@ function cardStatusLabel(pet){
 }
 
 function displayPetPhoto(pet){
-  return Boolean(pet.photoUrl && !brokenPhotos.value[pet.id]);
+  return Boolean(pet.photoUrl && !isLegacyUploadPhoto(pet.photoUrl) && !brokenPhotos.value[pet.id]);
+}
+
+function isLegacyUploadPhoto(photoUrl){
+  return /^https?:\/\/.+\/uploads\/pets\//i.test(photoUrl || '');
 }
 
 function markPhotoBroken(petId){
