@@ -38,7 +38,6 @@ async function submit() {
   <div class="login-page">
     <form class="login-card glass-card" @submit.prevent="submit">
       <img class="login-logo" :src="happyDogLogo" alt="Happy Dog">
-      <span class="badge">Acceso seguro</span>
       <h1>Acceso del personal</h1>
       <p>Ingresa con tu correo y contraseña. El sistema reconoce tu rol y abre tu panel automáticamente.</p>
       <label>Correo<input v-model="email" type="email" required placeholder="usuario@happydog.com"></label>

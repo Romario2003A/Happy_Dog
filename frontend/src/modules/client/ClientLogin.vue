@@ -41,7 +41,6 @@ async function submit() {
     <section class="login-card client-login-card glass-panel">
       <button class="ghost small client-login-back" type="button" @click="router.push('/cliente')">Volver</button>
       <img class="login-logo client-login-logo" :src="happyDogLogo" alt="Happy Dog">
-      <span class="badge">Portal cliente</span>
       <h1>{{ mode === 'login' ? 'Bienvenido' : 'Crea tu cuenta' }}</h1>
       <p class="muted-text client-login-copy">
         {{ mode === 'login' ? 'Ingresa para revisar tus mascotas, citas y carnet.' : 'Registra tus datos para gestionar tus visitas con Happy Dog.' }}
