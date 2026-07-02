@@ -239,22 +239,23 @@ export class PetsService {
 
   private drawCardBase(doc: PDFKit.PDFDocument) {
     doc.save();
-    doc.rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#EEDFB9');
-    doc.opacity(0.18).rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#FFF8E4');
-    doc.opacity(0.11).circle(this.mm(75), this.mm(8), this.mm(14)).fill('#86D6AD');
-    doc.opacity(0.06).circle(this.mm(8), this.mm(46), this.mm(19)).fill('#155B66');
-    doc.opacity(0.045).circle(this.mm(48), this.mm(52), this.mm(22)).fill('#155B66');
+    doc.rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#E9DBB5');
+    doc.opacity(0.42).rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#F7ECCC');
+    doc.opacity(0.14).circle(this.mm(76), this.mm(8), this.mm(14)).fill('#91CBA1');
+    doc.opacity(0.08).circle(this.mm(7), this.mm(47), this.mm(19)).fill('#6F8F72');
+    doc.opacity(0.055).circle(this.mm(48), this.mm(52), this.mm(22)).fill('#155B66');
+    doc.opacity(0.035).rect(this.mm(4), this.mm(4), this.mm(77.6), this.mm(46)).fill('#FFFFFF');
     doc.opacity(1);
     this.drawSecurityTexture(doc);
     this.drawWatermarkSeal(doc);
     doc.opacity(1);
-    doc.roundedRect(this.mm(2), this.mm(2), this.mm(81.6), this.mm(50), this.mm(3)).lineWidth(0.9).stroke('#155B66');
+    doc.roundedRect(this.mm(2), this.mm(2), this.mm(81.6), this.mm(50), this.mm(3)).lineWidth(0.9).stroke('#0F5D66');
     doc.restore();
   }
 
   private drawSecurityTexture(doc: PDFKit.PDFDocument) {
     doc.save();
-    doc.lineWidth(0.13).opacity(0.16).strokeColor('#6FB899');
+    doc.lineWidth(0.1).opacity(0.11).strokeColor('#5FAE92');
     for (let row = 0; row < 19; row += 1) {
       const y = this.mm(7 + row * 3);
       doc.moveTo(0, y);
@@ -266,16 +267,35 @@ export class PetsService {
       doc.stroke();
     }
 
-    doc.lineWidth(0.1).opacity(0.13).strokeColor('#155B66');
-    for (let col = -15; col < 95; col += 4.3) {
+    doc.lineWidth(0.08).opacity(0.1).strokeColor('#155B66');
+    for (let col = -15; col < 95; col += 3.8) {
       doc.moveTo(this.mm(col), 0).lineTo(this.mm(col + 38), CARD_HEIGHT).stroke();
     }
 
-    doc.opacity(0.1).fillColor('#155B66');
-    for (let index = 0; index < 110; index += 1) {
+    doc.lineWidth(0.06).opacity(0.08).strokeColor('#B98B5A');
+    for (let row = 0; row < 16; row += 1) {
+      const y = this.mm(2 + row * 3.5);
+      doc.moveTo(0, y);
+      for (let col = 0; col <= 86; col += 3) {
+        const x = this.mm(col);
+        const wave = Math.cos((col + row * 4) / 5) * this.mm(0.45);
+        doc.lineTo(x, y + wave);
+      }
+      doc.stroke();
+    }
+
+    doc.opacity(0.07).fillColor('#155B66');
+    for (let index = 0; index < 140; index += 1) {
       const x = this.mm((index * 17) % 86);
       const y = this.mm((index * 29) % 54);
-      doc.circle(x, y, 0.28).fill();
+      doc.circle(x, y, index % 5 === 0 ? 0.22 : 0.14).fill();
+    }
+
+    doc.opacity(0.045).fillColor('#8A6F3F');
+    for (let index = 0; index < 95; index += 1) {
+      const x = this.mm((index * 23) % 86);
+      const y = this.mm((index * 31) % 54);
+      doc.rect(x, y, this.mm(0.7), this.mm(0.08)).fill();
     }
     doc.restore();
   }
