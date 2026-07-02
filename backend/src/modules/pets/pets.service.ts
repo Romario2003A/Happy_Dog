@@ -230,13 +230,20 @@ export class PetsService {
     return 'No especificado';
   }
 
+  private sexCode(pet: PetWithClient) {
+    const raw = `${pet.sex || ''} ${pet.color || ''} ${pet.breed || ''}`.toUpperCase();
+    if (raw.includes('FEMALE') || raw.includes('HEMBRA')) return 'H';
+    if (raw.includes('MALE') || raw.includes('MACHO')) return 'M';
+    return '-';
+  }
+
   private drawCardBase(doc: PDFKit.PDFDocument) {
     doc.save();
-    doc.rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#F1E3BD');
-    doc.opacity(0.16).rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#FFFFFF');
-    doc.opacity(0.16).circle(this.mm(75), this.mm(8), this.mm(14)).fill('#86D6AD');
-    doc.opacity(0.1).circle(this.mm(8), this.mm(46), this.mm(19)).fill('#155B66');
-    doc.opacity(0.08).circle(this.mm(48), this.mm(52), this.mm(22)).fill('#155B66');
+    doc.rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#EEDFB9');
+    doc.opacity(0.18).rect(0, 0, CARD_WIDTH, CARD_HEIGHT).fill('#FFF8E4');
+    doc.opacity(0.11).circle(this.mm(75), this.mm(8), this.mm(14)).fill('#86D6AD');
+    doc.opacity(0.06).circle(this.mm(8), this.mm(46), this.mm(19)).fill('#155B66');
+    doc.opacity(0.045).circle(this.mm(48), this.mm(52), this.mm(22)).fill('#155B66');
     doc.opacity(1);
     this.drawSecurityTexture(doc);
     this.drawWatermarkSeal(doc);
@@ -247,8 +254,8 @@ export class PetsService {
 
   private drawSecurityTexture(doc: PDFKit.PDFDocument) {
     doc.save();
-    doc.lineWidth(0.18).opacity(0.2).strokeColor('#73BFA3');
-    for (let row = 0; row < 15; row += 1) {
+    doc.lineWidth(0.13).opacity(0.16).strokeColor('#6FB899');
+    for (let row = 0; row < 19; row += 1) {
       const y = this.mm(7 + row * 3);
       doc.moveTo(0, y);
       for (let col = 0; col <= 86; col += 2) {
@@ -259,13 +266,13 @@ export class PetsService {
       doc.stroke();
     }
 
-    doc.lineWidth(0.12).opacity(0.16).strokeColor('#155B66');
-    for (let col = -15; col < 95; col += 5) {
+    doc.lineWidth(0.1).opacity(0.13).strokeColor('#155B66');
+    for (let col = -15; col < 95; col += 4.3) {
       doc.moveTo(this.mm(col), 0).lineTo(this.mm(col + 38), CARD_HEIGHT).stroke();
     }
 
-    doc.opacity(0.12).fillColor('#155B66');
-    for (let index = 0; index < 70; index += 1) {
+    doc.opacity(0.1).fillColor('#155B66');
+    for (let index = 0; index < 110; index += 1) {
       const x = this.mm((index * 17) % 86);
       const y = this.mm((index * 29) % 54);
       doc.circle(x, y, 0.28).fill();
@@ -405,12 +412,12 @@ export class PetsService {
     this.drawCardBase(doc);
     const issueDate = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
     const petCode = this.petCode(pet);
-    const sex = pet.sex === 'FEMALE' ? 'H' : pet.sex === 'MALE' ? 'M' : '-';
+    const sex = this.sexCode(pet);
 
     doc.roundedRect(this.mm(4), this.mm(3), this.mm(77.6), this.mm(8), this.mm(2)).fill('#F7FAF8');
     doc.font('Helvetica-Bold').fontSize(6.9).fillColor('#1F2A2D').text('REPUBLICA DEL PERU', this.mm(6), this.mm(5.7), { width: this.mm(30), height: this.mm(3), ellipsis: true });
-    doc.font('Helvetica-Bold').fontSize(3.9).fillColor('#1F2A2D').text('REGISTRO NACIONAL DE IDENTIFICACION', this.mm(37), this.mm(4.8), { width: this.mm(25), height: this.mm(2.4), align: 'center', ellipsis: true });
-    doc.font('Helvetica-Bold').fontSize(3.9).fillColor('#1F2A2D').text('DOCUMENTO NACIONAL DE IDENTIDAD', this.mm(37), this.mm(7.4), { width: this.mm(25), height: this.mm(2.4), align: 'center', ellipsis: true });
+    doc.font('Helvetica-Bold').fontSize(3.25).fillColor('#1F2A2D').text('REGISTRO NACIONAL DE IDENTIFICACION', this.mm(36), this.mm(4.8), { width: this.mm(28), height: this.mm(2.4), align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(3.25).fillColor('#1F2A2D').text('DOCUMENTO NACIONAL DE IDENTIDAD', this.mm(36), this.mm(7.4), { width: this.mm(28), height: this.mm(2.4), align: 'center' });
     doc.font('Helvetica-Bold').fontSize(5).fillColor('#1F2A2D').text('DNI', this.mm(65.5), this.mm(5.4), { width: this.mm(6), height: this.mm(3) });
     doc.font('Helvetica-Bold').fontSize(4.7).fillColor('#CF6677').text(petCode.replace('MAS', '').slice(0, 8), this.mm(71), this.mm(5.4), { width: this.mm(9.5), height: this.mm(3), align: 'right' });
 
@@ -478,7 +485,8 @@ export class PetsService {
     this.label(doc, 'Provincia', 'AREQUIPA', this.mm(28), this.mm(19.5), this.mm(20));
     this.label(doc, 'Distrito', 'CAYMA', this.mm(51), this.mm(19.5), this.mm(20));
     this.label(doc, 'Direccion', pet.client?.address || 'AV. AREQUIPA 113 FC. BOLOGNESI CAYMA', this.mm(5), this.mm(29), this.mm(68));
-    this.label(doc, 'Observaciones', pet.color || pet.breed || 'Sin observaciones', this.mm(5), this.mm(36), this.mm(45));
+    this.label(doc, 'Raza', pet.breed || 'No registrada', this.mm(5), this.mm(36), this.mm(28));
+    this.label(doc, 'Color', pet.color || 'No registrado', this.mm(35), this.mm(36), this.mm(28));
 
     this.drawPdf417Like(doc, realisticCode, this.mm(5), this.mm(39.8), this.mm(58), this.mm(10));
     this.drawVerticalBars(doc, realisticCode, this.mm(70), this.mm(29), this.mm(8), this.mm(18));
