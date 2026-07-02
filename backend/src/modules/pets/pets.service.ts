@@ -234,7 +234,7 @@ export class PetsService {
     const raw = `${pet.sex || ''} ${pet.color || ''} ${pet.breed || ''}`.toUpperCase();
     if (raw.includes('FEMALE') || raw.includes('HEMBRA')) return 'H';
     if (raw.includes('MALE') || raw.includes('MACHO')) return 'M';
-    return '-';
+    return 'N/R';
   }
 
   private drawCardBase(doc: PDFKit.PDFDocument) {
