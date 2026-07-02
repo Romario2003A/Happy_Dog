@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { PetSex, Role } from '@prisma/client';
+import { AppointmentStatus, PetSex, Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -60,6 +60,31 @@ export class ClientPortalController {
     return this.prisma.appointment.findMany({
       where: { clientId },
       orderBy: { scheduledAt: 'desc' },
+      include: { pet: true, veterinarian: true, service: true },
+    });
+  }
+
+  @Post('appointments')
+  async createAppointment(@CurrentUser('id') clientId: string, @Body() body: any) {
+    const petId = String(body.petId || '').trim();
+    const reason = String(body.reason || '').trim();
+    const scheduledAt = new Date(body.scheduledAt);
+
+    if (!petId || !reason || Number.isNaN(scheduledAt.getTime())) {
+      throw new BadRequestException('Selecciona mascota, fecha y motivo de la cita.');
+    }
+
+    const pet = await this.prisma.pet.findFirst({ where: { id: petId, clientId } });
+    if (!pet) throw new NotFoundException('Mascota no encontrada.');
+
+    return this.prisma.appointment.create({
+      data: {
+        clientId,
+        petId,
+        reason,
+        scheduledAt,
+        status: AppointmentStatus.PENDING,
+      },
       include: { pet: true, veterinarian: true, service: true },
     });
   }

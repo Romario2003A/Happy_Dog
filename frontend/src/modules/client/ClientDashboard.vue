@@ -17,6 +17,13 @@ const brokenPhotos=ref({});
 const newPetPhotoInput=ref(null);
 const showPetForm=ref(false);
 const savingPet=ref(false);
+const showAppointmentForm=ref(false);
+const savingAppointment=ref(false);
+const appointmentForm=ref({
+  petId:'',
+  scheduledAt:'',
+  reason:'',
+});
 const newPet=ref({
   name:'',
   species:'Perro',
@@ -152,6 +159,35 @@ async function createPet(){
   }
 }
 
+async function createAppointment(){
+  error.value='';
+  success.value='';
+  if(!pets.value.length){
+    error.value='Primero registra una mascota para pedir una cita.';
+    return;
+  }
+  if(!appointmentForm.value.petId || !appointmentForm.value.scheduledAt || !appointmentForm.value.reason.trim()){
+    error.value='Selecciona mascota, fecha y motivo de la cita.';
+    return;
+  }
+  savingAppointment.value=true;
+  try{
+    await api.post('/client-portal/appointments',{
+      petId:appointmentForm.value.petId,
+      scheduledAt:appointmentForm.value.scheduledAt,
+      reason:appointmentForm.value.reason.trim(),
+    });
+    success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
+    appointmentForm.value={petId:'',scheduledAt:'',reason:''};
+    showAppointmentForm.value=false;
+    await loadData();
+  }catch(e){
+    error.value=e.response?.data?.message || 'No se pudo pedir la cita.';
+  }finally{
+    savingAppointment.value=false;
+  }
+}
+
 function formatDate(value){
   if(!value) return '-';
   return new Date(value).toLocaleString('es-PE',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -191,7 +227,9 @@ onMounted(loadData);
 </script>
 <template>
   <ClientLayout title="Portal cliente" subtitle="Mascotas, citas y carnet en un solo lugar">
-    <template #nav><button class="secondary" @click="$router.push('/cliente')">Nueva cita</button></template>
+    <template #nav>
+      <button class="secondary" type="button" @click="showAppointmentForm=true">Nueva cita</button>
+    </template>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
@@ -224,8 +262,21 @@ onMounted(loadData);
             <span class="badge">Proxima cita</span>
             <h2>Agenda</h2>
           </div>
-          <button class="small secondary" @click="$router.push('/cliente')">Agendar</button>
+          <button class="small secondary" type="button" @click="showAppointmentForm=!showAppointmentForm">
+            {{ showAppointmentForm ? 'Cerrar' : 'Agendar' }}
+          </button>
         </div>
+        <form v-if="showAppointmentForm" class="client-appointment-form" @submit.prevent="createAppointment">
+          <select v-model="appointmentForm.petId" required>
+            <option value="" disabled>Selecciona tu mascota</option>
+            <option v-for="pet in pets" :key="pet.id" :value="pet.id">{{ pet.name }}</option>
+          </select>
+          <input v-model="appointmentForm.scheduledAt" type="datetime-local" step="60" required>
+          <textarea v-model="appointmentForm.reason" required placeholder="Motivo de la visita"></textarea>
+          <button :disabled="savingAppointment || !pets.length">
+            {{ savingAppointment ? 'Enviando...' : 'Enviar solicitud' }}
+          </button>
+        </form>
         <div v-if="nextAppointment" class="next-appointment">
           <strong>{{ nextAppointment.pet?.name || 'Mascota' }}</strong>
           <span>{{ formatDate(nextAppointment.scheduledAt) }}</span>
