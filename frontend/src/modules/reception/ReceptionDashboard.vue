@@ -16,7 +16,9 @@ const success = ref('');
 const search = ref('');
 const quickMode = ref('new');
 const agendaView = ref('day');
-const cardFilter = ref('pending');
+const cardFilter = ref('ready');
+const cardSearch = ref('');
+const cardVisibleLimit = ref(25);
 const selectedCardPetIds = ref([]);
 const selectedAppointment = ref(null);
 const duplicateOverride = ref(false);
@@ -115,7 +117,13 @@ const cardStats = computed(() => {
 });
 
 const filteredCardPets = computed(() => {
-  const query = search.value.toLowerCase();
+  const query = cardSearch.value.trim().toLowerCase();
+  const statusWeight = {
+    REPRINT_REQUESTED: 0,
+    PENDING: 1,
+    PRINTED: 4,
+  };
+
   return allPets.value.filter(pet => {
     const text = `${pet.name || ''} ${pet.species || ''} ${pet.breed || ''} ${pet.client?.fullName || ''} ${pet.client?.phone || ''} ${pet.client?.email || ''}`.toLowerCase();
     if (query && !text.includes(query)) return false;
@@ -125,9 +133,18 @@ const filteredCardPets = computed(() => {
     if (cardFilter.value === 'printed') return pet.cardStatus === 'PRINTED';
     if (cardFilter.value === 'reprint') return pet.cardStatus === 'REPRINT_REQUESTED';
     return true;
+  }).sort((a, b) => {
+    const aWeight = statusWeight[a.cardStatus || 'PENDING'] ?? 2;
+    const bWeight = statusWeight[b.cardStatus || 'PENDING'] ?? 2;
+    if (aWeight !== bWeight) return aWeight - bWeight;
+
+    const aDate = new Date(a.updatedAt || a.cardLastGeneratedAt || a.cardPrintedAt || a.createdAt || 0).getTime();
+    const bDate = new Date(b.updatedAt || b.cardLastGeneratedAt || b.cardPrintedAt || b.createdAt || 0).getTime();
+    return bDate - aDate;
   });
 });
 
+const visibleCardPets = computed(() => filteredCardPets.value.slice(0, cardVisibleLimit.value));
 const selectedCardPets = computed(() => allPets.value.filter(pet => selectedCardPetIds.value.includes(pet.id)));
 
 function normalizeText(value) {
@@ -216,6 +233,13 @@ function cardStatusLabel(status) {
   return labels[status] || 'Pendiente';
 }
 
+function cardActivityLabel(pet) {
+  if (pet.cardStatus === 'PRINTED') return `Entregado: ${formatDateTime(pet.cardPrintedAt)}`;
+  if (pet.cardStatus === 'REPRINT_REQUESTED') return `Reimpresion solicitada: ${formatDateTime(pet.updatedAt || pet.createdAt)}`;
+  if (pet.photoUrl) return `Foto lista: ${formatDateTime(pet.updatedAt || pet.createdAt)}`;
+  return `Registrado: ${formatDateTime(pet.createdAt || pet.updatedAt)}`;
+}
+
 function formatDateTime(value) {
   if (!value) return '-';
   return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
@@ -230,7 +254,7 @@ function toggleCardPet(petId, checked) {
 }
 
 function selectVisibleCardPets() {
-  selectedCardPetIds.value = filteredCardPets.value.map(pet => pet.id);
+  selectedCardPetIds.value = visibleCardPets.value.map(pet => pet.id);
 }
 
 function clearSelectedCardPets() {
@@ -242,6 +266,18 @@ function setActive(tab) {
   error.value = '';
   success.value = '';
   search.value = '';
+  cardSearch.value = '';
+  cardVisibleLimit.value = 25;
+}
+
+function setCardFilter(filter) {
+  cardFilter.value = filter;
+  cardVisibleLimit.value = 25;
+  selectedCardPetIds.value = [];
+}
+
+function showMoreCardPets() {
+  cardVisibleLimit.value += 25;
 }
 
 async function loadData() {
@@ -699,20 +735,20 @@ onMounted(loadData);
         </div>
 
         <div class="segmented card-tabs">
-          <button type="button" :class="{active:cardFilter==='pending'}" @click="cardFilter='pending'">Por resolver</button>
-          <button type="button" :class="{active:cardFilter==='ready'}" @click="cardFilter='ready'">Listos</button>
-          <button type="button" :class="{active:cardFilter==='missingPhoto'}" @click="cardFilter='missingPhoto'">Falta foto</button>
-          <button type="button" :class="{active:cardFilter==='printed'}" @click="cardFilter='printed'">Entregados</button>
-          <button type="button" :class="{active:cardFilter==='all'}" @click="cardFilter='all'">Todos</button>
+          <button type="button" :class="{active:cardFilter==='ready'}" @click="setCardFilter('ready')">Listos</button>
+          <button type="button" :class="{active:cardFilter==='reprint'}" @click="setCardFilter('reprint')">Reimpresion</button>
+          <button type="button" :class="{active:cardFilter==='missingPhoto'}" @click="setCardFilter('missingPhoto')">Falta foto</button>
+          <button type="button" :class="{active:cardFilter==='printed'}" @click="setCardFilter('printed')">Entregados</button>
+          <button type="button" :class="{active:cardFilter==='all'}" @click="setCardFilter('all')">Buscar todos</button>
         </div>
 
         <div class="card-print-summary">
           <strong>{{ selectedCardPetIds.length }} seleccionados</strong>
-          <span>{{ filteredCardPets.length }} mascotas en esta vista</span>
+          <span>{{ visibleCardPets.length }} de {{ filteredCardPets.length }} mascotas visibles</span>
           <span>{{ cardStats.ready }} listos con foto</span>
         </div>
 
-        <input v-model="search" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
+        <input v-model="cardSearch" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
         <table>
           <thead>
             <tr>
@@ -721,7 +757,7 @@ onMounted(loadData);
               <th>Cliente</th>
               <th>Foto</th>
               <th>Estado</th>
-              <th>Ultima impresion</th>
+              <th>Actividad</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -729,7 +765,7 @@ onMounted(loadData);
             <tr v-if="!filteredCardPets.length">
               <td colspan="7" class="empty">No hay mascotas con este filtro.</td>
             </tr>
-            <tr v-for="pet in filteredCardPets" :key="pet.id">
+            <tr v-for="pet in visibleCardPets" :key="pet.id">
               <td class="checkbox-cell">
                 <input type="checkbox" :checked="selectedCardPetIds.includes(pet.id)" @change="toggleCardPet(pet.id, $event.target.checked)">
               </td>
@@ -746,7 +782,7 @@ onMounted(loadData);
                 <span class="status">{{ cardStatusLabel(pet.cardStatus) }}</span>
                 <small>{{ pet.cardPrintCount || 0 }} impresion(es)</small>
               </td>
-              <td>{{ formatDateTime(pet.cardPrintedAt) }}</td>
+              <td>{{ cardActivityLabel(pet) }}</td>
               <td>
                 <div class="pet-actions">
                   <button class="small secondary" type="button" @click="generatePetIdCard(pet.id)">PDF</button>
@@ -767,6 +803,11 @@ onMounted(loadData);
             </tr>
           </tbody>
         </table>
+        <div v-if="visibleCardPets.length < filteredCardPets.length" class="load-more-row">
+          <button class="secondary" type="button" @click="showMoreCardPets">
+            Ver 25 mas
+          </button>
+        </div>
       </section>
     </div>
 
