@@ -232,8 +232,8 @@ export class PetsService {
 
   private sexCode(pet: PetWithClient) {
     const raw = `${pet.sex || ''} ${pet.color || ''} ${pet.breed || ''}`.toUpperCase();
-    if (raw.includes('FEMALE') || raw.includes('HEMBRA')) return 'H';
-    if (raw.includes('MALE') || raw.includes('MACHO')) return 'M';
+    if (raw.includes('FEMALE') || raw.includes('HEMBRA')) return 'HEMBRA';
+    if (raw.includes('MALE') || raw.includes('MACHO')) return 'MACHO';
     return 'N/R';
   }
 
@@ -433,7 +433,7 @@ export class PetsService {
     this.label(doc, 'Primer Apellido', firstSurname, this.mm(34), this.mm(14), this.mm(23));
     this.label(doc, 'Segundo Apellido', secondSurname, this.mm(34), this.mm(23), this.mm(23));
     this.label(doc, 'Nombre', pet.name.toUpperCase(), this.mm(34), this.mm(32), this.mm(23));
-    this.label(doc, 'SEXO', sex, this.mm(34), this.mm(38), this.mm(9));
+    this.label(doc, 'SEXO', sex, this.mm(34), this.mm(38), this.mm(13));
     this.label(doc, 'ESPECIE', pet.species.toUpperCase(), this.mm(47), this.mm(38), this.mm(17));
 
     doc.rect(this.mm(65), this.mm(14), this.mm(15), this.mm(7.5)).lineWidth(0.55).stroke('#1F2A2D');
