@@ -15,10 +15,12 @@ const success = ref('');
 const saving = ref(false);
 const showUserForm = ref(false);
 const showProductForm = ref(false);
+const editingProductId = ref('');
+const inventorySearch = ref('');
 const userForm = ref({ fullName: '', email: '', password: '', role: 'VETERINARIAN' });
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
 
-const lowStockProducts = computed(() => inventory.value.filter(p => Number(p.stock) <= Number(p.minStock)));
+const lowStockProducts = computed(() => inventory.value.filter(p => p.active !== false && Number(p.stock) <= Number(p.minStock)));
 const clientPetsCount = computed(() => clients.value.reduce((total, client) => total + (client.pets?.length || 0), 0));
 const adminStats = computed(() => ({
   clients: clients.value.length || summary.value.clients || 0,
@@ -26,6 +28,21 @@ const adminStats = computed(() => ({
   appointments: appointments.value.length || summary.value.appointments || 0,
   lowStock: inventory.value.length ? lowStockProducts.value.length : (summary.value.lowStock || 0),
 }));
+const inventoryStats = computed(() => ({
+  total: inventory.value.length,
+  active: inventory.value.filter(p => p.active !== false).length,
+  low: lowStockProducts.value.length,
+  inactive: inventory.value.filter(p => p.active === false).length,
+}));
+const filteredInventory = computed(() => {
+  const query = inventorySearch.value.trim().toLowerCase();
+  if (!query) return inventory.value;
+  return inventory.value.filter(product => [
+    product.name,
+    product.category,
+    product.sku,
+  ].some(value => String(value || '').toLowerCase().includes(query)));
+});
 
 function openUsers() {
   active.value = 'usuarios';
@@ -40,10 +57,13 @@ function openUserCreator() {
 function openInventory() {
   active.value = 'inventario';
   showProductForm.value = false;
+  editingProductId.value = '';
 }
 
 function openProductCreator() {
   active.value = 'inventario';
+  editingProductId.value = '';
+  resetProductForm();
   showProductForm.value = true;
 }
 
@@ -100,26 +120,109 @@ async function createUser() {
   }
 }
 
-async function createProduct() {
+function resetProductForm() {
+  productForm.value = { name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 };
+}
+
+function productPayload() {
+  return {
+    ...productForm.value,
+    unitPrice: Number(productForm.value.unitPrice),
+    stock: Number(productForm.value.stock),
+    minStock: Number(productForm.value.minStock),
+  };
+}
+
+function startEditProduct(product) {
+  active.value = 'inventario';
+  editingProductId.value = product.id;
+  productForm.value = {
+    name: product.name || '',
+    category: product.category || '',
+    unitPrice: Number(product.unitPrice || 0),
+    stock: Number(product.stock || 0),
+    minStock: Number(product.minStock || 0),
+  };
+  showProductForm.value = true;
+}
+
+async function saveProduct() {
   saving.value = true;
   error.value = '';
   success.value = '';
   try {
-    await api.post('/inventory', {
-      ...productForm.value,
-      unitPrice: Number(productForm.value.unitPrice),
-      stock: Number(productForm.value.stock),
-      minStock: Number(productForm.value.minStock),
-    });
-    productForm.value = { name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 };
+    if (editingProductId.value) {
+      await api.patch(`/inventory/${editingProductId.value}`, productPayload());
+      success.value = 'Producto actualizado correctamente.';
+    } else {
+      await api.post('/inventory', productPayload());
+      success.value = 'Producto agregado al inventario.';
+    }
+    resetProductForm();
+    editingProductId.value = '';
     showProductForm.value = false;
-    success.value = 'Producto agregado al inventario.';
     await loadData();
   } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo agregar el producto.';
+    error.value = e.response?.data?.message || 'No se pudo guardar el producto.';
   } finally {
     saving.value = false;
   }
+}
+
+async function toggleProductActive(product) {
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.patch(`/inventory/${product.id}`, { active: product.active === false });
+    success.value = product.active === false ? 'Producto activado.' : 'Producto retirado del inventario.';
+    await loadData();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo actualizar el producto.';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function deleteProduct(product) {
+  const ok = window.confirm(`Eliminar "${product.name}" del inventario? Si tiene historial, se retirara sin borrar sus registros.`);
+  if (!ok) return;
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.delete(`/inventory/${product.id}`);
+    success.value = 'Producto eliminado del inventario.';
+    await loadData();
+  } catch (e) {
+    try {
+      await api.patch(`/inventory/${product.id}`, { active: false });
+      success.value = 'Producto retirado del inventario porque tiene historial asociado.';
+      await loadData();
+    } catch (fallbackError) {
+      error.value = fallbackError.response?.data?.message || e.response?.data?.message || 'No se pudo eliminar el producto.';
+    }
+  } finally {
+    saving.value = false;
+  }
+}
+
+function formatPrice(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function stockLabel(product) {
+  if (product.active === false) return 'Retirado';
+  if (Number(product.stock) <= 0) return 'Agotado';
+  if (Number(product.stock) <= Number(product.minStock)) return 'Stock bajo';
+  return 'Disponible';
+}
+
+function stockClass(product) {
+  if (product.active === false) return 'inactive';
+  if (Number(product.stock) <= 0) return 'out';
+  if (Number(product.stock) <= Number(product.minStock)) return 'low';
+  return 'ok';
 }
 
 onMounted(loadData);
@@ -210,32 +313,56 @@ onMounted(loadData);
             <h2>Inventario</h2>
             <p class="muted-text">Revisa productos, stock y medicamentos disponibles para atenciones.</p>
           </div>
-          <button class="secondary small" @click="showProductForm = true">Agregar producto</button>
+          <button class="secondary small" @click="openProductCreator">Agregar producto</button>
+        </div>
+        <div class="inventory-toolbar">
+          <input v-model="inventorySearch" placeholder="Buscar producto, categoria o SKU">
+          <div class="inventory-mini-stats">
+            <span><strong>{{ inventoryStats.active }}</strong> activos</span>
+            <span><strong>{{ inventoryStats.low }}</strong> stock bajo</span>
+            <span><strong>{{ inventoryStats.inactive }}</strong> retirados</span>
+          </div>
         </div>
         <table>
-          <thead><tr><th>Producto</th><th>Categoria</th><th>Precio</th><th>Stock</th></tr></thead>
+          <thead><tr><th>Producto</th><th>Categoria</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>
-            <tr v-if="!inventory.length"><td colspan="4" class="empty">No hay productos registrados.</td></tr>
-            <tr v-for="p in inventory" :key="p.id"><td>{{ p.name }}</td><td>{{ p.category || '-' }}</td><td>S/ {{ p.unitPrice }}</td><td>{{ p.stock }}</td></tr>
+            <tr v-if="!filteredInventory.length"><td colspan="6" class="empty">No hay productos con ese criterio.</td></tr>
+            <tr v-for="p in filteredInventory" :key="p.id" :class="{ 'muted-row': p.active === false }">
+              <td class="product-cell">
+                <strong>{{ p.name }}</strong>
+                <small v-if="p.sku">SKU: {{ p.sku }}</small>
+              </td>
+              <td>{{ p.category || '-' }}</td>
+              <td>S/ {{ formatPrice(p.unitPrice) }}</td>
+              <td>{{ p.stock }} <small>min. {{ p.minStock }}</small></td>
+              <td><span class="stock-pill" :class="stockClass(p)">{{ stockLabel(p) }}</span></td>
+              <td>
+                <div class="table-actions">
+                  <button class="ghost small" type="button" @click="startEditProduct(p)">Editar</button>
+                  <button class="secondary small" type="button" @click="toggleProductActive(p)">{{ p.active === false ? 'Activar' : 'Retirar' }}</button>
+                  <button class="danger small" type="button" @click="deleteProduct(p)">Eliminar</button>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </section>
       <section v-if="showProductForm" class="glass-card">
         <div class="section-title">
           <div>
-            <h2>Agregar producto</h2>
-            <p class="muted-text">Registra medicamentos, vacunas, alimento o insumos.</p>
+            <h2>{{ editingProductId ? 'Editar producto' : 'Agregar producto' }}</h2>
+            <p class="muted-text">{{ editingProductId ? 'Actualiza precio, stock o categoria sin perder historial.' : 'Registra medicamentos, vacunas, alimento o insumos.' }}</p>
           </div>
-          <button class="ghost small" type="button" @click="showProductForm = false">Cerrar</button>
+          <button class="ghost small" type="button" @click="showProductForm = false; editingProductId = ''; resetProductForm()">Cerrar</button>
         </div>
-        <form class="stack" @submit.prevent="createProduct">
+        <form class="stack" @submit.prevent="saveProduct">
           <label>Producto<input v-model="productForm.name" required placeholder="Vacuna, medicamento, alimento"></label>
           <label>Categoria<input v-model="productForm.category" placeholder="Medicamento"></label>
           <label>Precio<input v-model.number="productForm.unitPrice" type="number" min="0" step="0.01" required></label>
           <label>Stock<input v-model.number="productForm.stock" type="number" min="0" required></label>
           <label>Stock minimo<input v-model.number="productForm.minStock" type="number" min="0"></label>
-          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Agregar producto' }}</button>
-          <button class="secondary" type="button" @click="showProductForm = false">Cancelar</button>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : (editingProductId ? 'Guardar cambios' : 'Agregar producto') }}</button>
+          <button class="secondary" type="button" @click="showProductForm = false; editingProductId = ''; resetProductForm()">Cancelar</button>
         </form>
       </section>
     </div>
