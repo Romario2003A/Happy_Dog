@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
+import { api } from '../../services/api';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 
 const router = useRouter();
@@ -10,6 +11,7 @@ const mode = ref('login');
 const form = ref({ fullName: '', phone: '', email: '', password: '' });
 const loading = ref(false);
 const error = ref('');
+const googleLoginUrl = computed(() => `${api.defaults.baseURL}/auth/client/google`);
 
 function normalizePhone() {
   form.value.phone = form.value.phone.replace(/\D/g, '');
@@ -34,6 +36,26 @@ async function submit() {
     loading.value = false;
   }
 }
+
+onMounted(() => {
+  const query = router.currentRoute.value.query;
+  if (query.googleError) {
+    error.value = String(query.googleError);
+    router.replace('/cliente/login');
+    return;
+  }
+  if (!query.googleToken || !query.googleUser) return;
+  try {
+    auth.setSession({
+      accessToken: String(query.googleToken),
+      user: JSON.parse(String(query.googleUser)),
+    });
+    router.replace('/cliente/dashboard');
+  } catch {
+    error.value = 'No se pudo completar el acceso con Google.';
+    router.replace('/cliente/login');
+  }
+});
 </script>
 
 <template>
@@ -45,6 +67,13 @@ async function submit() {
       <p class="muted-text client-login-copy">
         {{ mode === 'login' ? 'Ingresa para revisar tus mascotas, citas y carnet.' : 'Registra tus datos para gestionar tus visitas con Happy Dog.' }}
       </p>
+
+      <a class="google-login-button" :href="googleLoginUrl">
+        <span>G</span>
+        Continuar con Google
+      </a>
+
+      <div class="login-divider"><span>o usa tu correo</span></div>
 
       <form class="stack" @submit.prevent="submit">
         <input v-if="mode === 'register'" v-model="form.fullName" required placeholder="Nombre completo">

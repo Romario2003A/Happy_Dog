@@ -44,6 +44,11 @@ button.small{padding:8px 10px;font-size:13px}
 .client-login-copy{max-width:320px;margin:0 0 22px;line-height:1.45}
 .client-login-card form{gap:10px}
 .client-login-card input{background:rgba(255,255,255,.9)}
+.google-login-button{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;margin:8px 0 14px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.92);color:var(--ink);font-weight:800;text-decoration:none;box-shadow:0 12px 26px rgba(21,91,102,.07);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.google-login-button:hover{transform:translateY(-1px);border-color:rgba(15,143,125,.36);box-shadow:0 16px 34px rgba(21,91,102,.1)}
+.google-login-button span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#fff;color:#155b66;border:1px solid var(--line);font-weight:900}
+.login-divider{display:flex;align-items:center;gap:12px;margin:0 0 12px;color:var(--muted);font-size:13px;font-weight:800}
+.login-divider:before,.login-divider:after{content:"";height:1px;flex:1;background:var(--line)}
 .client-login-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-weight:700}
 .badge{display:inline-flex;padding:8px 12px;border-radius:999px;background:rgba(134,214,173,.2);color:var(--blue-dark);font-weight:800;font-size:13px;border:1px solid rgba(21,91,102,.12)}
 .public-hero{position:relative;padding:34px;max-width:1160px;margin:0 auto 24px;display:grid;grid-template-columns:1fr .72fr;gap:36px;align-items:center;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,.95) 0%,rgba(240,251,246,.88) 58%,rgba(255,246,220,.72) 100%);border-color:rgba(134,214,173,.32)}
