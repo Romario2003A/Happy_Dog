@@ -13,11 +13,9 @@ const active = ref('resumen');
 const error = ref('');
 const success = ref('');
 const saving = ref(false);
-const showUserForm = ref(false);
 const showProductForm = ref(false);
 const editingProductId = ref('');
 const inventorySearch = ref('');
-const userForm = ref({ fullName: '', email: '', password: '', role: 'VETERINARIAN' });
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
 
 const lowStockProducts = computed(() => inventory.value.filter(p => p.active !== false && Number(p.stock) <= Number(p.minStock)));
@@ -46,12 +44,6 @@ const filteredInventory = computed(() => {
 
 function openUsers() {
   active.value = 'usuarios';
-  showUserForm.value = false;
-}
-
-function openUserCreator() {
-  active.value = 'usuarios';
-  showUserForm.value = true;
 }
 
 function openInventory() {
@@ -100,23 +92,6 @@ async function loadData() {
   const failed = [summaryRes, usersRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
   if (failed) {
     error.value = 'Algunos datos administrativos no se pudieron cargar. Actualiza la página o vuelve a iniciar sesión si falta información.';
-  }
-}
-
-async function createUser() {
-  saving.value = true;
-  error.value = '';
-  success.value = '';
-  try {
-    await api.post('/users', userForm.value);
-    userForm.value = { fullName: '', email: '', password: '', role: 'VETERINARIAN' };
-    showUserForm.value = false;
-    success.value = 'Usuario creado correctamente.';
-    await loadData();
-  } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo crear el usuario.';
-  } finally {
-    saving.value = false;
   }
 }
 
@@ -253,7 +228,6 @@ onMounted(loadData);
         <p class="muted-text">Administra usuarios, inventario, clientes y reportes sin mezclarlo con la agenda diaria.</p>
       </div>
       <div class="admin-actions">
-        <button @click="openUserCreator">Crear usuario</button>
         <button class="secondary" @click="openProductCreator">Agregar producto</button>
       </div>
     </div>
@@ -265,14 +239,13 @@ onMounted(loadData);
       <div class="glass-card metric"><span>Stock bajo</span><strong>{{ adminStats.lowStock }}</strong></div>
     </div>
 
-    <div v-if="active==='usuarios'" class="panel-grid" :class="{ single: !showUserForm }">
+    <div v-if="active==='usuarios'" class="panel-grid single">
       <section class="glass-card">
         <div class="section-title">
           <div>
             <h2>Usuarios del sistema</h2>
             <p class="muted-text">Gestiona las cuentas internas que entran a recepción, veterinario y administración.</p>
           </div>
-          <button class="secondary small" @click="showUserForm = true">Crear usuario</button>
         </div>
         <table>
           <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th></tr></thead>
@@ -280,29 +253,6 @@ onMounted(loadData);
             <tr v-for="u in users" :key="u.id"><td>{{ u.fullName }}</td><td>{{ u.email }}</td><td>{{ u.role }}</td><td>{{ u.active ? 'Activo' : 'Inactivo' }}</td></tr>
           </tbody>
         </table>
-      </section>
-      <section v-if="showUserForm" class="glass-card">
-        <div class="section-title">
-          <div>
-            <h2>Crear usuario interno</h2>
-            <p class="muted-text">Crea una cuenta temporal para el personal y luego podrá cambiar su contraseña.</p>
-          </div>
-          <button class="ghost small" type="button" @click="showUserForm = false">Cerrar</button>
-        </div>
-        <form class="stack" @submit.prevent="createUser">
-          <label>Nombre<input v-model="userForm.fullName" required placeholder="Nombre completo"></label>
-          <label>Correo<input v-model="userForm.email" type="email" required placeholder="usuario@happydog.com"></label>
-          <label>Contraseña temporal<input v-model="userForm.password" type="password" required minlength="6" placeholder="Temporal2026!"></label>
-          <label>Rol
-            <select v-model="userForm.role">
-              <option value="VETERINARIAN">Veterinario</option>
-              <option value="RECEPTIONIST">Recepción</option>
-              <option value="ADMIN">Administrador</option>
-            </select>
-          </label>
-          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Crear usuario' }}</button>
-          <button class="secondary" type="button" @click="showUserForm = false">Cancelar</button>
-        </form>
       </section>
     </div>
 
