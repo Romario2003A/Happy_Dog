@@ -227,9 +227,6 @@ onMounted(loadData);
         <h2>Control general de Happy Dog</h2>
         <p class="muted-text">Administra usuarios, inventario, clientes y reportes sin mezclarlo con la agenda diaria.</p>
       </div>
-      <div class="admin-actions">
-        <button class="secondary" @click="openProductCreator">Agregar producto</button>
-      </div>
     </div>
 
     <div v-if="active==='resumen'" class="cards">
