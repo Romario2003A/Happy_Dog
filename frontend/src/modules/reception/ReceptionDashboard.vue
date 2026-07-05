@@ -243,14 +243,14 @@ function cardStatusLabel(status) {
   const labels = {
     PENDING: 'Pendiente',
     PRINTED: 'Impresa',
-    REPRINT_REQUESTED: 'Reimpresion',
+    REPRINT_REQUESTED: 'Reimpresión',
   };
   return labels[status] || 'Pendiente';
 }
 
 function cardActivityLabel(pet) {
   if (pet.cardStatus === 'PRINTED') return `Entregado: ${formatDateTime(pet.cardPrintedAt)}`;
-  if (pet.cardStatus === 'REPRINT_REQUESTED') return `Reimpresion solicitada: ${formatDateTime(pet.updatedAt || pet.createdAt)}`;
+  if (pet.cardStatus === 'REPRINT_REQUESTED') return `Reimpresión solicitada: ${formatDateTime(pet.updatedAt || pet.createdAt)}`;
   if (pet.photoUrl) return `Foto lista: ${formatDateTime(pet.updatedAt || pet.createdAt)}`;
   return `Registrado: ${formatDateTime(pet.createdAt || pet.updatedAt)}`;
 }
@@ -421,6 +421,27 @@ async function markSelectedCardsPrinted() {
     await loadData();
   } catch (e) {
     error.value = 'No se pudo marcar los carnets como impresos.';
+  }
+}
+
+async function requestCardReprint(pet) {
+  if (!pet?.id) return;
+
+  const petName = pet.name || 'Esta mascota';
+  const message = `${petName} ya figura como carnet entregado. ¿Quieres moverlo a Reimpresiones para generar otro carnet?`;
+  if (!window.confirm(message)) return;
+
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post(`/pets/${pet.id}/request-card-reprint`);
+    success.value = `${petName} pasó a Reimpresiones.`;
+    selectedCardPetIds.value = [];
+    cardVisibleLimit.value = 25;
+    cardFilter.value = 'reprint';
+    await loadData();
+  } catch (e) {
+    error.value = 'No se pudo solicitar la reimpresión.';
   }
 }
 
@@ -766,7 +787,7 @@ onMounted(loadData);
           <article>
             <span>Reimpresiones</span>
             <strong>{{ cardStats.reprint }}</strong>
-            <small>Solicitudes especiales</small>
+            <small>Carnets entregados que piden otro</small>
           </article>
           <article>
             <span>Ya entregados</span>
@@ -777,7 +798,7 @@ onMounted(loadData);
 
         <div class="segmented card-tabs">
           <button type="button" :class="{active:cardFilter==='ready'}" @click="setCardFilter('ready')">Listos</button>
-          <button type="button" :class="{active:cardFilter==='reprint'}" @click="setCardFilter('reprint')">Reimpresion</button>
+          <button type="button" :class="{active:cardFilter==='reprint'}" @click="setCardFilter('reprint')">Reimpresión</button>
           <button type="button" :class="{active:cardFilter==='missingPhoto'}" @click="setCardFilter('missingPhoto')">Falta foto</button>
           <button type="button" :class="{active:cardFilter==='printed'}" @click="setCardFilter('printed')">Entregados</button>
           <button type="button" :class="{active:cardFilter==='all'}" @click="setCardFilter('all')">Buscar todos</button>
@@ -838,6 +859,14 @@ onMounted(loadData);
                     @click="selectedCardPetIds=[pet.id]; markSelectedCardsPrinted()"
                   >
                     Marcar impreso
+                  </button>
+                  <button
+                    v-else
+                    class="small secondary"
+                    type="button"
+                    @click="requestCardReprint(pet)"
+                  >
+                    Solicitar reimpresión
                   </button>
                 </div>
               </td>
