@@ -63,42 +63,12 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .public-hero h1{font-size:clamp(36px,4.8vw,56px);line-height:1.04;max-width:640px}
 .public-hero p{font-size:17px;line-height:1.45;max-width:520px}
 .public-hero img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:18px;box-shadow:0 18px 46px rgba(6,60,53,.12);border:1px solid rgba(15,143,125,.1)}
-.public-hero img.hero-doctor-dog{position:relative;z-index:1;aspect-ratio:4/3;object-position:center;max-height:420px;background:#0b6d68;border:8px solid rgba(255,255,255,.82);box-shadow:0 20px 52px rgba(21,91,102,.16),0 0 0 1px rgba(134,214,173,.18);animation:gentleFloat 6s ease-in-out infinite}
+.public-hero img.hero-doctor-dog{position:relative;z-index:1;aspect-ratio:4/3;object-position:center 36%;max-height:420px;background:#0b6d68;border:8px solid rgba(255,255,255,.82);box-shadow:0 20px 52px rgba(21,91,102,.16),0 0 0 1px rgba(134,214,173,.18);animation:dogPortraitBreath 5.8s ease-in-out infinite}
 .hero-copy{padding:4px}
 .hero-media{position:relative}
 .hero-media:before{content:"";position:absolute;inset:12px -10px -12px 22px;border-radius:22px;background:linear-gradient(135deg,rgba(15,143,125,.18),rgba(245,200,106,.16));filter:blur(16px);pointer-events:none}
-.animated-dog-doctor{position:relative;z-index:1;width:100%;min-height:420px;aspect-ratio:4/3;overflow:hidden;border-radius:22px;background:radial-gradient(circle at 52% 34%,rgba(77,192,178,.34),transparent 24%),linear-gradient(145deg,#0b716b 0%,#095b60 56%,#073f46 100%);border:8px solid rgba(255,255,255,.82);box-shadow:0 20px 52px rgba(21,91,102,.16),0 0 0 1px rgba(134,214,173,.18);animation:gentleFloat 6s ease-in-out infinite}
-.animated-dog-doctor:before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.08),transparent 28%,rgba(255,255,255,.05) 68%,transparent),repeating-linear-gradient(100deg,rgba(255,255,255,.035) 0 1px,transparent 1px 22px);opacity:.62}
-.animated-dog-doctor:after{content:"";position:absolute;left:8%;right:8%;bottom:24px;height:24px;border-radius:50%;background:rgba(0,24,26,.22);filter:blur(10px)}
-.animated-dog-doctor:before,.animated-dog-doctor:after{z-index:0}
-.dog-glow{position:absolute;left:50%;top:48%;width:72%;height:72%;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.18),transparent 62%);transform:translate(-50%,-50%);pointer-events:none}
-.dog-glow,.dog-body,.dog-head{z-index:1}
-.dog-body{position:absolute;left:50%;bottom:-7%;width:38%;height:42%;transform:translateX(-50%);animation:dogBreath 3.4s ease-in-out infinite}
-.scrub{position:absolute;left:28%;right:28%;bottom:14%;height:66%;border-radius:34% 34% 14% 14%;background:linear-gradient(180deg,#bcecf1,#77c8d1);box-shadow:inset 0 0 0 1px rgba(21,91,102,.16)}
-.coat{position:absolute;bottom:0;width:50%;height:86%;background:linear-gradient(145deg,#fff 0%,#eff8f6 58%,#cfe7e7 100%);box-shadow:inset 0 0 0 1px rgba(21,91,102,.08)}
-.coat-left{left:2%;border-radius:58% 20% 18% 24%;transform:skewX(-8deg)}
-.coat-right{right:2%;border-radius:20% 58% 24% 18%;transform:skewX(8deg)}
-.stethoscope{position:absolute;top:8%;width:28%;height:58%;border:6px solid #33484f;border-top:0;border-radius:0 0 999px 999px}
-.stethoscope-left{left:26%;border-right:0;transform:rotate(8deg)}
-.stethoscope-right{right:26%;border-left:0;transform:rotate(-8deg)}
-.scope-bell{position:absolute;left:50%;bottom:8%;width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 38% 34%,#f7fbfb 0 17%,#95a9ad 19% 43%,#364a50 46% 100%);transform:translateX(-50%);box-shadow:0 8px 16px rgba(0,0,0,.16)}
-.dog-head{position:absolute;left:50%;top:18%;width:46%;height:48%;transform:translateX(-50%);animation:dogHead 4.8s ease-in-out infinite}
-.dog-head:before{content:"";position:absolute;inset:8% 10% 0;border-radius:48% 48% 44% 44%;background:radial-gradient(circle at 36% 34%,#fff 0 10%,transparent 12%),radial-gradient(circle at 64% 34%,#fff 0 10%,transparent 12%),linear-gradient(145deg,#fff7dc 0%,#eed5a9 54%,#c99f70 100%);box-shadow:inset -16px -24px 42px rgba(102,65,42,.25),inset 18px 24px 46px rgba(255,255,255,.46)}
-.dog-head:after{content:"";position:absolute;left:50%;top:45%;width:46%;height:36%;border-radius:48% 48% 52% 52%;background:linear-gradient(180deg,#3c2e2c,#1f1818);transform:translateX(-50%);box-shadow:0 4px 16px rgba(0,0,0,.12)}
-.ear{position:absolute;z-index:-1;top:15%;width:28%;height:38%;background:linear-gradient(145deg,#7a593f,#3b2c2a 72%);box-shadow:inset 8px 10px 16px rgba(255,255,255,.08)}
-.ear-left{left:2%;border-radius:70% 28% 60% 38%;transform:rotate(-22deg);animation:leftEar 4.8s ease-in-out infinite}
-.ear-right{right:2%;border-radius:28% 70% 38% 60%;transform:rotate(22deg);animation:rightEar 4.8s ease-in-out infinite}
-.fur{position:absolute;z-index:2;top:5%;width:34%;height:24%;border-radius:70% 30% 70% 30%;background:linear-gradient(145deg,#fff7df,#efd4a4);opacity:.95}
-.tuft-one{left:30%;transform:rotate(-18deg)}
-.tuft-two{right:30%;transform:rotate(18deg)}
-.eye{position:absolute;z-index:3;top:42%;width:12%;height:13%;border-radius:50%;background:#17120f;box-shadow:0 0 0 6px rgba(67,48,39,.18);animation:dogBlink 5.2s ease-in-out infinite}
-.eye span{position:absolute;left:28%;top:18%;width:28%;height:28%;border-radius:50%;background:white}
-.eye-left{left:33%}
-.eye-right{right:33%}
-.muzzle{position:absolute;z-index:4;left:50%;top:58%;width:30%;height:27%;transform:translateX(-50%);border-radius:48% 48% 52% 52%;background:linear-gradient(180deg,#3e2d2a,#171312)}
-.nose{position:absolute;left:50%;top:8%;width:34%;height:26%;border-radius:52% 52% 62% 62%;background:radial-gradient(circle at 36% 28%,#7c6b67,#0e0d0d 62%);transform:translateX(-50%)}
-.mouth{position:absolute;left:50%;top:38%;width:48%;height:24%;border-bottom:3px solid rgba(255,255,255,.42);border-radius:50%;transform:translateX(-50%)}
-.tongue{position:absolute;left:50%;top:53%;width:28%;height:0;border-radius:0 0 999px 999px;background:linear-gradient(180deg,#ff9aa5,#e75e74);transform:translateX(-50%);transform-origin:50% 0;animation:dogLick 4.2s ease-in-out infinite;box-shadow:inset -3px 0 0 rgba(165,39,59,.22)}
+.living-dog-frame{position:relative;z-index:1;overflow:hidden;border-radius:24px;animation:gentleFloat 6s ease-in-out infinite}
+.living-dog-frame:after{content:"";position:absolute;inset:8px;border-radius:18px;background:linear-gradient(120deg,rgba(255,255,255,.16),transparent 28%,rgba(255,255,255,.08) 66%,transparent);pointer-events:none;mix-blend-mode:screen}
 .hero-contact-card{position:absolute;left:22px;bottom:22px;display:grid;gap:3px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.86);border:1px solid rgba(255,255,255,.72);box-shadow:0 16px 34px rgba(6,60,53,.14);backdrop-filter:blur(16px)}
 .hero-contact-card strong{color:var(--blue-dark)}
 .hero-contact-card span{color:var(--muted);font-size:13px;font-weight:800}
@@ -413,14 +383,9 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 .pet-overview-card{animation-delay:.1s}
 .client-history-card{animation-delay:.14s}
 @keyframes gentleFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-@keyframes dogBreath{0%,100%{transform:translateX(-50%) scaleY(1)}50%{transform:translateX(-50%) scaleY(1.025)}}
-@keyframes dogHead{0%,100%{transform:translateX(-50%) rotate(0)}35%{transform:translateX(-50%) rotate(-1.8deg)}70%{transform:translateX(-50%) rotate(1.4deg)}}
-@keyframes dogBlink{0%,45%,49%,100%{transform:scaleY(1)}47%{transform:scaleY(.08)}}
-@keyframes dogLick{0%,62%,100%{height:0;transform:translateX(-50%) scaleY(.2)}68%{height:34%;transform:translateX(-48%) rotate(-12deg) scaleY(1)}74%{height:30%;transform:translateX(-52%) rotate(10deg) scaleY(.92)}82%{height:0;transform:translateX(-50%) scaleY(.2)}}
-@keyframes leftEar{0%,100%{transform:rotate(-22deg)}48%{transform:rotate(-25deg)}54%{transform:rotate(-18deg)}}
-@keyframes rightEar{0%,100%{transform:rotate(22deg)}48%{transform:rotate(25deg)}54%{transform:rotate(18deg)}}
+@keyframes dogPortraitBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.018)}}
 @media(max-width:1100px){.sheet-top,.owner-grid,.pet-grid,.vitals-grid,.diagnosis-grid,.frequency-row{grid-template-columns:1fr}.sheet-top .sheet-code:last-child{text-align:left}.clinical-table div,.clinical-table div:nth-child(2n),.pet-grid div:nth-child(2n),.pet-grid div:nth-child(3n){border-right:0}.exam-section{grid-template-columns:1fr 1fr}}
-@media(max-width:900px){.login-page,.public-page{padding:18px}.app-shell,.client-shell{grid-template-columns:1fr;padding:14px;gap:14px}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.doctor-hero,.doctor-stats,.quick-action-grid,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row,.contact-grid,.card-workflow{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.animated-dog-doctor{min-height:320px;aspect-ratio:16/11}.admin-hero,.calendar-header,.calendar-event{flex-direction:column;align-items:flex-start}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.date-controls{width:100%;flex-wrap:wrap}.date-controls input{min-width:0;max-width:none;flex:1}.week-calendar{grid-template-columns:1fr}.week-day{min-width:0}table{display:block;overflow-x:auto;max-width:100%}.whatsapp-float{right:14px;bottom:14px;min-height:44px;padding:10px 14px}.hero-actions .button-link{width:100%}}
+@media(max-width:900px){.login-page,.public-page{padding:18px}.app-shell,.client-shell{grid-template-columns:1fr;padding:14px;gap:14px}.client-top{align-items:flex-start;flex-direction:column}.client-top nav,.user-actions{flex-wrap:wrap}.public-hero,.public-grid,.panel-grid,.panel-grid.wide,.doctor-hero,.doctor-stats,.quick-action-grid,.clinical-grid,.clinical-grid.main,.reception-grid,.form-grid,.cards,.patient-grid,.prescription-box,.calendar-row,.contact-grid,.card-workflow{grid-template-columns:1fr}.public-hero{padding:22px}.public-hero img{aspect-ratio:16/10}.admin-hero,.calendar-header,.calendar-event{flex-direction:column;align-items:flex-start}.sidebar{position:static}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.date-controls{width:100%;flex-wrap:wrap}.date-controls input{min-width:0;max-width:none;flex:1}.week-calendar{grid-template-columns:1fr}.week-day{min-width:0}table{display:block;overflow-x:auto;max-width:100%}.whatsapp-float{right:14px;bottom:14px;min-height:44px;padding:10px 14px}.hero-actions .button-link{width:100%}}
 @media(max-width:900px){.client-dashboard-hero,.client-dashboard-grid{grid-template-columns:1fr}.client-summary-strip{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:620px){.client-summary-strip,.client-pet-form{grid-template-columns:1fr}.client-pet-card{grid-template-columns:auto 1fr}.client-pet-card button,.client-pet-form button,.client-appointment-form button{grid-column:1/-1;width:100%}.client-appointment-list article{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

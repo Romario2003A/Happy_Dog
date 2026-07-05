@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { api } from '../../services/api';
+import doctorDog from '../../assets/images/happy-dog-doctor-painting.webp';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
 
@@ -74,29 +75,8 @@ async function submit() {
         </div>
       </div>
       <div class="hero-media">
-        <div class="animated-dog-doctor" role="img" aria-label="Perrito doctor animado">
-          <div class="dog-glow"></div>
-          <div class="dog-body">
-            <div class="coat coat-left"></div>
-            <div class="coat coat-right"></div>
-            <div class="scrub"></div>
-            <div class="stethoscope stethoscope-left"></div>
-            <div class="stethoscope stethoscope-right"></div>
-            <div class="scope-bell"></div>
-          </div>
-          <div class="dog-head">
-            <div class="ear ear-left"></div>
-            <div class="ear ear-right"></div>
-            <div class="fur tuft-one"></div>
-            <div class="fur tuft-two"></div>
-            <div class="eye eye-left"><span></span></div>
-            <div class="eye eye-right"><span></span></div>
-            <div class="muzzle">
-              <div class="nose"></div>
-              <div class="mouth"></div>
-              <div class="tongue"></div>
-            </div>
-          </div>
+        <div class="living-dog-frame">
+          <img class="hero-doctor-dog" :src="doctorDog" alt="Perrito con bata de doctor representando atencion veterinaria">
         </div>
       </div>
     </header>
