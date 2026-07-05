@@ -68,6 +68,11 @@ async function submit() {
         </div>
         <h1>Citas veterinarias sin complicaciones</h1>
         <p>Solicita atenci&oacute;n para tu mascota y recepci&oacute;n confirmar&aacute; el horario por tel&eacute;fono o WhatsApp.</p>
+        <div class="hero-microcopy" aria-label="Beneficios principales">
+          <span>Confirmaci&oacute;n por WhatsApp</span>
+          <span>Carnet personalizado</span>
+          <span>Atenci&oacute;n en Cayma</span>
+        </div>
       </div>
       <div class="hero-media">
         <img class="hero-doctor-dog" :src="doctorDog" alt="Perro con bata de doctor representando atencion veterinaria">
@@ -99,6 +104,11 @@ async function submit() {
         <span class="badge">Beneficio Happy Dog</span>
         <h2>Tu mascota con ficha y carnet</h2>
         <p>Reg&iacute;strate para acceder a sus datos, fotos, citas e historial. Adem&aacute;s, te entregamos su carnet personalizado.</p>
+        <div class="portal-benefits">
+          <span>Foto para carnet</span>
+          <span>Historial de visitas</span>
+          <span>Citas ordenadas</span>
+        </div>
         <button class="secondary" @click="$router.push('/cliente/login')">Entrar o registrarme</button>
       </section>
     </main>
