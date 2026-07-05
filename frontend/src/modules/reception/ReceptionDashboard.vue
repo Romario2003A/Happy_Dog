@@ -1,13 +1,23 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ReceptionLayout from '../../layouts/ReceptionLayout.vue';
 import { api } from '../../services/api';
+
+const route = useRoute();
+const router = useRouter();
+const receptionTabs = ['citas', 'clientes', 'carnets'];
+
+function tabFromRoute() {
+  const tab = String(route.query.tab || '');
+  return receptionTabs.includes(tab) ? tab : 'citas';
+}
 
 const appointments = ref([]);
 const clients = ref([]);
 const users = ref([]);
 const summary = ref({});
-const active = ref('citas');
+const active = ref(tabFromRoute());
 const showQuick = ref(false);
 const loading = ref(false);
 const saving = ref(false);
@@ -266,14 +276,33 @@ function clearSelectedCardPets() {
   selectedCardPetIds.value = [];
 }
 
-function setActive(tab) {
+function setActive(tab, syncUrl = true) {
+  if (!receptionTabs.includes(tab)) return;
   active.value = tab;
   error.value = '';
   success.value = '';
   search.value = '';
   cardSearch.value = '';
   cardVisibleLimit.value = 25;
+
+  if (!syncUrl) return;
+
+  const nextQuery = { ...route.query };
+  if (tab === 'citas') {
+    delete nextQuery.tab;
+  } else {
+    nextQuery.tab = tab;
+  }
+
+  const currentTab = String(route.query.tab || 'citas');
+  if (currentTab !== tab) {
+    router.replace({ query: nextQuery });
+  }
 }
+
+watch(() => route.query.tab, () => {
+  setActive(tabFromRoute(), false);
+});
 
 function setCardFilter(filter) {
   cardFilter.value = filter;
