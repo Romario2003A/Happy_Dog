@@ -59,8 +59,12 @@ async function loadData(){
     pets.value=petsResponse.data;
     appointments.value=appointmentsResponse.data;
   }catch(e){
-    auth.logout();
-    router.replace('/cliente/login');
+    if(e.response?.status===401){
+      auth.logout();
+      router.replace('/cliente/login');
+      return;
+    }
+    error.value='No se pudo cargar tu panel. Actualiza nuevamente o intenta en unos segundos.';
   }
 }
 
