@@ -32,6 +32,11 @@ function dateKey(value = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function toIsoDateTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
 const selectedDate = ref(dateKey());
 const quick = ref({
   clientId: '',
@@ -474,8 +479,8 @@ async function saveQuickAppointment() {
     await api.post('/appointments', {
       clientId,
       petId,
-      scheduledAt: quick.value.scheduledAt,
-      reason: quick.value.reason,
+      scheduledAt: toIsoDateTime(quick.value.scheduledAt),
+      reason: quick.value.reason.trim(),
     });
     success.value = 'Cita creada desde recepción correctamente.';
     resetQuick();
@@ -656,7 +661,7 @@ onMounted(loadData);
             <label>Peso kg<input v-model.number="quick.weightKg" type="number" min="0" step="0.01" placeholder="Ej. 8.5"></label>
           </template>
 
-          <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local" step="1"></label>
+          <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local"></label>
           <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
           <div v-if="possibleDuplicateAppointments.length" class="duplicate-alert">
             <strong>Posible cita duplicada</strong>
