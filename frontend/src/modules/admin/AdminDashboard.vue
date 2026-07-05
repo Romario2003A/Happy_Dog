@@ -1,14 +1,18 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import { api } from '../../services/api';
 
+const route = useRoute();
+const router = useRouter();
 const summary = ref({});
 const inventory = ref([]);
 const clients = ref([]);
 const appointments = ref([]);
 const pets = ref([]);
-const active = ref('resumen');
+const adminTabs = ['resumen', 'inventario', 'clientes', 'caja'];
+const active = ref(tabFromRoute());
 const error = ref('');
 const success = ref('');
 const saving = ref(false);
@@ -42,16 +46,31 @@ const filteredInventory = computed(() => {
 });
 
 function openInventory() {
-  active.value = 'inventario';
+  setActive('inventario');
   showProductForm.value = false;
   editingProductId.value = '';
 }
 
 function openProductCreator() {
-  active.value = 'inventario';
+  setActive('inventario');
   editingProductId.value = '';
   resetProductForm();
   showProductForm.value = true;
+}
+
+function tabFromRoute() {
+  const tab = String(route.query.tab || '');
+  return adminTabs.includes(tab) ? tab : 'resumen';
+}
+
+function setActive(tab, syncUrl = true) {
+  active.value = adminTabs.includes(tab) ? tab : 'resumen';
+  if (!syncUrl) return;
+
+  const nextQuery = { ...route.query };
+  if (active.value === 'resumen') delete nextQuery.tab;
+  else nextQuery.tab = active.value;
+  router.replace({ query: nextQuery });
 }
 
 async function loadData() {
@@ -102,7 +121,7 @@ function productPayload() {
 }
 
 function startEditProduct(product) {
-  active.value = 'inventario';
+  setActive('inventario');
   editingProductId.value = product.id;
   productForm.value = {
     name: product.name || '',
@@ -193,16 +212,20 @@ function stockClass(product) {
   return 'ok';
 }
 
+watch(() => route.query.tab, () => {
+  setActive(tabFromRoute(), false);
+});
+
 onMounted(loadData);
 </script>
 
 <template>
   <AdminLayout title="Administración" subtitle="Control del negocio, inventario, caja y reportes" hide-user-pill>
     <template #nav>
-      <button @click="active='resumen'">Resumen</button>
+      <button @click="setActive('resumen')">Resumen</button>
       <button @click="openInventory">Inventario</button>
-      <button @click="active='clientes'">Clientes</button>
-      <button @click="active='caja'">Caja</button>
+      <button @click="setActive('clientes')">Clientes</button>
+      <button @click="setActive('caja')">Caja</button>
       <button @click="$router.push('/admin/cuenta')">Mi cuenta</button>
     </template>
 

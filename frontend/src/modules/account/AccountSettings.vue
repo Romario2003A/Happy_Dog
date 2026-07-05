@@ -19,6 +19,14 @@ const Layout = computed(() => isVet.value ? VeterinarianLayout : isAdmin.value ?
 const dashboardPath = computed(() => isVet.value ? '/veterinario' : isAdmin.value ? '/admin' : '/recepcion');
 const title = computed(() => isVet.value ? 'Doctor Veterinario' : isAdmin.value ? 'Administración' : 'Recepción');
 
+function goToAdminTab(tab) {
+  router.push({ path: '/admin', query: { tab } });
+}
+
+function goToReceptionTab(tab) {
+  router.push({ path: '/recepcion', query: { tab } });
+}
+
 async function submit() {
   error.value = '';
   success.value = '';
@@ -44,8 +52,23 @@ async function submit() {
 
 <template>
   <component :is="Layout" :title="title" subtitle="Cuenta y seguridad">
-    <template #nav>
+    <template v-if="isAdmin" #nav>
+      <button @click="goToAdminTab('resumen')">Resumen</button>
+      <button @click="goToAdminTab('inventario')">Inventario</button>
+      <button @click="goToAdminTab('clientes')">Clientes</button>
+      <button @click="goToAdminTab('caja')">Caja</button>
+      <button>Mi cuenta</button>
+    </template>
+
+    <template v-else-if="isVet" #nav>
       <button @click="router.push(dashboardPath)">Panel</button>
+      <button>Mi cuenta</button>
+    </template>
+
+    <template v-else #nav>
+      <button @click="goToReceptionTab('citas')">Citas</button>
+      <button @click="goToReceptionTab('clientes')">Clientes</button>
+      <button @click="goToReceptionTab('carnets')">Carnets</button>
       <button>Mi cuenta</button>
     </template>
 
