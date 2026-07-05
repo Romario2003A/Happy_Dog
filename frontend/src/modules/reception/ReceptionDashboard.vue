@@ -507,7 +507,14 @@ onMounted(loadData);
     </template>
 
     <template #top-actions>
-      <button class="secondary top-action-button" type="button" @click="$router.push('/admin')">Administración</button>
+      <button
+        class="secondary top-action-button"
+        type="button"
+        aria-label="Abrir el panel administrativo"
+        @click="$router.push('/admin')"
+      >
+        Panel administrativo
+      </button>
     </template>
 
     <p v-if="error" class="error">{{ error }}</p>

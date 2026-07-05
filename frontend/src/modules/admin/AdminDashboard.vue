@@ -207,7 +207,14 @@ onMounted(loadData);
     </template>
 
     <template #top-actions>
-      <button class="secondary top-action-button" type="button" @click="$router.push('/recepcion')">Recepción</button>
+      <button
+        class="secondary top-action-button"
+        type="button"
+        aria-label="Volver a la agenda diaria de recepción"
+        @click="$router.push('/recepcion')"
+      >
+        Volver a agenda diaria
+      </button>
     </template>
 
     <p v-if="error" class="error">{{ error }}</p>
