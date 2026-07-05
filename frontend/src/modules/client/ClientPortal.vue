@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { api } from '../../services/api';
-import doctorDog from '../../assets/images/happy-dog-doctor-painting.webp';
+import doctorDog from '../../assets/images/happy-dog-doctor-teal.webp';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
 
