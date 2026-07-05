@@ -4,7 +4,6 @@ import AdminLayout from '../../layouts/AdminLayout.vue';
 import { api } from '../../services/api';
 
 const summary = ref({});
-const users = ref([]);
 const inventory = ref([]);
 const clients = ref([]);
 const appointments = ref([]);
@@ -42,10 +41,6 @@ const filteredInventory = computed(() => {
   ].some(value => String(value || '').toLowerCase().includes(query)));
 });
 
-function openUsers() {
-  active.value = 'usuarios';
-}
-
 function openInventory() {
   active.value = 'inventario';
   showProductForm.value = false;
@@ -61,16 +56,14 @@ function openProductCreator() {
 
 async function loadData() {
   error.value = '';
-  const [summaryRes, usersRes, inventoryRes, clientsRes, appointmentsRes, petsRes] = await Promise.allSettled([
+  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes] = await Promise.allSettled([
     api.get('/reports/summary'),
-    api.get('/users'),
     api.get('/inventory'),
     api.get('/clients'),
     api.get('/appointments'),
     api.get('/pets'),
   ]);
 
-  if (usersRes.status === 'fulfilled') users.value = usersRes.value.data;
   if (inventoryRes.status === 'fulfilled') inventory.value = inventoryRes.value.data;
   if (clientsRes.status === 'fulfilled') clients.value = clientsRes.value.data;
   if (appointmentsRes.status === 'fulfilled') appointments.value = appointmentsRes.value.data;
@@ -89,7 +82,7 @@ async function loadData() {
     };
   }
 
-  const failed = [summaryRes, usersRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
+  const failed = [summaryRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
   if (failed) {
     error.value = 'Algunos datos administrativos no se pudieron cargar. Actualiza la página o vuelve a iniciar sesión si falta información.';
   }
@@ -204,10 +197,9 @@ onMounted(loadData);
 </script>
 
 <template>
-  <AdminLayout title="Administración" subtitle="Control del negocio, usuarios, inventario, caja y reportes" hide-user-pill>
+  <AdminLayout title="Administración" subtitle="Control del negocio, inventario, caja y reportes" hide-user-pill>
     <template #nav>
       <button @click="active='resumen'">Resumen</button>
-      <button @click="openUsers">Usuarios</button>
       <button @click="openInventory">Inventario</button>
       <button @click="active='clientes'">Clientes</button>
       <button @click="active='caja'">Caja</button>
@@ -225,7 +217,7 @@ onMounted(loadData);
       <div>
         <span class="badge">Panel administrativo</span>
         <h2>Control general de Happy Dog</h2>
-        <p class="muted-text">Administra usuarios, inventario, clientes y reportes sin mezclarlo con la agenda diaria.</p>
+        <p class="muted-text">Administra inventario, clientes y reportes sin mezclarlo con la agenda diaria.</p>
       </div>
     </div>
 
@@ -234,23 +226,6 @@ onMounted(loadData);
       <div class="glass-card metric"><span>Pacientes</span><strong>{{ adminStats.pets }}</strong></div>
       <div class="glass-card metric"><span>Citas</span><strong>{{ adminStats.appointments }}</strong></div>
       <div class="glass-card metric"><span>Stock bajo</span><strong>{{ adminStats.lowStock }}</strong></div>
-    </div>
-
-    <div v-if="active==='usuarios'" class="panel-grid single">
-      <section class="glass-card">
-        <div class="section-title">
-          <div>
-            <h2>Usuarios del sistema</h2>
-            <p class="muted-text">Gestiona las cuentas internas que entran a recepción, veterinario y administración.</p>
-          </div>
-        </div>
-        <table>
-          <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th></tr></thead>
-          <tbody>
-            <tr v-for="u in users" :key="u.id"><td>{{ u.fullName }}</td><td>{{ u.email }}</td><td>{{ u.role }}</td><td>{{ u.active ? 'Activo' : 'Inactivo' }}</td></tr>
-          </tbody>
-        </table>
-      </section>
     </div>
 
     <div v-else-if="active==='inventario'" class="panel-grid" :class="{ single: !showProductForm }">
@@ -332,7 +307,7 @@ onMounted(loadData);
 
     <section v-else class="glass-card">
       <h2>Resumen administrativo</h2>
-      <p class="muted-text">Usa las pestañas para gestionar usuarios, inventario, clientes y caja. La agenda diaria vive en Recepción.</p>
+      <p class="muted-text">Usa las pestañas para gestionar inventario, clientes y caja. La agenda diaria vive en Recepción.</p>
     </section>
   </AdminLayout>
 </template>
