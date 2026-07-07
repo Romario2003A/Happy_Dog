@@ -38,7 +38,10 @@ function homeByRole(role) {
 router.beforeEach((to)=>{
  const auth=useAuthStore();
  if(to.meta.requiresAuth && !auth.isAuthenticated) return to.meta.loginPath || '/personal/login';
- if(to.meta.roles && !to.meta.roles.includes(auth.role)) return homeByRole(auth.role);
+ if(to.meta.roles && !to.meta.roles.includes(auth.role)) {
+  if(!auth.role) return to.meta.loginPath || '/personal/login';
+  return homeByRole(auth.role);
+ }
 });
 
 export default router;

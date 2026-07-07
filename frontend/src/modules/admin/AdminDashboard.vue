@@ -147,7 +147,12 @@ function toDateTimeInput(date) {
   return local.toISOString().slice(0, 16);
 }
 
+function rejectedStatus(result) {
+  return result.status === 'rejected' ? result.reason?.response?.status : null;
+}
+
 async function loadCash() {
+  error.value = '';
   const [summaryRes, movementsRes] = await Promise.allSettled([
     api.get(`/cash/summary?date=${cashDate.value}`),
     api.get(`/cash?from=${cashDate.value}&to=${cashDate.value}`),
@@ -170,7 +175,10 @@ async function loadCash() {
   }
 
   if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected') {
-    error.value = 'No se pudo cargar caja.';
+    const status = rejectedStatus(summaryRes) || rejectedStatus(movementsRes);
+    error.value = status === 401 || status === 403
+      ? 'Tu sesion no tiene permisos para Caja. Ingresa otra vez con la cuenta de recepcion o administracion.'
+      : 'No se pudo cargar caja. Intenta actualizar la pagina en unos segundos.';
   }
 }
 
@@ -204,7 +212,10 @@ async function loadData() {
 
   const failed = [summaryRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
   if (failed) {
-    error.value = 'Algunos datos administrativos no se pudieron cargar. Actualiza la página o vuelve a iniciar sesión si falta información.';
+    const status = rejectedStatus(summaryRes) || rejectedStatus(inventoryRes) || rejectedStatus(clientsRes);
+    error.value = status === 401 || status === 403
+      ? 'Tu sesion no tiene permisos de administracion. Ingresa otra vez con la cuenta de recepcion o administracion.'
+      : 'Algunos datos administrativos no se pudieron cargar. Actualiza la pagina o vuelve a iniciar sesion si falta informacion.';
   }
 }
 
