@@ -20,6 +20,41 @@ const showProductForm = ref(false);
 const editingProductId = ref('');
 const inventorySearch = ref('');
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
+const cashDate = ref(todayInputDate());
+const cashMovements = ref([]);
+const cashSummary = ref(defaultCashSummary());
+const showCashForm = ref(false);
+const cashForm = ref(defaultCashForm());
+const closingForm = ref({ openingAmount: 0, countedAmount: 0, notes: '' });
+
+const cashTypeOptions = [
+  { value: 'INCOME', label: 'Ingreso' },
+  { value: 'EXPENSE', label: 'Gasto' },
+  { value: 'DEBT_PAYMENT', label: 'Pago de deuda' },
+  { value: 'ADJUSTMENT', label: 'Ajuste' },
+];
+const cashCategoryOptions = [
+  { value: 'CONSULTATION', label: 'Consulta' },
+  { value: 'VACCINE', label: 'Vacuna' },
+  { value: 'SURGERY', label: 'Cirugia' },
+  { value: 'GROOMING', label: 'Bano y corte' },
+  { value: 'TREATMENT', label: 'Tratamiento' },
+  { value: 'PRODUCT', label: 'Producto' },
+  { value: 'CAMPAIGN', label: 'Campana' },
+  { value: 'DEBT', label: 'Deuda' },
+  { value: 'OTHER', label: 'Otro' },
+];
+const paymentOptions = [
+  { value: 'CASH', label: 'Efectivo' },
+  { value: 'CARD', label: 'Tarjeta' },
+  { value: 'TRANSFER', label: 'Transferencia' },
+  { value: 'YAPE', label: 'Yape' },
+  { value: 'PLIN', label: 'Plin' },
+  { value: 'OTHER', label: 'Otro' },
+];
+const cashTypeLabels = Object.fromEntries(cashTypeOptions.map(option => [option.value, option.label]));
+const cashCategoryLabels = Object.fromEntries(cashCategoryOptions.map(option => [option.value, option.label]));
+const paymentLabels = Object.fromEntries(paymentOptions.map(option => [option.value, option.label]));
 
 const lowStockProducts = computed(() => inventory.value.filter(p => p.active !== false && Number(p.stock) <= Number(p.minStock)));
 const clientPetsCount = computed(() => clients.value.reduce((total, client) => total + (client.pets?.length || 0), 0));
@@ -44,6 +79,7 @@ const filteredInventory = computed(() => {
     product.sku,
   ].some(value => String(value || '').toLowerCase().includes(query)));
 });
+const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
 
 function openInventory() {
   setActive('inventario');
@@ -65,12 +101,77 @@ function tabFromRoute() {
 
 function setActive(tab, syncUrl = true) {
   active.value = adminTabs.includes(tab) ? tab : 'resumen';
+  if (active.value === 'caja') loadCash();
   if (!syncUrl) return;
 
   const nextQuery = { ...route.query };
   if (active.value === 'resumen') delete nextQuery.tab;
   else nextQuery.tab = active.value;
   router.replace({ query: nextQuery });
+}
+
+function defaultCashSummary() {
+  return {
+    income: 0,
+    expenses: 0,
+    debtPayments: 0,
+    adjustments: 0,
+    net: 0,
+    movementCount: 0,
+    byPaymentMethod: [],
+    byCategory: [],
+    closing: null,
+  };
+}
+
+function defaultCashForm() {
+  return {
+    type: 'INCOME',
+    category: 'CONSULTATION',
+    description: '',
+    amount: 0,
+    paymentMethod: 'CASH',
+    occurredAt: toDateTimeInput(new Date()),
+    clientName: '',
+    petName: '',
+    notes: '',
+  };
+}
+
+function todayInputDate() {
+  return toDateTimeInput(new Date()).slice(0, 10);
+}
+
+function toDateTimeInput(date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+async function loadCash() {
+  const [summaryRes, movementsRes] = await Promise.allSettled([
+    api.get(`/cash/summary?date=${cashDate.value}`),
+    api.get(`/cash?from=${cashDate.value}&to=${cashDate.value}`),
+  ]);
+
+  if (summaryRes.status === 'fulfilled') {
+    cashSummary.value = { ...defaultCashSummary(), ...summaryRes.value.data };
+    const closing = summaryRes.value.data?.closing;
+    if (closing) {
+      closingForm.value = {
+        openingAmount: Number(closing.openingAmount || 0),
+        countedAmount: Number(closing.countedAmount || 0),
+        notes: closing.notes || '',
+      };
+    }
+  }
+
+  if (movementsRes.status === 'fulfilled') {
+    cashMovements.value = movementsRes.value.data;
+  }
+
+  if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected') {
+    error.value = 'No se pudo cargar caja.';
+  }
 }
 
 async function loadData() {
@@ -194,8 +295,98 @@ async function deleteProduct(product) {
   }
 }
 
+function resetCashForm() {
+  cashForm.value = defaultCashForm();
+}
+
+function cashPayload() {
+  return {
+    ...cashForm.value,
+    amount: Number(cashForm.value.amount),
+    paymentMethod: cashForm.value.type === 'EXPENSE' ? null : cashForm.value.paymentMethod,
+  };
+}
+
+async function saveCashMovement() {
+  if (Number(cashForm.value.amount) <= 0) {
+    error.value = 'Ingresa un monto mayor a cero.';
+    return;
+  }
+
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post('/cash/movements', cashPayload());
+    success.value = 'Movimiento de caja registrado.';
+    resetCashForm();
+    showCashForm.value = false;
+    await loadCash();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo registrar el movimiento.';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function deleteCashMovement(movement) {
+  const ok = window.confirm(`Eliminar el movimiento "${movement.description}"?`);
+  if (!ok) return;
+
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.delete(`/cash/movements/${movement.id}`);
+    success.value = 'Movimiento eliminado.';
+    await loadCash();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo eliminar el movimiento.';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function closeCashDay() {
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post('/cash/closing', {
+      businessDate: cashDate.value,
+      openingAmount: Number(closingForm.value.openingAmount || 0),
+      countedAmount: Number(closingForm.value.countedAmount || 0),
+      notes: closingForm.value.notes || '',
+    });
+    success.value = 'Cierre de caja guardado.';
+    await loadCash();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo cerrar caja.';
+  } finally {
+    saving.value = false;
+  }
+}
+
 function formatPrice(value) {
   return Number(value || 0).toFixed(2);
+}
+
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function formatCashDateTime(value) {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+}
+
+function movementAmountClass(movement) {
+  return movement.type === 'EXPENSE' ? 'amount-negative' : 'amount-positive';
+}
+
+function movementSignedAmount(movement) {
+  const prefix = movement.type === 'EXPENSE' ? '-' : '+';
+  return `${prefix} S/ ${formatMoney(movement.amount)}`;
 }
 
 function stockLabel(product) {
@@ -216,7 +407,12 @@ watch(() => route.query.tab, () => {
   setActive(tabFromRoute(), false);
 });
 
-onMounted(loadData);
+watch(cashDate, loadCash);
+
+onMounted(async () => {
+  await loadData();
+  if (active.value === 'caja') await loadCash();
+});
 </script>
 
 <template>
@@ -330,9 +526,112 @@ onMounted(loadData);
       </table>
     </section>
 
-    <section v-else-if="active==='caja'" class="glass-card">
-      <h2>Caja / ventas</h2>
-      <p class="empty">Modulo preparado para conectar pagos, ventas de productos y reportes de caja.</p>
+    <section v-else-if="active==='caja'" class="glass-card cash-panel">
+      <div class="section-title">
+        <div>
+          <span class="badge">Caja diaria</span>
+          <h2>Movimientos de caja</h2>
+          <p class="muted-text">Registra consultas, vacunas, cirugias, bano y corte, productos, deudas y gastos.</p>
+        </div>
+        <div class="cash-actions">
+          <input v-model="cashDate" class="cash-date" type="date">
+          <button class="secondary small" type="button" @click="showCashForm = !showCashForm">
+            {{ showCashForm ? 'Ocultar' : 'Nuevo movimiento' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="cash-cards">
+        <div class="cash-metric"><span>Ingresos</span><strong>S/ {{ formatMoney(cashSummary.income) }}</strong></div>
+        <div class="cash-metric"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
+        <div class="cash-metric"><span>Deudas cobradas</span><strong>S/ {{ formatMoney(cashSummary.debtPayments) }}</strong></div>
+        <div class="cash-metric emphasis"><span>Neto del dia</span><strong>S/ {{ formatMoney(cashSummary.net) }}</strong></div>
+      </div>
+
+      <form v-if="showCashForm" class="cash-form" @submit.prevent="saveCashMovement">
+        <label>Tipo
+          <select v-model="cashForm.type">
+            <option v-for="option in cashTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
+        </label>
+        <label>Categoria
+          <select v-model="cashForm.category">
+            <option v-for="option in cashCategoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
+        </label>
+        <label>Monto
+          <input v-model.number="cashForm.amount" type="number" min="0" step="0.01" required placeholder="0.00">
+        </label>
+        <label>Metodo
+          <select v-model="cashForm.paymentMethod" :disabled="cashForm.type === 'EXPENSE'">
+            <option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
+        </label>
+        <label>Cliente
+          <input v-model="cashForm.clientName" placeholder="Nombre del cliente">
+        </label>
+        <label>Mascota
+          <input v-model="cashForm.petName" placeholder="Paciente">
+        </label>
+        <label>Fecha y hora
+          <input v-model="cashForm.occurredAt" type="datetime-local">
+        </label>
+        <label class="wide">Detalle
+          <input v-model="cashForm.description" required placeholder="Consulta, vacuna, compra, pago pendiente">
+        </label>
+        <label class="full">Notas
+          <textarea v-model="cashForm.notes" rows="2" placeholder="Observacion opcional"></textarea>
+        </label>
+        <div class="cash-form-actions">
+          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar movimiento' }}</button>
+          <button class="secondary" type="button" @click="resetCashForm(); showCashForm = false">Cancelar</button>
+        </div>
+      </form>
+
+      <div class="cash-split">
+        <section class="cash-box">
+          <h3>Metodo de pago</h3>
+          <div v-if="cashSummary.byPaymentMethod?.length" class="cash-methods">
+            <span v-for="item in cashSummary.byPaymentMethod" :key="item.key" class="cash-chip">
+              {{ paymentLabels[item.key] || item.key }} <strong>S/ {{ formatMoney(item.total) }}</strong>
+            </span>
+          </div>
+          <p v-else class="empty compact">Aun no hay pagos registrados para este dia.</p>
+        </section>
+        <section class="cash-box">
+          <h3>Cierre del dia</h3>
+          <form class="cash-closing-form" @submit.prevent="closeCashDay">
+            <label>Apertura
+              <input v-model.number="closingForm.openingAmount" type="number" min="0" step="0.01">
+            </label>
+            <label>Conteo real
+              <input v-model.number="closingForm.countedAmount" type="number" min="0" step="0.01">
+            </label>
+            <label>Notas
+              <input v-model="closingForm.notes" placeholder="Diferencias u observaciones">
+            </label>
+            <button class="secondary small" :disabled="saving">Guardar cierre</button>
+          </form>
+        </section>
+      </div>
+
+      <table>
+        <thead><tr><th>Hora</th><th>Concepto</th><th>Categoria</th><th>Metodo</th><th>Monto</th><th>Acciones</th></tr></thead>
+        <tbody>
+          <tr v-if="!sortedCashMovements.length"><td colspan="6" class="empty">Caja limpia para este dia. Agrega el primer movimiento cuando haya una venta, pago o gasto.</td></tr>
+          <tr v-for="movement in sortedCashMovements" :key="movement.id">
+            <td>{{ formatCashDateTime(movement.occurredAt) }}</td>
+            <td>
+              <strong>{{ movement.description }}</strong>
+              <small v-if="movement.clientName || movement.petName">{{ movement.clientName || '-' }} · {{ movement.petName || '-' }}</small>
+            </td>
+            <td>{{ cashCategoryLabels[movement.category] || movement.category }}</td>
+            <td>{{ paymentLabels[movement.paymentMethod] || '-' }}</td>
+            <td :class="movementAmountClass(movement)">{{ movementSignedAmount(movement) }}</td>
+            <td><button class="danger small" type="button" @click="deleteCashMovement(movement)">Eliminar</button></td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
     <section v-else class="glass-card">
@@ -341,4 +640,167 @@ onMounted(loadData);
     </section>
   </AdminLayout>
 </template>
+
+<style scoped>
+.cash-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.cash-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cash-date {
+  max-width: 180px;
+}
+
+.cash-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cash-metric {
+  border: 1px solid rgba(13, 95, 96, 0.14);
+  border-radius: 20px;
+  padding: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(232, 250, 244, 0.64));
+  box-shadow: 0 18px 40px rgba(13, 79, 80, 0.08);
+}
+
+.cash-metric span {
+  display: block;
+  color: #60716d;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.cash-metric strong {
+  display: block;
+  margin-top: 8px;
+  color: #10231f;
+  font-size: 1.6rem;
+}
+
+.cash-metric.emphasis {
+  background: linear-gradient(135deg, #0f766e, #12a28d);
+}
+
+.cash-metric.emphasis span,
+.cash-metric.emphasis strong {
+  color: #fff;
+}
+
+.cash-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(13, 95, 96, 0.14);
+  border-radius: 22px;
+  background: rgba(240, 250, 247, 0.75);
+}
+
+.cash-form label,
+.cash-closing-form label {
+  display: grid;
+  gap: 6px;
+  color: #142522;
+  font-weight: 800;
+}
+
+.cash-form .wide {
+  grid-column: span 2;
+}
+
+.cash-form .full {
+  grid-column: 1 / -1;
+}
+
+.cash-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cash-split {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 14px;
+}
+
+.cash-box {
+  padding: 16px;
+  border: 1px solid rgba(13, 95, 96, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.cash-box h3 {
+  margin: 0 0 12px;
+}
+
+.cash-methods {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #e7f7f2;
+  color: #0b5d58;
+  font-weight: 800;
+}
+
+.cash-closing-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.cash-panel td small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7b77;
+}
+
+.amount-positive {
+  color: #087f5b;
+  font-weight: 900;
+}
+
+.amount-negative {
+  color: #b42318;
+  font-weight: 900;
+}
+
+.empty.compact {
+  padding: 10px 0;
+}
+
+@media (max-width: 980px) {
+  .cash-cards,
+  .cash-form,
+  .cash-split,
+  .cash-closing-form {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-form .wide {
+    grid-column: 1 / -1;
+  }
+}
+</style>
 

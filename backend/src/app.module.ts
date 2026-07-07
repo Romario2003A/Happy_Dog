@@ -11,6 +11,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { FilesModule } from './modules/files/files.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CashModule } from './modules/cash/cash.module';
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, ClientsModule, PetsModule, AppointmentsModule, MedicalRecordsModule, InventoryModule, SalesModule, FilesModule, ReportsModule], providers: [PrismaService] })
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, ClientsModule, PetsModule, AppointmentsModule, MedicalRecordsModule, InventoryModule, SalesModule, FilesModule, ReportsModule, CashModule], providers: [PrismaService] })
 export class AppModule {}

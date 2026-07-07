@@ -51,6 +51,25 @@ enum PaymentMethod {
   OTHER
 }
 
+enum CashMovementType {
+  INCOME
+  EXPENSE
+  DEBT_PAYMENT
+  ADJUSTMENT
+}
+
+enum CashMovementCategory {
+  CONSULTATION
+  VACCINE
+  SURGERY
+  GROOMING
+  TREATMENT
+  PRODUCT
+  CAMPAIGN
+  DEBT
+  OTHER
+}
+
 enum MovementType {
   IN
   OUT
@@ -69,6 +88,8 @@ model User {
   appointments Appointment[] @relation("VetAppointments")
   medicalRecords MedicalRecord[]
   sales Sale[]
+  cashMovements CashMovement[]
+  cashClosings CashClosing[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -85,6 +106,7 @@ model Client {
   pets Pet[]
   appointments Appointment[]
   sales Sale[]
+  cashMovements CashMovement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([fullName])
@@ -111,6 +133,7 @@ model Pet {
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   appointments Appointment[]
   medicalRecords MedicalRecord[]
+  cashMovements CashMovement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([clientId])
@@ -146,6 +169,7 @@ model Appointment {
   service Service? @relation(fields: [serviceId], references: [id])
   medicalRecord MedicalRecord?
   sale Sale?
+  cashMovements CashMovement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([scheduledAt])
@@ -234,8 +258,57 @@ model Sale {
   appointment Appointment? @relation(fields: [appointmentId], references: [id])
   cashier User? @relation(fields: [cashierId], references: [id])
   items SaleItem[]
+  cashMovements CashMovement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CashMovement {
+  id String @id @default(uuid())
+  type CashMovementType
+  category CashMovementCategory @default(OTHER)
+  description String
+  amount Decimal @db.Decimal(10,2)
+  paymentMethod PaymentMethod?
+  occurredAt DateTime @default(now())
+  clientName String?
+  petName String?
+  clientId String?
+  petId String?
+  saleId String?
+  appointmentId String?
+  notes String?
+  registeredById String?
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  pet Pet? @relation(fields: [petId], references: [id], onDelete: SetNull)
+  sale Sale? @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  registeredBy User? @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([occurredAt])
+  @@index([type])
+  @@index([category])
+  @@index([paymentMethod])
+  @@index([clientId])
+  @@index([petId])
+}
+
+model CashClosing {
+  id String @id @default(uuid())
+  businessDate DateTime @unique
+  openingAmount Decimal @db.Decimal(10,2) @default(0)
+  expectedAmount Decimal @db.Decimal(10,2) @default(0)
+  countedAmount Decimal @db.Decimal(10,2) @default(0)
+  difference Decimal @db.Decimal(10,2) @default(0)
+  notes String?
+  closedById String?
+  closedBy User? @relation(fields: [closedById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessDate])
 }
 
 model SaleItem {
