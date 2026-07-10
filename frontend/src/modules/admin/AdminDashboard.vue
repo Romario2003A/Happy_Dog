@@ -80,6 +80,14 @@ const filteredInventory = computed(() => {
   ].some(value => String(value || '').toLowerCase().includes(query)));
 });
 const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
+const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.net || 0));
+const closingDifference = computed(() => Number(closingForm.value.countedAmount || 0) - expectedClosingAmount.value);
+const closingStatus = computed(() => {
+  if (Math.abs(closingDifference.value) < 0.01) return { label: 'Caja cuadrada', tone: 'ok' };
+  return closingDifference.value > 0
+    ? { label: 'Sobra dinero', tone: 'warn' }
+    : { label: 'Falta dinero', tone: 'danger' };
+});
 
 function openInventory() {
   setActive('inventario');
@@ -610,18 +618,43 @@ onMounted(async () => {
           <p v-else class="empty compact">Aun no hay pagos registrados para este dia.</p>
         </section>
         <section class="cash-box">
-          <h3>Cierre del dia</h3>
-          <form class="cash-closing-form" @submit.prevent="closeCashDay">
-            <label>Apertura
-              <input v-model.number="closingForm.openingAmount" type="number" min="0" step="0.01">
+          <div class="cash-close-header">
+            <div>
+              <h3>Cierre de caja</h3>
+              <p class="muted-text">Al terminar el turno, cuenta el dinero real y compáralo con lo registrado.</p>
+            </div>
+            <span :class="['closing-status', closingStatus.tone]">{{ closingStatus.label }}</span>
+          </div>
+
+          <div class="cash-guide">
+            <span>1. Dinero inicial</span>
+            <span>2. Movimiento del día</span>
+            <span>3. Conteo final</span>
+          </div>
+
+          <form class="cash-closing-form improved" @submit.prevent="closeCashDay">
+            <label>Dinero inicial
+              <input v-model.number="closingForm.openingAmount" type="number" min="0" step="0.01" placeholder="Ej. 50.00">
             </label>
-            <label>Conteo real
-              <input v-model.number="closingForm.countedAmount" type="number" min="0" step="0.01">
+            <div class="cash-total">
+              <span>Movimiento del día</span>
+              <strong>S/ {{ formatMoney(cashSummary.net) }}</strong>
+            </div>
+            <div class="cash-total strong">
+              <span>Caja esperada</span>
+              <strong>S/ {{ formatMoney(expectedClosingAmount) }}</strong>
+            </div>
+            <label>Dinero contado al cerrar
+              <input v-model.number="closingForm.countedAmount" type="number" min="0" step="0.01" placeholder="Ej. 230.00">
             </label>
-            <label>Notas
-              <input v-model="closingForm.notes" placeholder="Diferencias u observaciones">
+            <div :class="['cash-total', closingStatus.tone]">
+              <span>Diferencia</span>
+              <strong>S/ {{ formatMoney(closingDifference) }}</strong>
+            </div>
+            <label>Notas del cierre
+              <input v-model="closingForm.notes" placeholder="Ej. falta vuelto, pago pendiente o caja conforme">
             </label>
-            <button class="secondary small" :disabled="saving">Guardar cierre</button>
+            <button class="secondary small" :disabled="saving">Guardar cierre de caja</button>
           </form>
         </section>
       </div>
