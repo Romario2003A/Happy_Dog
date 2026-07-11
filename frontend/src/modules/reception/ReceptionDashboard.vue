@@ -341,7 +341,8 @@ async function setStatus(appointment, status) {
   try {
     const { data } = await api.patch(`/appointments/${appointment.id}`, { status });
     appointments.value = appointments.value.map(item => item.id === data.id ? data : item);
-    if (selectedAppointment.value?.id === data.id) selectedAppointment.value = data;
+    if (selectedAppointment.value?.id === data.id) selectedAppointment.value = null;
+    await loadData();
     success.value = 'Cita actualizada correctamente.';
   } catch (e) {
     error.value = 'No se pudo actualizar la cita.';
