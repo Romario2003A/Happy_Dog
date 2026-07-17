@@ -1,61 +1,110 @@
-# Happy Dog Profesional
+<div align="center">
+  <h1>🐾 Happy Dog</h1>
+  <p><strong>Sistema Integral de Gestión Veterinaria</strong></p>
+  <p>Una plataforma moderna y completa diseñada para simplificar y profesionalizar la administración de clínicas veterinarias. Desde la agenda de citas hasta el historial clínico y la caja diaria, todo en un solo lugar.</p>
+</div>
 
-Sistema integral para veterinaria: portal cliente, recepción, veterinario y administrador.
+---
 
-## Stack
-- Frontend: Vue 3 + Vite + Vue Router + Pinia + Axios
-- Backend: NestJS + Prisma
-- Base de datos: PostgreSQL
-- Seguridad: JWT, roles, guards, validaciones DTO
-- Archivos: módulo local preparado para reemplazar por Supabase Storage/S3
-- PDF: generación de receta/comprobante desde backend
+## ✨ Características Principales
 
-## Principios de arquitectura
-- Monolito modular: más simple que microservicios, pero escalable.
-- Separación por módulos: auth, usuarios, clientes, mascotas, citas, historia clínica, inventario, ventas, archivos y reportes.
-- No contiene datos predefinidos del cliente. El sistema inicia vacío.
-- Los usuarios iniciales se crean desde endpoint protegido/seed opcional o desde base de datos según despliegue.
+Happy Dog está diseñado para cubrir todas las necesidades de una clínica veterinaria con paneles separados para cada tipo de usuario:
 
-## Instalación local
+- **Portal Administrativo**: Control total del negocio. Gestiona el inventario, clientes, ventas, reportes financieros y caja diaria.
+- **Consultorio Veterinario**: Acceso rápido a historiales clínicos, generación de recetas médicas en PDF y registro detallado de consultas.
+- **Recepción**: Agenda diaria interactiva, creación de citas por llamada, registro rápido de clientes y generación de carnets de mascotas.
+- **Portal del Cliente**: Interfaz amigable para que los dueños agenden citas, se registren usando Google OAuth y lleven control de sus mascotas.
+
+## 🛠️ Stack Tecnológico
+
+Construido con herramientas modernas para garantizar escalabilidad, seguridad y una excelente experiencia de usuario.
+
+### Frontend
+- **Framework:** Vue 3 (Composition API) + Vite
+- **Estado y Enrutamiento:** Pinia + Vue Router
+- **Peticiones:** Axios
+
+### Backend
+- **Framework:** NestJS + TypeScript
+- **ORM & Base de Datos:** Prisma + PostgreSQL
+- **Seguridad:** JWT, Guards, Encriptación bcrypt, Google OAuth
+- **Documentación API:** Swagger integrado
+
+---
+
+## 🚀 Guía de Instalación Rápida
+
+Puedes correr este proyecto localmente en tu máquina siguiendo estos pasos:
+
+### Opción 1: Instalación Rápida (Recomendada)
+Si tienes Node.js y Docker instalados, ejecuta los siguientes comandos en la raíz del proyecto:
 
 ```bash
+# 1. Instalar dependencias para frontend y backend
 npm run install:all
+
+# 2. Configurar variables de entorno (copiar las plantillas)
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
+
+# 3. Levantar la base de datos, backend y frontend usando Docker Compose
 npm run docker:up
 ```
 
-Otra forma:
+### Opción 2: Instalación Manual
+Si prefieres correr los servicios por separado sin Docker:
 
+**1. Backend**
 ```bash
 cd backend
 npm install
 npx prisma generate
 npx prisma migrate dev --name init
 npm run start:dev
+```
 
-cd ../frontend
+**2. Frontend**
+Abre una nueva terminal y ejecuta:
+```bash
+cd frontend
 npm install
 npm run dev
 ```
 
-## Rutas del sistema
-- `/cliente` Portal público para agendar citas.
-- `/recepcion/login` Login recepción.
-- `/recepcion` Panel recepción.
-- `/veterinario/login` Login veterinario.
-- `/veterinario` Consultorio veterinario.
-- `/admin/login` Login administración.
-- `/admin` Panel administrador.
+---
 
-## Variables principales
-Ver `backend/.env.example` y `frontend/.env.example`.
+## 🗺️ Estructura del Sistema
 
-## Preparado para nube
-Puedes desplegar:
-- Backend NestJS en Render, Railway, Fly.io o VPS.
-- PostgreSQL en Supabase, Neon, Render PostgreSQL o Railway PostgreSQL.
-- Frontend Vue en Vercel, Netlify o Cloudflare Pages.
+Una vez que el proyecto esté corriendo, puedes acceder a los diferentes portales a través de las siguientes rutas:
 
-## Nota importante
-Este proyecto es una base profesional funcional para desarrollo académico/productivo. Para producción real se recomienda configurar dominio, HTTPS, backups, monitoreo, almacenamiento externo de archivos, facturación electrónica según normativa local y pruebas automatizadas completas.
+| Portal | Ruta de Acceso | Descripción |
+|--------|---------------|-------------|
+| **Portal Cliente** | `/cliente` | Agenda pública y registro de dueños. |
+| **Recepción** | `/recepcion` | Panel de agenda diaria y carnets. |
+| **Veterinario** | `/veterinario` | Historias clínicas y consultas médicas. |
+| **Administración**| `/admin` | Inventario, caja y reportes del negocio. |
+
+*Nota: Todas las rutas del personal (recepción, veterinario, admin) cuentan con sus respectivos logins de seguridad bajo la ruta `/personal/login`.*
+
+---
+
+## ☁️ Listo para la Nube
+
+El sistema utiliza una arquitectura de *Monolito Modular*, lo que lo hace perfecto para desplegar de forma sencilla y escalable:
+- **Backend:** Render, Railway, Fly.io o cualquier VPS.
+- **Base de Datos:** Supabase, Neon, Render o Railway PostgreSQL.
+- **Frontend:** Vercel, Netlify o Cloudflare Pages.
+
+---
+
+## 🛡️ Notas para Producción
+
+Happy Dog es una base sólida para un entorno real. Si planeas llevarlo a producción, te recomendamos:
+- Configurar un dominio personalizado con certificados HTTPS.
+- Implementar backups automáticos de la base de datos PostgreSQL.
+- Migrar el almacenamiento local de imágenes (fotos de mascotas) a un servicio como Supabase Storage o AWS S3.
+
+---
+<div align="center">
+  <p>Desarrollado con ❤️ para mejorar la atención de nuestras mascotas.</p>
+</div>
