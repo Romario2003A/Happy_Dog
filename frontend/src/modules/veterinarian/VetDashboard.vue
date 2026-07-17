@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import VeterinarianLayout from '../../layouts/VeterinarianLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
@@ -18,6 +18,20 @@ const success = ref('');
 const petSearch = ref('');
 const patientSearch = ref(null);
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
+const surgeryConsent = reactive({
+  ownerDni: '',
+  ownerAddress: '',
+  petAge: '',
+  petColor: '',
+  lastMeal: '',
+  digestiveIssue: false,
+  medicalCondition: false,
+  medicalConditionDetail: '',
+  medication: '',
+  alternativeName: '',
+  alternativePhone: '',
+  staffNotes: '',
+});
 const examOptions = [
   { key: 'ecografia', label: 'Ecografía' },
   { key: 'rayosX', label: 'Rayos X' },
@@ -70,6 +84,9 @@ const filteredPets = computed(() => pets.value.filter(pet => {
 const selectedPet = computed(() => selected.value?.pet || selectedStandalonePet.value);
 const selectedClient = computed(() => selected.value?.client || selectedStandalonePet.value?.client);
 const selectedProduct = computed(() => products.value.find(product => product.id === prescription.value.productId));
+const surgeryCode = computed(() => selectedPet.value?.id
+  ? `CX-${String(selectedPet.value.id).replace(/-/g, '').slice(0, 8).toUpperCase()}`
+  : 'CX-00000000');
 
 function dateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -82,6 +99,10 @@ function dateKey(value = new Date()) {
 function formatDate(value) {
   if (!value) return 'Sin fecha';
   return new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function formatShortDate(value = new Date()) {
+  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value));
 }
 
 function greeting() {
@@ -339,6 +360,164 @@ function generatePrescriptionPdf() {
   printWindow.document.close();
 }
 
+function generateSurgeryConsentPdf() {
+  if (!selectedPet.value) {
+    error.value = 'Selecciona un paciente antes de generar la autorizacion quirurgica.';
+    return;
+  }
+
+  const pet = selectedPet.value;
+  const client = selectedClient.value || {};
+  const petSpecies = String(pet.species || '').toLowerCase();
+  const petSex = sexLabel(pet.sex).toLowerCase();
+  const isCat = petSpecies.includes('gato') || petSpecies.includes('felino');
+  const isDog = petSpecies.includes('perro') || petSpecies.includes('canino') || !isCat;
+  const isMale = petSex.includes('macho');
+  const isFemale = petSex.includes('hembra');
+  const checked = value => (value ? '&#9745;' : '&#9744;');
+  const date = formatShortDate();
+
+  const printWindow = window.open('', '_blank', 'width=980,height=760');
+  if (!printWindow) {
+    error.value = 'El navegador bloqueo la ventana de impresion. Permite ventanas emergentes para generar el PDF.';
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Autorizacion quirurgica - ${escapeHtml(pet.name || 'Paciente')}</title>
+        <style>
+          @page{size:A4;margin:9mm}
+          *{box-sizing:border-box}
+          body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;background:#fff}
+          .sheet{position:relative;min-height:277mm;padding:8mm 9mm 7mm;overflow:hidden}
+          .watermark{position:absolute;inset:0;display:grid;place-items:center;font-size:132px;font-weight:900;color:rgba(0,0,0,.055);line-height:.78;z-index:0;text-align:center}
+          .content{position:relative;z-index:1}
+          .top-row{display:grid;grid-template-columns:150px 1fr 150px;align-items:center;margin-bottom:7mm}
+          .date-box,.code-box{border:1.5px solid #333;padding:7px 10px;font-weight:800;font-size:13px}
+          .date-box{justify-self:start}.code-box{justify-self:end}
+          .brand{text-align:center;color:#7aa681;font-weight:900;line-height:1}
+          .brand strong{display:block;color:#5a8c66;font-size:22px}
+          h1{margin:0 0 8mm;text-align:center;font-size:27px;line-height:1.14;font-weight:900;letter-spacing:.02em}
+          h2{margin:0 0 4px;text-align:center;font-size:17px;font-weight:900;letter-spacing:.02em}
+          .main-grid{display:grid;grid-template-columns:1fr 1fr;gap:18mm;margin-bottom:9mm}
+          .panel{position:relative;background:#b8b8b8;padding:8mm 6mm 6mm;min-height:102mm}
+          .panel .panel-logo{position:absolute;inset:auto 8mm 10mm auto;font-size:82px;font-weight:900;color:rgba(255,255,255,.16);line-height:.8}
+          .line{border-bottom:1.4px solid rgba(0,0,0,.58);min-height:21px;margin:0 0 7px;padding-top:2px;font-size:13px}
+          .line strong{display:block;font-size:12px;text-transform:uppercase}
+          .two{display:grid;grid-template-columns:1fr 1fr;gap:6mm}
+          .checks{display:flex;flex-wrap:wrap;gap:13px;margin:6px 0 7px;font-size:14px}
+          .question{font-size:13px;line-height:1.2;margin:8px 0 5px}
+          .note-box{background:#fff;min-height:55mm;padding:8px;border:1px solid transparent}
+          .warning{text-align:center;font-size:10px;font-weight:800;line-height:1.15;margin:4px 0 8px}
+          .side-date{position:absolute;left:3mm;top:122mm;transform:rotate(-90deg);transform-origin:left top;font-size:28px;letter-spacing:.04em}
+          .consent-title{font-weight:900;font-size:17px;margin:0 0 3px}
+          .consent-grid{display:grid;grid-template-columns:1fr 1fr;gap:8mm;background:#b8b8b8;padding:7mm 7mm 5mm;margin-top:4mm}
+          .consent-grid p{font-size:12.5px;line-height:1.18;margin:0 0 8px;text-align:justify}
+          .footer{margin-top:6mm;display:grid;grid-template-columns:1fr 1fr;gap:12mm;align-items:end}
+          .owner-sign{font-size:16px;font-weight:900;line-height:1.3}
+          .signature{text-align:center;font-size:10px}
+          .signature-line{border-top:1.5px solid #222;margin:0 auto 4px;width:210px}
+          @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.sheet{padding:7mm 8mm}}
+        </style>
+      </head>
+      <body>
+        <main class="sheet">
+          <div class="watermark">Happy<br>Dog.</div>
+          <div class="side-date">FECHA:</div>
+          <section class="content">
+            <div class="top-row">
+              <div class="date-box">FECHA: ${escapeHtml(date)}</div>
+              <div class="brand"><strong>Happy Dog</strong>Clinica Veterinaria</div>
+              <div class="code-box">CODIGO: ${escapeHtml(surgeryCode.value)}</div>
+            </div>
+
+            <h1>FORMULARIO DE REGISTRO PARA CIRUGIA<br>DE ESTERILIZACION / CASTRACION</h1>
+
+            <div class="main-grid">
+              <div>
+                <h2>INFORMACION DEL PACIENTE</h2>
+                <div class="panel">
+                  <div class="line"><strong>Nombre del paciente</strong>${escapeHtml(pet.name || '')}</div>
+                  <div class="checks">
+                    <span>PERRO ${checked(isDog)}</span>
+                    <span>GATO ${checked(isCat)}</span>
+                    <span>MACHO ${checked(isMale)}</span>
+                    <span>HEMBRA ${checked(isFemale)}</span>
+                  </div>
+                  <div class="two">
+                    <div class="line"><strong>Edad</strong>${escapeHtml(surgeryConsent.petAge || pet.age || '')}</div>
+                    <div class="line"><strong>Color</strong>${escapeHtml(surgeryConsent.petColor || pet.color || '')}</div>
+                  </div>
+                  <div class="line"><strong>Raza</strong>${escapeHtml(pet.breed || '')}</div>
+                  <div class="question">A que hora comio su mascota por ultima vez?</div>
+                  <div class="line">${escapeHtml(surgeryConsent.lastMeal || '')}</div>
+                  <div class="question">Su mascota ha vomitado o tenido diarrea en las ultimas 24 horas?</div>
+                  <div class="checks"><span>SI ${checked(surgeryConsent.digestiveIssue)}</span><span>NO ${checked(!surgeryConsent.digestiveIssue)}</span></div>
+                  <div class="question">Tiene su mascota algun problema medico preexistente?</div>
+                  <div class="checks"><span>SI ${checked(surgeryConsent.medicalCondition)}</span><span>NO ${checked(!surgeryConsent.medicalCondition)}</span></div>
+                  <div class="question">En caso afirmativo, por favor explique</div>
+                  <div class="line">${escapeHtml(surgeryConsent.medicalConditionDetail || '')}</div>
+                  <div class="question">Su mascota toma algun medicamento?</div>
+                  <div class="line">${escapeHtml(surgeryConsent.medication || '')}</div>
+                  <div class="panel-logo">Happy<br>Dog.</div>
+                </div>
+              </div>
+
+              <div>
+                <h2>INFORMACION DEL DUENO</h2>
+                <div class="panel">
+                  <div class="line"><strong>Nombres y apellidos</strong>${escapeHtml(client.fullName || '')}</div>
+                  <div class="line"><strong>Direccion</strong>${escapeHtml(surgeryConsent.ownerAddress || client.address || '')}</div>
+                  <div class="line"><strong>Numero de contacto</strong>${escapeHtml(client.phone || selected.value?.phone || '')}</div>
+                  <h2 style="text-align:left;margin:7mm 0 5px">INFORMACION ALTERNATIVA</h2>
+                  <div class="line"><strong>Nombre de la persona alternativa para recojo de mascota</strong>${escapeHtml(surgeryConsent.alternativeName || '')}</div>
+                  <div class="line"><strong>Numero de contacto de la persona alternativa</strong>${escapeHtml(surgeryConsent.alternativePhone || '')}</div>
+                  <p class="warning">** POR FAVOR COMPLETE TODA LA INFORMACION ANTERIOR! **<br>SI NO PODEMOS COMUNICARNOS CON USTED PARA PREGUNTAS O INQUIETUDES, EL VETERINARIO PODRIA DECIDIR NO REALIZAR LA CIRUGIA.</p>
+                  <div class="note-box"><strong>Anotaciones u observaciones del personal</strong><br>${escapeHtml(surgeryConsent.staffNotes || '')}</div>
+                  <div class="panel-logo">Happy<br>Dog.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="consent-title">FICHA DE CONSENTIMIENTO</div>
+            <div class="consent-grid">
+              <div>
+                <p>Por la presente, yo, el propietario del animal mencionado anteriormente, doy mi consentimiento para que el personal medico veterinario lleve a cabo el procedimiento de esterilizacion y/o castracion, comprendiendo y aceptando los siguientes terminos y condiciones:</p>
+                <p><strong>Riesgos de la cirugia:</strong> Reconozco que la cirugia de esterilizacion o castracion es un procedimiento quirurgico que conlleva ciertos riesgos inherentes, incluyendo infecciones, hemorragias, reacciones adversas a la anestesia y complicaciones imprevistas durante o despues de la operacion.</p>
+                <p><strong>Rasurado del area quirurgica:</strong> Entiendo que, para permitir una adecuada realizacion de la incision quirurgica, se procedera al rasurado del pelaje de mi mascota en la zona correspondiente.</p>
+                <p><strong>Anestesia:</strong> Autorizo al medico veterinario a utilizar la anestesia local o inhalatoria segun lo considere conveniente para el procedimiento.</p>
+              </div>
+              <div>
+                <p><strong>Celo y embarazo:</strong> En caso de que mi mascota este en celo o embarazada en el momento de la cirugia, entiendo que el procedimiento podria incluir la interrupcion del embarazo y autorizo la realizacion de dicho procedimiento.</p>
+                <p><strong>Autorizacion para emergencias:</strong> Autorizo a los medicos veterinarios y al personal del establecimiento a realizar cualquier procedimiento o intervencion que consideren necesario para salvar la vida de mi mascota en caso de emergencia.</p>
+                <p><strong>Exoneracion de responsabilidad:</strong> Acepto que no se me brindara compensacion alguna por consecuencias relacionadas con este procedimiento. Asimismo, renuncio a presentar cualquier reclamo relacionado con la cirugia.</p>
+                <p><strong>Responsabilidad financiera:</strong> Certifico que he leido y comprendido todos los puntos de este documento y asumo la responsabilidad financiera por los cargos relacionados.</p>
+              </div>
+            </div>
+
+            <div class="footer">
+              <div class="owner-sign">
+                NOMBRES Y APELLIDOS: ${escapeHtml(client.fullName || '')}<br>
+                DNI: ${escapeHtml(surgeryConsent.ownerDni || '')}
+              </div>
+              <div class="signature">
+                <div class="signature-line"></div>
+                FIRMA<br>
+                Entiendo que he dado consentimiento para que los veterinarios y veterinarios externos supervisados directamente por HAPPY DOG realicen el procedimiento quirurgico programado.
+              </div>
+            </div>
+          </section>
+        </main>
+        <script>window.onload=function(){window.print()}<\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
 async function saveRecord() {
   if (!selected.value) return;
   const diagnosis = buildDiagnosisText();
@@ -374,6 +553,16 @@ async function saveRecord() {
     saving.value = false;
   }
 }
+
+watch(selectedPet, (pet) => {
+  surgeryConsent.petAge = pet?.age || '';
+  surgeryConsent.petColor = pet?.color || '';
+});
+
+watch(selectedClient, (client) => {
+  surgeryConsent.ownerAddress = client?.address || '';
+  surgeryConsent.ownerDni = client?.dni || '';
+});
 
 onMounted(loadData);
 </script>
@@ -610,6 +799,36 @@ onMounted(loadData);
             <input v-model.number="prescription.quantity" type="number" min="1" placeholder="Cantidad">
             <input v-model="prescription.dosage" placeholder="Dosis">
             <input v-model="prescription.instructions" placeholder="Indicaciones">
+          </section>
+
+          <section class="surgery-consent-box">
+            <div class="prescription-head">
+              <div>
+                <h3>Autorizacion de cirugia</h3>
+                <p class="muted-text">Para esterilizacion o castracion. Completa los datos y genera el documento para firma.</p>
+              </div>
+              <button class="secondary small" type="button" @click="generateSurgeryConsentPdf">Generar autorizacion PDF</button>
+            </div>
+            <div class="form-grid surgery-grid">
+              <input v-model="surgeryConsent.ownerDni" placeholder="DNI del dueno">
+              <input v-model="surgeryConsent.ownerAddress" placeholder="Direccion del dueno">
+              <input v-model="surgeryConsent.petAge" placeholder="Edad de la mascota">
+              <input v-model="surgeryConsent.petColor" placeholder="Color de la mascota">
+              <input v-model="surgeryConsent.lastMeal" placeholder="Ultima comida">
+              <input v-model="surgeryConsent.medication" placeholder="Medicamento actual">
+              <input v-model="surgeryConsent.alternativeName" placeholder="Persona alternativa para recojo">
+              <input v-model="surgeryConsent.alternativePhone" placeholder="Telefono alternativo">
+              <label class="checkbox-row">
+                <input v-model="surgeryConsent.digestiveIssue" type="checkbox">
+                Vomito o diarrea en las ultimas 24 horas
+              </label>
+              <label class="checkbox-row">
+                <input v-model="surgeryConsent.medicalCondition" type="checkbox">
+                Problema medico preexistente
+              </label>
+              <textarea v-model="surgeryConsent.medicalConditionDetail" placeholder="Detalle del problema medico, si aplica"></textarea>
+              <textarea v-model="surgeryConsent.staffNotes" placeholder="Anotaciones u observaciones del personal"></textarea>
+            </div>
           </section>
 
           <button :disabled="!selected || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Selecciona una cita para guardar atención' }}</button>

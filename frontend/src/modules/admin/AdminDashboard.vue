@@ -80,6 +80,18 @@ const filteredInventory = computed(() => {
   ].some(value => String(value || '').toLowerCase().includes(query)));
 });
 const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
+const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.net || 0));
+const closingDifference = computed(() => Number(closingForm.value.countedAmount || 0) - expectedClosingAmount.value);
+const closingStatus = computed(() => {
+  if (Math.abs(closingDifference.value) < 0.01) return { label: 'Caja cuadrada', tone: 'ok' };
+  return closingDifference.value > 0
+    ? { label: 'Sobra dinero', tone: 'warn' }
+    : { label: 'Falta dinero', tone: 'danger' };
+});
+const cashActivityLabel = computed(() => {
+  if (cashMovements.value.length === 1) return '1 movimiento registrado';
+  return `${cashMovements.value.length} movimientos registrados`;
+});
 
 function openInventory() {
   setActive('inventario');
@@ -552,11 +564,35 @@ onMounted(async () => {
         </div>
       </div>
 
+      <div class="cash-flow">
+        <article class="cash-step active">
+          <span>1</span>
+          <div>
+            <strong>Abrir caja</strong>
+            <small>Coloca el efectivo inicial del turno.</small>
+          </div>
+        </article>
+        <article class="cash-step" :class="{ active: sortedCashMovements.length }">
+          <span>2</span>
+          <div>
+            <strong>Registrar ventas y gastos</strong>
+            <small>{{ cashActivityLabel }}</small>
+          </div>
+        </article>
+        <article class="cash-step" :class="closingStatus.tone">
+          <span>3</span>
+          <div>
+            <strong>Cerrar turno</strong>
+            <small>{{ closingStatus.label }}</small>
+          </div>
+        </article>
+      </div>
+
       <div class="cash-cards">
-        <div class="cash-metric"><span>Ingresos</span><strong>S/ {{ formatMoney(cashSummary.income) }}</strong></div>
-        <div class="cash-metric"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
-        <div class="cash-metric"><span>Deudas cobradas</span><strong>S/ {{ formatMoney(cashSummary.debtPayments) }}</strong></div>
-        <div class="cash-metric emphasis"><span>Neto del dia</span><strong>S/ {{ formatMoney(cashSummary.net) }}</strong></div>
+        <div class="cash-metric income"><span>Ventas y cobros</span><strong>S/ {{ formatMoney(cashSummary.income + cashSummary.debtPayments) }}</strong></div>
+        <div class="cash-metric expense"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
+        <div class="cash-metric"><span>Movimientos</span><strong>{{ sortedCashMovements.length }}</strong></div>
+        <div class="cash-metric emphasis"><span>Saldo operativo</span><strong>S/ {{ formatMoney(cashSummary.net) }}</strong></div>
       </div>
 
       <form v-if="showCashForm" class="cash-form" @submit.prevent="saveCashMovement">
@@ -601,27 +637,53 @@ onMounted(async () => {
 
       <div class="cash-split">
         <section class="cash-box">
-          <h3>Metodo de pago</h3>
+          <h3>Resumen de cobros</h3>
+          <p class="muted-text compact-text">Revisa cuanto entro por efectivo, Yape, tarjeta u otros medios.</p>
           <div v-if="cashSummary.byPaymentMethod?.length" class="cash-methods">
             <span v-for="item in cashSummary.byPaymentMethod" :key="item.key" class="cash-chip">
               {{ paymentLabels[item.key] || item.key }} <strong>S/ {{ formatMoney(item.total) }}</strong>
             </span>
           </div>
-          <p v-else class="empty compact">Aun no hay pagos registrados para este dia.</p>
+          <p v-else class="empty compact">Aun no hay cobros registrados para este dia.</p>
         </section>
-        <section class="cash-box">
-          <h3>Cierre del dia</h3>
-          <form class="cash-closing-form" @submit.prevent="closeCashDay">
-            <label>Apertura
-              <input v-model.number="closingForm.openingAmount" type="number" min="0" step="0.01">
+        <section class="cash-box cash-close-box">
+          <div class="cash-close-header">
+            <div>
+              <h3>Cierre de caja</h3>
+              <p class="muted-text">Al terminar el turno, cuenta el dinero fisico y confirma si cuadra con el sistema.</p>
+            </div>
+            <span :class="['closing-status', closingStatus.tone]">{{ closingStatus.label }}</span>
+          </div>
+
+          <form class="cash-closing-form improved" @submit.prevent="closeCashDay">
+            <label>Dinero inicial del turno
+              <small>Lo que habia en caja antes de atender.</small>
+              <input v-model.number="closingForm.openingAmount" type="number" min="0" step="0.01" placeholder="Ej. 50.00">
             </label>
-            <label>Conteo real
-              <input v-model.number="closingForm.countedAmount" type="number" min="0" step="0.01">
+            <div class="cash-total">
+              <span>Resultado del dia</span>
+              <small>Ventas y cobros menos gastos.</small>
+              <strong>S/ {{ formatMoney(cashSummary.net) }}</strong>
+            </div>
+            <div class="cash-total strong">
+              <span>Caja esperada</span>
+              <small>Inicial + resultado del dia.</small>
+              <strong>S/ {{ formatMoney(expectedClosingAmount) }}</strong>
+            </div>
+            <label>Dinero contado fisicamente
+              <small>Lo que tienes en efectivo al cerrar.</small>
+              <input v-model.number="closingForm.countedAmount" type="number" min="0" step="0.01" placeholder="Ej. 230.00">
             </label>
+            <div :class="['cash-total', closingStatus.tone]">
+              <span>Resultado automatico</span>
+              <small>Debe quedar en S/ 0.00.</small>
+              <strong>S/ {{ formatMoney(closingDifference) }}</strong>
+            </div>
             <label>Notas
-              <input v-model="closingForm.notes" placeholder="Diferencias u observaciones">
+              <small>Opcional, solo si hubo diferencia.</small>
+              <input v-model="closingForm.notes" placeholder="Ej. falta vuelto, pago pendiente o caja conforme">
             </label>
-            <button class="secondary small" :disabled="saving">Guardar cierre</button>
+            <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar cierre del dia' }}</button>
           </form>
         </section>
       </div>

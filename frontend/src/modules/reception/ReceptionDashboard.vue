@@ -106,6 +106,14 @@ const upcomingAppointments = computed(() => {
     .slice(0, 12);
 });
 
+const acceptedAppointments = computed(() => {
+  const now = new Date();
+  return searchedAppointments.value
+    .filter(item => new Date(item.scheduledAt) >= now && ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].includes(item.status))
+    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+    .slice(0, 8);
+});
+
 const filteredClients = computed(() => {
   const query = search.value.trim().toLowerCase();
   if (query.length < 2) return [];
@@ -221,6 +229,10 @@ function moveDay(days) {
 function setToday() {
   selectedDate.value = dateKey();
   agendaView.value = 'day';
+}
+
+function selectAppointment(appointment) {
+  selectedAppointment.value = appointments.value.find(item => item.id === appointment.id) || appointment;
 }
 
 function hourAppointments(hour) {
@@ -341,7 +353,8 @@ async function setStatus(appointment, status) {
   try {
     const { data } = await api.patch(`/appointments/${appointment.id}`, { status });
     appointments.value = appointments.value.map(item => item.id === data.id ? data : item);
-    if (selectedAppointment.value?.id === data.id) selectedAppointment.value = data;
+    if (selectedAppointment.value?.id === data.id) selectedAppointment.value = null;
+    await loadData();
     success.value = 'Cita actualizada correctamente.';
   } catch (e) {
     error.value = 'No se pudo actualizar la cita.';
@@ -481,7 +494,7 @@ function resetQuick() {
 }
 
 function useExistingAppointment(appointment) {
-  selectedAppointment.value = appointment;
+  selectAppointment(appointment);
   selectedDate.value = dateKey(appointment.scheduledAt);
   agendaView.value = 'day';
   showQuick.value = false;
@@ -599,14 +612,14 @@ onMounted(loadData);
           <div v-for="hour in hours" :key="hour" class="calendar-row">
             <div class="calendar-time">{{ String(hour).padStart(2, '0') }}:00</div>
             <div class="calendar-slot">
-              <article v-for="item in hourAppointments(hour)" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectedAppointment=item">
+              <article v-for="item in hourAppointments(hour)" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectAppointment(item)">
                 <div>
                   <strong>{{ formatTime(item.scheduledAt) }} - {{ item.pet?.name || 'Mascota' }}</strong>
                   <span>{{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
                 </div>
                 <div class="event-actions">
                   <span class="status">{{ statusLabel(item.status) }}</span>
-                  <button class="small secondary" @click.stop="selectedAppointment=item">Ver</button>
+                  <button class="small secondary" @click.stop="selectAppointment(item)">Ver</button>
                 </div>
               </article>
               <span v-if="!hourAppointments(hour).length" class="empty-slot">Libre</span>
@@ -622,7 +635,7 @@ onMounted(loadData);
               <small>{{ day.items.length }} citas</small>
             </button>
             <div class="week-events">
-              <button v-for="item in day.items" :key="item.id" class="week-event" type="button" @click="selectedAppointment=item">
+              <button v-for="item in day.items" :key="item.id" class="week-event" type="button" @click="selectAppointment(item)">
                 <strong>{{ formatTime(item.scheduledAt) }} - {{ item.pet?.name || 'Mascota' }}</strong>
                 <span>{{ item.client?.fullName || 'Cliente' }}</span>
                 <small>{{ statusLabel(item.status) }}</small>
@@ -633,14 +646,14 @@ onMounted(loadData);
         </div>
 
         <div v-else class="upcoming-list">
-          <article v-for="item in upcomingAppointments" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectedAppointment=item">
+          <article v-for="item in upcomingAppointments" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectAppointment(item)">
             <div>
               <strong>{{ formatDate(item.scheduledAt) }} - {{ formatTime(item.scheduledAt) }}</strong>
               <span>{{ item.pet?.name || 'Mascota' }} · {{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
             </div>
             <div class="event-actions">
               <span class="status">{{ statusLabel(item.status) }}</span>
-              <button class="small secondary" @click.stop="selectedAppointment=item">Ver</button>
+              <button class="small secondary" @click.stop="selectAppointment(item)">Ver</button>
             </div>
           </article>
           <p v-if="!upcomingAppointments.length" class="empty">No hay citas futuras pendientes con este filtro.</p>
@@ -663,20 +676,20 @@ onMounted(loadData);
         <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar formulario' : '+ Nueva cita por llamada o WhatsApp' }}</button>
 
         <div class="detail-box upcoming-summary">
-          <span class="badge">Próximas</span>
-          <h3>{{ upcomingAppointments.length }} citas por venir</h3>
+          <span class="badge">Aceptadas</span>
+          <h3>{{ acceptedAppointments.length }} citas aceptadas</h3>
           <button
-            v-for="item in upcomingAppointments.slice(0, 4)"
+            v-for="item in acceptedAppointments.slice(0, 4)"
             :key="item.id"
             class="summary-appointment"
             type="button"
-            @click="selectedAppointment=item; agendaView='upcoming'"
+            @click="selectAppointment(item); agendaView='upcoming'"
           >
             <strong>{{ formatDate(item.scheduledAt) }} · {{ formatTime(item.scheduledAt) }}</strong>
-            <span>{{ item.pet?.name || 'Mascota' }} - {{ item.client?.fullName || 'Cliente' }}</span>
+            <span>{{ item.pet?.name || 'Mascota' }} - {{ statusLabel(item.status) }}</span>
           </button>
-          <button v-if="upcomingAppointments.length > 4" class="secondary small full" type="button" @click="agendaView='upcoming'">Ver todas</button>
-          <p v-if="!upcomingAppointments.length" class="muted-text">No tienes citas futuras pendientes.</p>
+          <button v-if="acceptedAppointments.length > 4" class="secondary small full" type="button" @click="agendaView='upcoming'">Ver todas</button>
+          <p v-if="!acceptedAppointments.length" class="muted-text">Cuando confirmes una cita, aparecerá aquí como aceptada.</p>
         </div>
 
         <form v-if="showQuick" class="stack quick-form" @submit.prevent="saveQuickAppointment">
