@@ -156,6 +156,7 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .checkbox-row{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.72);font-weight:800;color:var(--ink)}
 .checkbox-row input{width:auto;min-width:18px;min-height:18px;accent-color:var(--blue)}
 .medical-form{display:grid;gap:16px}
+.medical-title{margin-top:9px!important}
 .medical-section{padding:16px;border-radius:18px;background:rgba(255,255,255,.58);border:1px solid var(--line)}
 .clinical-sheet{display:grid;gap:14px;padding:18px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(250,253,251,.9));border:1px solid rgba(22,91,102,.24);box-shadow:inset 0 0 0 1px rgba(255,255,255,.7)}
 .sheet-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}
@@ -193,11 +194,25 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .section-title.compact{margin-bottom:12px}
 .section-title.compact h3{margin:8px 0 0}
 .compact-grid{grid-template-columns:repeat(3,1fr)}
-.history-panel{align-content:start}
-.history-item{padding:16px 0;border-bottom:1px solid var(--line)}
-.history-item:last-child{border-bottom:0}
-.history-item div{display:flex;justify-content:space-between;gap:12px;color:var(--muted)}
-.history-item p{margin:8px 0 0}
+.history-panel{align-content:start;min-width:0}
+.history-panel .section-title>div h2{margin-top:9px}
+.history-count{white-space:nowrap;padding:7px 10px;border-radius:999px;background:rgba(15,143,125,.08);border:1px solid var(--line);color:var(--blue-dark);font-size:12px;font-weight:900}
+.history-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.history-summary div{display:grid;gap:5px;padding:13px;border-radius:16px;background:linear-gradient(145deg,rgba(15,143,125,.08),rgba(255,255,255,.7));border:1px solid var(--line)}
+.history-summary span,.history-date small,.history-reason small,.history-vitals small{color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase}
+.history-summary strong{font-size:13px}
+.history-filter{margin:0 0 10px}
+.history-item{margin-top:10px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:rgba(255,255,255,.52);transition:border-color .18s ease,box-shadow .18s ease}
+.history-item.expanded{border-color:rgba(15,143,125,.28);box-shadow:0 14px 32px rgba(6,60,53,.08)}
+.history-item-head{width:100%;display:grid;grid-template-columns:1fr 1fr auto;align-items:center;gap:12px;padding:14px;text-align:left;border-radius:0;background:transparent;color:var(--ink);box-shadow:none}
+.history-item-head:hover{transform:none;background:rgba(15,143,125,.06);box-shadow:none}
+.history-date,.history-reason{display:grid;gap:4px;min-width:0}.history-date small,.history-reason strong{overflow:hidden;text-overflow:ellipsis}.history-toggle{color:var(--blue-dark);font-size:12px;font-weight:900}
+.history-detail{display:grid;gap:14px;padding:0 16px 16px;border-top:1px solid var(--line)}
+.history-detail section{padding-top:14px}.history-detail h4{margin:0 0 7px;color:var(--blue-dark);font-size:13px;text-transform:uppercase}.history-detail p{margin:4px 0;white-space:pre-line;line-height:1.45;color:var(--ink)}
+.history-vitals{display:flex;gap:10px;padding-top:14px}.history-vitals span{display:grid;gap:3px;min-width:110px;padding:10px 12px;border-radius:13px;background:rgba(15,143,125,.07);border:1px solid var(--line)}
+.history-prescriptions{display:grid;gap:8px}.history-prescriptions span{display:grid;gap:3px;padding:10px 12px;border-radius:13px;background:rgba(245,200,106,.12);border:1px solid rgba(184,135,70,.18)}.history-prescriptions small{color:var(--muted)}
+.history-files{display:flex;flex-wrap:wrap;gap:8px}.history-files a{padding:8px 10px;border-radius:10px;background:rgba(15,143,125,.08);border:1px solid var(--line);color:var(--blue-dark);font-size:12px;font-weight:800;text-decoration:none}
+.next-control-note{padding:11px 12px;border-radius:13px;background:rgba(134,214,173,.14);border:1px solid var(--line)}
 .search-field{margin:0 0 16px}
 .patient-search-results{display:grid;gap:10px;margin-bottom:12px}
 .segmented{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:6px;border-radius:16px;background:rgba(15,143,125,.06);border:1px solid var(--line)}

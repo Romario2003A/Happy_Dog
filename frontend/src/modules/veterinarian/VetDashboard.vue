@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import VeterinarianLayout from '../../layouts/VeterinarianLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
+import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 
 const auth = useAuthStore();
 const appointments = ref([]);
@@ -16,6 +17,8 @@ const saving = ref(false);
 const error = ref('');
 const success = ref('');
 const petSearch = ref('');
+const historySearch = ref('');
+const expandedRecordId = ref(null);
 const patientSearch = ref(null);
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
 const surgeryConsent = reactive({
@@ -84,6 +87,17 @@ const filteredPets = computed(() => pets.value.filter(pet => {
 const selectedPet = computed(() => selected.value?.pet || selectedStandalonePet.value);
 const selectedClient = computed(() => selected.value?.client || selectedStandalonePet.value?.client);
 const selectedProduct = computed(() => products.value.find(product => product.id === prescription.value.productId));
+const filteredHistory = computed(() => {
+  const query = historySearch.value.trim().toLowerCase();
+  if (!query) return history.value;
+  return history.value.filter(record => [
+    record.reason, record.diagnosis, record.treatment, record.observations,
+    record.veterinarian?.fullName,
+    ...(record.prescriptions || []).map(item => item.product?.name),
+  ].filter(Boolean).join(' ').toLowerCase().includes(query));
+});
+const lastVisit = computed(() => history.value[0]?.visitDate || null);
+const nextControl = computed(() => history.value.find(record => record.nextControlAt)?.nextControlAt || null);
 const surgeryCode = computed(() => selectedPet.value?.id
   ? `CX-${String(selectedPet.value.id).replace(/-/g, '').slice(0, 8).toUpperCase()}`
   : 'CX-00000000');
@@ -99,6 +113,19 @@ function dateKey(value = new Date()) {
 function formatDate(value) {
   if (!value) return 'Sin fecha';
   return new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function lines(value) {
+  return String(value || '').split('\n').map(line => line.trim()).filter(Boolean);
+}
+
+function fileUrl(url) {
+  if (!url || /^https?:\/\//i.test(url)) return url || '#';
+  return `${api.defaults.baseURL.replace(/\/api\/?$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+function toggleRecord(recordId) {
+  expandedRecordId.value = expandedRecordId.value === recordId ? null : recordId;
 }
 
 function formatShortDate(value = new Date()) {
@@ -182,6 +209,8 @@ async function selectAppointment(appointment) {
   selectedStandalonePet.value = null;
   resetForm(appointment);
   history.value = [];
+  historySearch.value = '';
+  expandedRecordId.value = null;
   if (!appointment?.petId) return;
   try {
     history.value = (await api.get(`/medical-records/pet/${appointment.petId}`)).data;
@@ -195,6 +224,8 @@ async function selectPet(pet) {
   selectedStandalonePet.value = pet;
   resetForm({ pet, reason: '' });
   history.value = [];
+  historySearch.value = '';
+  expandedRecordId.value = null;
   try {
     history.value = (await api.get(`/medical-records/pet/${pet.id}`)).data;
   } catch (e) {
@@ -357,6 +388,45 @@ function generatePrescriptionPdf() {
       </body>
     </html>
   `);
+  printWindow.document.close();
+}
+
+function generateClinicalHistoryPdf() {
+  if (!selectedPet.value) {
+    error.value = 'Selecciona un paciente antes de generar la historia clínica.';
+    return;
+  }
+
+  const pet = selectedPet.value;
+  const client = selectedClient.value || {};
+  const checked = value => value ? '&#9745;' : '&#9744;';
+  const exam = key => checked(Boolean(form.value.exams?.[key]));
+  const printWindow = window.open('', '_blank', 'width=1000,height=780');
+  if (!printWindow) {
+    error.value = 'El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para generar el PDF.';
+    return;
+  }
+  const rows = count => Array.from({ length: count }, () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>').join('');
+  const clinicalBlock = (withPatient = true) => `
+    ${withPatient ? `<header class="top"><div class="box">FECHA: ${escapeHtml(formatShortDate())}</div><img src="${happyDogLogo}" alt="Happy Dog"><div class="box">CÓDIGO: ${escapeHtml(String(pet.id || '').slice(0, 8).toUpperCase())}</div></header>
+    <h1>HISTORIA CLÍNICA</h1><h2>DATOS DEL PROPIETARIO</h2>
+    <table class="owner"><tr><td><b>NOMBRE:</b> ${escapeHtml(client.fullName || '')}</td><td><b>TELF:</b> ${escapeHtml(client.phone || '')}</td></tr><tr><td><b>DIRECCIÓN:</b> ${escapeHtml(client.address || '')}</td><td><b>DNI:</b> ${escapeHtml(client.dni || '')}</td></tr></table>
+    <h2>DATOS DE LA MASCOTA</h2>
+    <table><tr><td><b>NOMBRE:</b> ${escapeHtml(pet.name || '')}</td><td><b>ESPECIE:</b> ${escapeHtml(pet.species || '')}</td><td><b>RAZA:</b> ${escapeHtml(pet.breed || '')}</td></tr><tr><td><b>SEXO:</b> H ${checked(pet.sex === 'FEMALE')} M ${checked(pet.sex === 'MALE')}</td><td><b>EDAD:</b> ${escapeHtml(pet.age || '')}</td><td><b>PESO:</b> ${escapeHtml(form.value.weightKg || pet.weightKg || '')}</td></tr><tr><td><b>COLOR:</b> ${escapeHtml(pet.color || '')}</td><td><b>ESTERILIZADO:</b> SÍ ${checked(pet.sterilized)} NO ${checked(!pet.sterilized)}</td><td><b>PROCEDENCIA:</b></td></tr></table>` : ''}
+    <table class="clinical">
+      <tr class="vitals"><td><b>FECHA:</b> ${escapeHtml(formatShortDate())}</td><td><b>PESO:</b> ${escapeHtml(form.value.weightKg || '')}</td><td><b>T:</b> ${escapeHtml(form.value.temperatureC || '')}</td><td><b>FC:</b> ${escapeHtml(form.value.fc || '')}</td><td><b>FR:</b> ${escapeHtml(form.value.fr || '')}</td><td><b>MUCOSAS:</b> ${escapeHtml(form.value.mucosas || '')}</td></tr>
+      <tr class="large"><th>ANAMNESIS</th><td colspan="5" class="written">${escapeHtml(form.value.anamnesis || '')}</td></tr>
+      <tr class="exams"><th>EXÁMENES<br>COMPLEMENTARIOS</th><td colspan="5"><div class="exam-grid"><span>ECOGRAFÍA ${exam('ecografia')}</span><span>EXAMEN DE HECES ${exam('heces')}</span><span>CITOLOGÍA ${exam('citologia')}</span><span>RAYOS X ${exam('rayosX')}</span><span>EXAMEN DE ORINA ${exam('orina')}</span><span>RASPADO DE PIEL ${exam('raspadoPiel')}</span><span>HEMOGRAMA ${exam('hemograma')}</span><span>TGO, TGP Y FAS ${exam('tgoTgpFas')}</span><span>UREA Y CREA ${exam('ureaCrea')}</span><span>TEST ${exam('test')}</span><span>OTROS ${exam('otros')} ${escapeHtml(form.value.examOther || '')}</span></div></td></tr>
+      <tr><th>DX PRESUNTIVO</th><td colspan="5" class="written">${escapeHtml(form.value.presumptiveDx || '')}</td></tr>
+      <tr><th>DX DEFINITIVO</th><td colspan="3" class="written">${escapeHtml(form.value.definitiveDx || '')}</td><th>PRONÓSTICO</th><td class="written">${escapeHtml(form.value.prognosis || '')}</td></tr>
+      <tr class="treatment"><th>TRATAMIENTO</th><td colspan="5" class="written">${escapeHtml(form.value.treatment || '')}</td></tr>
+      <tr><th>FRECUENCIA</th><td colspan="2" class="written">${escapeHtml(form.value.frequency || '')}</td><td colspan="3" class="days">DÍA 1 □ &nbsp; DÍA 2 □ &nbsp; DÍA 3 □ &nbsp; DÍA 4 □ &nbsp; DÍA 5 □</td></tr>
+      <tr class="recommend"><th>RECOMENDACIONES</th><td colspan="5" class="written">${escapeHtml(form.value.recommendations || '')}<b class="doctor">MÉDICO: ${escapeHtml(auth.user?.fullName || '')}</b></td></tr>
+    </table>`;
+
+  printWindow.document.write(`<!doctype html><html><head><title>Historia clínica - ${escapeHtml(pet.name || 'Paciente')}</title><style>
+    @page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#111;font-size:10.5px}.page{min-height:277mm;page-break-after:always;padding:4mm 2mm}.page:last-child{page-break-after:auto}.top{display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;margin:4mm 0 8mm}.top img{width:105px;height:72px;object-fit:cover;justify-self:center}.box{border:1.5px solid #111;padding:9px 12px;font-size:12px;font-weight:800;width:max-content}.top .box:last-child{justify-self:end}h1{text-align:center;font-size:17px;margin:0 0 5mm}h2{text-align:center;font-size:12px;margin:3mm 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{border:1px solid #111;padding:5px 7px;text-align:left;vertical-align:top}th{width:20%;text-align:center;vertical-align:middle}.owner td:first-child{width:64%}.clinical{margin-top:10mm}.vitals td:nth-child(1){width:20%}.vitals td:nth-child(2){width:16%}.vitals td:nth-child(3){width:10%}.vitals td:nth-child(4){width:13%}.vitals td:nth-child(5){width:9%}.large{height:52mm}.exams{height:25mm}.treatment{height:38mm}.recommend{height:20mm}.written{white-space:pre-wrap;line-height:1.45}.exam-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px 18px;font-weight:700}.days{text-align:center;font-weight:800;white-space:nowrap}.doctor{float:right;margin-top:12mm}.schedule-title{text-align:center;font-size:13px;font-weight:800;margin:8mm 0 3mm}.schedule th{height:11mm;font-size:10px}.schedule td{height:7mm}.page.two .clinical{margin-top:2mm}.page.two .large{height:42mm}.page.two .treatment{height:30mm}.page.two .recommend{height:14mm}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body><main class="page">${clinicalBlock(true)}</main><main class="page two">${clinicalBlock(false)}<div class="schedule-title">CRONOGRAMA DE VACUNACIÓN</div><table class="schedule"><tr><th>FECHA<br>APLICACIÓN</th><th>VACUNA</th><th>PRÓXIMA<br>APLICACIÓN</th><th>EDAD</th><th>T</th><th>MÉDICO<br>RESPONSABLE</th></tr>${rows(6)}</table><div class="schedule-title">CRONOGRAMA DE DESPARASITACIÓN</div><table class="schedule"><tr><th>FECHA<br>APLICACIÓN</th><th>PRODUCTO</th><th>PRÓXIMA<br>APLICACIÓN</th><th>EDAD</th><th>T</th><th>MÉDICO<br>RESPONSABLE</th></tr>${rows(6)}</table></main><script>window.onload=function(){window.print()}<\/script></body></html>`);
   printWindow.document.close();
 }
 
@@ -670,8 +740,11 @@ onMounted(loadData);
     <div class="clinical-grid main">
       <section class="glass-card">
         <div class="section-title">
-          <span class="badge">Nueva atención</span>
-          <h2>{{ selectedPet ? 'Registro médico' : 'Iniciar registro médico' }}</h2>
+          <div>
+            <span class="badge">Nueva atención</span>
+            <h2 class="medical-title">{{ selectedPet ? 'Registro médico' : 'Iniciar registro médico' }}</h2>
+          </div>
+          <button v-if="selectedPet" type="button" class="secondary small" @click="generateClinicalHistoryPdf">Generar historia clínica PDF</button>
         </div>
         <div v-if="!selectedPet" class="empty-state medical-empty">
           <strong>Elige primero una mascota</strong>
@@ -838,23 +911,41 @@ onMounted(loadData);
 
       <section class="glass-card history-panel">
         <div class="section-title">
-          <span class="badge">Historial</span>
-          <h2>Consultas anteriores</h2>
+          <div><span class="badge">Historial</span><h2>Consultas anteriores</h2></div>
+          <span v-if="selectedPet" class="history-count">{{ history.length }} registro{{ history.length === 1 ? '' : 's' }}</span>
         </div>
         <p v-if="!selectedPet" class="empty">Selecciona una cita o busca un paciente para ver el historial.</p>
         <p v-else-if="!history.length" class="empty">Esta mascota aún no tiene historial clínico.</p>
-        <article v-for="record in history" :key="record.id" class="history-item">
-          <div>
-            <strong>{{ formatDate(record.visitDate) }}</strong>
-            <span>{{ record.veterinarian?.fullName || 'Veterinario' }}</span>
+        <template v-else>
+          <div class="history-summary">
+            <div><span>Última atención</span><strong>{{ formatDate(lastVisit) }}</strong></div>
+            <div><span>Próximo control</span><strong>{{ nextControl ? formatDate(nextControl) : 'No programado' }}</strong></div>
           </div>
-          <p><b>Motivo:</b> {{ record.reason }}</p>
-          <p v-if="record.weightKg || record.temperatureC"><b>Control:</b> {{ record.weightKg ? record.weightKg + ' kg' : '' }} {{ record.temperatureC ? ' · ' + record.temperatureC + ' C' : '' }}</p>
-          <p><b>Diagnóstico:</b> {{ record.diagnosis }}</p>
-          <p v-if="record.treatment"><b>Tratamiento:</b> {{ record.treatment }}</p>
-          <p v-if="record.observations"><b>Observaciones:</b> {{ record.observations }}</p>
-          <p v-if="record.prescriptions?.length"><b>Receta:</b> {{ record.prescriptions.map(i => `${i.product?.name || 'Producto'} x${i.quantity}`).join(', ') }}</p>
-        </article>
+          <input v-model="historySearch" class="history-filter" placeholder="Buscar por motivo, diagnóstico, tratamiento o medicamento">
+          <p v-if="!filteredHistory.length" class="empty">No hay consultas que coincidan con la búsqueda.</p>
+          <article v-for="record in filteredHistory" :key="record.id" class="history-item" :class="{ expanded: expandedRecordId === record.id }">
+            <button type="button" class="history-item-head" :aria-expanded="expandedRecordId === record.id" @click="toggleRecord(record.id)">
+              <span class="history-date"><strong>{{ formatDate(record.visitDate) }}</strong><small>{{ record.veterinarian?.fullName || 'Veterinario' }}</small></span>
+              <span class="history-reason"><small>Motivo</small><strong>{{ record.reason }}</strong></span>
+              <span class="history-toggle">{{ expandedRecordId === record.id ? 'Ocultar' : 'Ver detalle' }}</span>
+            </button>
+            <div v-if="expandedRecordId === record.id" class="history-detail">
+              <div v-if="record.weightKg || record.temperatureC" class="history-vitals">
+                <span v-if="record.weightKg"><small>Peso</small><strong>{{ record.weightKg }} kg</strong></span>
+                <span v-if="record.temperatureC"><small>Temperatura</small><strong>{{ record.temperatureC }} °C</strong></span>
+              </div>
+              <section><h4>Diagnóstico</h4><p v-for="line in lines(record.diagnosis)" :key="line">{{ line }}</p></section>
+              <section v-if="record.treatment"><h4>Tratamiento y evolución</h4><p v-for="line in lines(record.treatment)" :key="line">{{ line }}</p></section>
+              <section v-if="record.observations"><h4>Observaciones clínicas</h4><p v-for="line in lines(record.observations)" :key="line">{{ line }}</p></section>
+              <section v-if="record.prescriptions?.length">
+                <h4>Receta</h4>
+                <div class="history-prescriptions"><span v-for="item in record.prescriptions" :key="item.id"><strong>{{ item.product?.name || 'Producto' }} × {{ item.quantity }}</strong><small>{{ [item.dosage, item.instructions].filter(Boolean).join(' · ') || 'Sin indicaciones adicionales' }}</small></span></div>
+              </section>
+              <section v-if="record.files?.length"><h4>Archivos clínicos</h4><div class="history-files"><a v-for="file in record.files" :key="file.id" :href="fileUrl(file.url)" target="_blank" rel="noopener">{{ file.originalName }}</a></div></section>
+              <p v-if="record.nextControlAt" class="next-control-note"><strong>Próximo control:</strong> {{ formatDate(record.nextControlAt) }}</p>
+            </div>
+          </article>
+        </template>
       </section>
     </div>
   </VeterinarianLayout>
