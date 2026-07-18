@@ -16,6 +16,7 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 const success = ref('');
+const activeWorkspace = ref('agenda');
 const petSearch = ref('');
 const historySearch = ref('');
 const expandedRecordId = ref(null);
@@ -196,7 +197,6 @@ async function loadData() {
     appointments.value = appointmentsRes.data;
     products.value = productsRes.data.filter(p => p.active !== false);
     pets.value = petsRes.data;
-    if (!selected.value && visibleAppointments.value.length) await selectAppointment(visibleAppointments.value[0]);
   } catch (e) {
     error.value = 'No se pudieron cargar las citas del doctor.';
   } finally {
@@ -212,6 +212,7 @@ async function selectAppointment(appointment) {
   historySearch.value = '';
   expandedRecordId.value = null;
   if (!appointment?.petId) return;
+  activeWorkspace.value = 'consultation';
   try {
     history.value = (await api.get(`/medical-records/pet/${appointment.petId}`)).data;
   } catch (e) {
@@ -226,6 +227,7 @@ async function selectPet(pet) {
   history.value = [];
   historySearch.value = '';
   expandedRecordId.value = null;
+  activeWorkspace.value = 'consultation';
   try {
     history.value = (await api.get(`/medical-records/pet/${pet.id}`)).data;
   } catch (e) {
@@ -615,6 +617,7 @@ async function saveRecord() {
     success.value = 'Atención guardada. La cita pasó a atendida y el historial fue actualizado.';
     await loadData();
     if (selected.value?.petId) history.value = (await api.get(`/medical-records/pet/${selected.value.petId}`)).data;
+    activeWorkspace.value = 'history';
   } catch (e) {
     error.value = e.response?.status === 403
       ? 'Tu sesión no tiene permiso para guardar historias clínicas. Cierra sesión y entra nuevamente con la cuenta del doctor.'
@@ -660,7 +663,28 @@ onMounted(loadData);
       </div>
     </section>
 
-    <div class="clinical-grid">
+    <nav class="doctor-workflow glass-card" aria-label="Flujo de atención médica">
+      <button type="button" :class="{ active: activeWorkspace === 'agenda' }" @click="activeWorkspace = 'agenda'">
+        <span>1</span><div><strong>Elegir paciente</strong><small>Agenda y búsqueda</small></div>
+      </button>
+      <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'consultation' }" @click="activeWorkspace = 'consultation'">
+        <span>2</span><div><strong>Registrar atención</strong><small>{{ selectedPet ? selectedPet.name : 'Selecciona una mascota' }}</small></div>
+      </button>
+      <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'history' }" @click="activeWorkspace = 'history'">
+        <span>3</span><div><strong>Revisar historial</strong><small>{{ history.length }} consulta{{ history.length === 1 ? '' : 's' }}</small></div>
+      </button>
+    </nav>
+
+    <div class="workspace-heading">
+      <div>
+        <span class="badge">Paso {{ activeWorkspace === 'agenda' ? '1 de 3' : activeWorkspace === 'consultation' ? '2 de 3' : '3 de 3' }}</span>
+        <h2>{{ activeWorkspace === 'agenda' ? '¿A quién atenderás?' : activeWorkspace === 'consultation' ? `Atención de ${selectedPet?.name || 'paciente'}` : `Historial de ${selectedPet?.name || 'paciente'}` }}</h2>
+        <p>{{ activeWorkspace === 'agenda' ? 'Elige una cita confirmada o busca una mascota por nombre.' : activeWorkspace === 'consultation' ? 'Completa la ficha clínica y genera los documentos necesarios.' : 'Consulta antecedentes, recetas y próximos controles.' }}</p>
+      </div>
+      <button v-if="activeWorkspace !== 'agenda'" type="button" class="secondary small" @click="activeWorkspace = 'agenda'">Cambiar paciente</button>
+    </div>
+
+    <div v-show="activeWorkspace === 'agenda'" class="clinical-grid">
       <section class="glass-card appointment-list">
         <div class="section-title">
           <span class="badge">Agenda</span>
@@ -737,8 +761,8 @@ onMounted(loadData);
       </section>
     </div>
 
-    <div class="clinical-grid main">
-      <section class="glass-card">
+    <div v-show="activeWorkspace !== 'agenda'" class="clinical-grid main focused-workspace">
+      <section v-show="activeWorkspace === 'consultation'" class="glass-card">
         <div class="section-title">
           <div>
             <span class="badge">Nueva atención</span>
@@ -909,7 +933,7 @@ onMounted(loadData);
         </form>
       </section>
 
-      <section class="glass-card history-panel">
+      <section v-show="activeWorkspace === 'history'" class="glass-card history-panel">
         <div class="section-title">
           <div><span class="badge">Historial</span><h2>Consultas anteriores</h2></div>
           <span v-if="selectedPet" class="history-count">{{ history.length }} registro{{ history.length === 1 ? '' : 's' }}</span>
