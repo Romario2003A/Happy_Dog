@@ -150,7 +150,7 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .doctor-stats div{padding:16px;border-radius:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16)}
 .doctor-stats span{display:block;color:rgba(255,255,255,.72);font-weight:800;font-size:12px;text-transform:uppercase}
 .doctor-stats strong{display:block;font-size:34px;margin-top:8px}
-.account-overlay{position:fixed;z-index:100;inset:0;display:flex;justify-content:flex-end;background:rgba(8,35,36,.38);backdrop-filter:blur(5px);padding:18px}
+.account-overlay{position:fixed;z-index:100;inset:0;display:flex;justify-content:flex-end;background:rgba(8,35,36,.38);backdrop-filter:blur(5px);padding:18px 30px 18px 18px}
 .account-drawer{width:min(440px,100%);height:100%;overflow-y:auto;padding:24px;animation:drawerIn .22s ease both}
 .account-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.account-drawer-head h2{margin:10px 0 0}.account-identity{display:flex;align-items:center;gap:14px;margin-top:24px;padding:16px;border-radius:18px;background:linear-gradient(135deg,rgba(21,91,102,.09),rgba(134,214,173,.15));border:1px solid var(--line)}
 .account-identity>span{display:grid;place-items:center;width:54px;height:54px;border-radius:17px;background:linear-gradient(135deg,var(--blue-dark),var(--blue));color:white;font-size:23px;font-weight:900;flex:0 0 auto}.account-identity div{display:grid;gap:3px;min-width:0}.account-identity small{color:var(--muted);overflow:hidden;text-overflow:ellipsis}.account-divider{height:1px;background:var(--line);margin:22px 0}.account-drawer h3{margin:0}
@@ -531,6 +531,7 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 @media(max-width:700px){.app-shell.calm-workspace-theme.sidebar-hidden{padding:10px}.calm-workspace-theme.sidebar-hidden .topbar{align-items:center;flex-direction:row;padding:13px}.calm-workspace-theme.sidebar-hidden .topbar h1{font-size:19px}.calm-workspace-theme.sidebar-hidden .topbar p{display:none}.account-pill>div{display:none}.account-pill{padding:5px!important;border-radius:12px}.calm-section-nav{width:100%;justify-content:flex-start}.calm-section-nav button{flex:1;padding:9px 12px}}
 @media(max-width:700px){.account-admin-tools{align-items:stretch;flex-direction:column}.account-admin-actions{min-width:0}}
 @media(max-width:560px){.account-session-row{align-items:stretch;flex-direction:column}.account-session-row button{width:100%}}
+@media(max-width:560px){.account-overlay{padding:10px 14px 10px 10px}.account-drawer{padding:22px}}
 @media(max-width:900px){.document-auto-grid{grid-template-columns:1fr 1fr}.document-vitals-grid{grid-template-columns:1fr 1fr}.document-editor-head{flex-direction:column}}@media(max-width:560px){.document-auto-grid,.document-vitals-grid,.document-diagnosis-grid{grid-template-columns:1fr}}
 @media(max-width:900px){.preventive-form{grid-template-columns:1fr 1fr}.preventive-form button{grid-column:1/-1}}
 @media(max-width:900px){.cash-cards,.cash-flow,.cash-form,.cash-split,.cash-closing-form.improved,.cash-guide{grid-template-columns:1fr}.cash-actions{justify-content:flex-start}.cash-date{max-width:none;width:100%}.cash-close-header{flex-direction:column}}
