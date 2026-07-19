@@ -443,6 +443,24 @@ function escapeHtml(value) {
   }[char]));
 }
 
+function createPrintDocument() {
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.position = 'fixed';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  frame.style.opacity = '0';
+  document.body.appendChild(frame);
+  const printDocument = frame.contentWindow;
+  if (!printDocument) {
+    frame.remove();
+    return null;
+  }
+  printDocument.addEventListener('afterprint', () => frame.remove(), { once: true });
+  return printDocument;
+}
+
 function generatePrescriptionPdf() {
   if (!selectedPet.value) {
     error.value = 'Selecciona un paciente antes de generar la receta.';
@@ -460,9 +478,9 @@ function generatePrescriptionPdf() {
     `
     : '<tr><td colspan="4">Sin medicamento seleccionado. Completar indicaciones manuales si corresponde.</td></tr>';
 
-  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  const printWindow = createPrintDocument();
   if (!printWindow) {
-    error.value = 'El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para generar el PDF.';
+    error.value = 'No se pudo preparar el documento para impresión.';
     return;
   }
 
@@ -542,9 +560,9 @@ function generateClinicalHistoryPdf() {
 
   const pet = selectedPet.value;
   const client = selectedClient.value || {};
-  const printWindow = window.open('', '_blank', 'width=1000,height=780');
+  const printWindow = createPrintDocument();
   if (!printWindow) {
-    error.value = 'El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para generar el PDF.';
+    error.value = 'No se pudo preparar el documento para impresión.';
     return;
   }
   const blankRows = (count, columns) => Array.from({ length: count }, () => `<tr>${'<td>&nbsp;</td>'.repeat(columns)}</tr>`).join('');
@@ -600,9 +618,9 @@ function generateSurgeryConsentPdf() {
   const checked = value => (value ? '&#9745;' : '&#9744;');
   const date = formatShortDate();
 
-  const printWindow = window.open('', '_blank', 'width=980,height=760');
+  const printWindow = createPrintDocument();
   if (!printWindow) {
-    error.value = 'El navegador bloqueo la ventana de impresion. Permite ventanas emergentes para generar el PDF.';
+    error.value = 'No se pudo preparar el documento para impresión.';
     return;
   }
 
