@@ -2,13 +2,13 @@
 import { useAuthStore } from '../stores/auth';
 import happyDogLogo from '../assets/images/happy-dog-logo.jpeg';
 
-defineProps({ title: String, subtitle: String, hideUserPill: Boolean });
+defineProps({ title: String, subtitle: String, hideUserPill: Boolean, shellClass: String });
 
 const auth = useAuthStore();
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="shellClass">
     <aside class="sidebar glass-panel">
       <div class="brand brand-with-wordmark">
         <img class="brand-wordmark" :src="happyDogLogo" alt="Happy Dog">

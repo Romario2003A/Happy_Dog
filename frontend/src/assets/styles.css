@@ -114,6 +114,19 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .doctor-hero{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;align-items:center;background:linear-gradient(135deg,rgba(21,91,102,.98),rgba(20,137,120,.88) 68%,rgba(134,214,173,.82));color:white}
 .doctor-page{display:grid;gap:18px}.doctor-page>.glass-card,.doctor-page .clinical-grid>.glass-card{box-shadow:0 12px 34px rgba(21,91,102,.07);border-color:rgba(21,91,102,.1);backdrop-filter:none}.doctor-page .glass-card:hover{transform:none;box-shadow:0 12px 34px rgba(21,91,102,.07)}
 .doctor-page .doctor-hero{padding:20px 22px;background:#155b66;box-shadow:none}.doctor-page .doctor-hero h2{font-size:clamp(25px,3vw,34px);margin:8px 0}.doctor-page .doctor-stats div{padding:12px 14px;border-radius:14px}.doctor-page .doctor-stats strong{font-size:25px;margin-top:4px}
+.veterinarian-theme{--blue:#155b66;--blue-dark:#155b66;--mint:#8fb7bc;--aqua:#6d9ea5;--sun:#b7cccf;--line:rgba(21,91,102,.16);--bg:#f2f7f7}
+.veterinarian-theme .sidebar{background:linear-gradient(180deg,#155b66 0%,#124f58 58%,#0d4148 100%)}
+.veterinarian-theme button:not(.secondary):not(.ghost):not(.danger){background:linear-gradient(135deg,#155b66,#1d6c76)}
+.veterinarian-theme .badge{background:rgba(21,91,102,.1);border-color:rgba(21,91,102,.16);color:#155b66}
+.veterinarian-theme .doctor-hero .badge{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.22);color:white}
+.veterinarian-theme .doctor-workflow button:not(.active),.veterinarian-theme .consultation-tabs button:not(.active){background:transparent!important}
+.veterinarian-theme .doctor-workflow button.active{background:#155b66!important}.veterinarian-theme .attention-type-grid button.active{background:#155b66!important}
+.veterinarian-theme .doctor-workflow button>span,.veterinarian-theme .history-summary div,.veterinarian-theme .patient-grid div{background:rgba(21,91,102,.07)}
+.veterinarian-theme .consultation-tabs{background:#e9f0f1}.veterinarian-theme .consultation-tabs button.active{background:#fff;color:#155b66}.veterinarian-theme .consultation-tabs button.active>span{background:#155b66}
+.veterinarian-theme .attention-type-box,.veterinarian-theme .surgery-consent-box{background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(232,241,242,.82))}
+.veterinarian-theme .appointment-item{background:rgba(21,91,102,.055)}.veterinarian-theme .appointment-item:hover{background:rgba(21,91,102,.1)}.veterinarian-theme .appointment-item.active{background:#155b66}
+.veterinarian-theme input:focus,.veterinarian-theme textarea:focus,.veterinarian-theme select:focus{border-color:rgba(21,91,102,.5);box-shadow:0 0 0 4px rgba(21,91,102,.09)}
+.veterinarian-theme .direct-care-note,.veterinarian-theme .next-control-note{background:rgba(21,91,102,.08)}
 .doctor-hero h2{font-size:clamp(28px,4vw,44px);margin:12px 0}
 .doctor-hero .muted-text{color:rgba(255,255,255,.78)}
 .doctor-hero .badge{background:rgba(255,255,255,.13);color:white;border-color:rgba(255,255,255,.22)}
