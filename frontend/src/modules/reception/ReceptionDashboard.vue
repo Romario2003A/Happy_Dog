@@ -778,11 +778,11 @@ onMounted(loadData);
             <h2>Centro de carnets</h2>
             <p class="muted-text">Un solo lugar para revisar fotos subidas, generar PDFs y marcar carnets entregados.</p>
           </div>
-          <div class="detail-actions">
-            <button class="small secondary" type="button" @click="selectVisibleCardPets">Seleccionar visibles</button>
-            <button class="small secondary" type="button" @click="clearSelectedCardPets">Limpiar</button>
+          <div v-if="selectedCardPetIds.length" class="detail-actions card-batch-actions">
+            <strong>{{ selectedCardPetIds.length }} seleccionado{{ selectedCardPetIds.length === 1 ? '' : 's' }}</strong>
             <button class="small" type="button" @click="generatePetIdCardsBatch">Generar lote PDF</button>
             <button class="small secondary" type="button" @click="markSelectedCardsPrinted">Marcar impresos</button>
+            <button class="small secondary" type="button" @click="clearSelectedCardPets">Cancelar selección</button>
           </div>
         </div>
 
@@ -802,11 +802,6 @@ onMounted(loadData);
             <strong>{{ cardStats.reprint }}</strong>
             <small>Carnets entregados que piden otro</small>
           </article>
-          <article>
-            <span>Ya entregados</span>
-            <strong>{{ cardStats.printed }}</strong>
-            <small>No imprimir otra vez salvo pedido</small>
-          </article>
         </div>
 
         <div class="segmented card-tabs">
@@ -814,20 +809,22 @@ onMounted(loadData);
           <button type="button" :class="{active:cardFilter==='reprint'}" @click="setCardFilter('reprint')">Reimpresión</button>
           <button type="button" :class="{active:cardFilter==='missingPhoto'}" @click="setCardFilter('missingPhoto')">Falta foto</button>
           <button type="button" :class="{active:cardFilter==='printed'}" @click="setCardFilter('printed')">Entregados</button>
-          <button type="button" :class="{active:cardFilter==='all'}" @click="setCardFilter('all')">Buscar todos</button>
-        </div>
-
-        <div class="card-print-summary">
-          <strong>{{ selectedCardPetIds.length }} seleccionados</strong>
-          <span>{{ visibleCardPets.length }} de {{ filteredCardPets.length }} mascotas visibles</span>
-          <span>{{ cardStats.ready }} listos con foto</span>
+          <button type="button" :class="{active:cardFilter==='all'}" @click="setCardFilter('all')">Todos</button>
         </div>
 
         <input v-model="cardSearch" class="search-field" placeholder="Buscar cliente, telefono, correo o mascota">
+        <p class="card-result-count">{{ filteredCardPets.length }} resultado{{ filteredCardPets.length === 1 ? '' : 's' }}</p>
         <table>
           <thead>
             <tr>
-              <th class="checkbox-cell"></th>
+              <th class="checkbox-cell">
+                <input
+                  type="checkbox"
+                  aria-label="Seleccionar mascotas visibles"
+                  :checked="visibleCardPets.length > 0 && visibleCardPets.every(pet => selectedCardPetIds.includes(pet.id))"
+                  @change="$event.target.checked ? selectVisibleCardPets() : clearSelectedCardPets()"
+                >
+              </th>
               <th>Mascota</th>
               <th>Cliente</th>
               <th>Foto</th>
