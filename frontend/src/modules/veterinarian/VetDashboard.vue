@@ -996,9 +996,49 @@ onMounted(loadData);
             </div>
           </section>
 
-          <section v-if="selectedDocuments.clinicalHistory" class="selected-document-card">
-            <div><h3>Historia clínica Happy Dog</h3><p class="muted-text">Genera exclusivamente el formato del documento Word enviado.</p></div>
-            <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar PDF</button>
+          <section v-if="selectedDocuments.clinicalHistory" class="clinical-document-editor">
+            <div class="document-editor-head">
+              <div><span class="badge">Documento editable</span><h3>Historia clínica Happy Dog</h3><p>Los datos del paciente se completan automáticamente. El doctor registra únicamente la información médica.</p></div>
+              <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar PDF</button>
+            </div>
+            <div class="document-auto-section">
+              <div class="document-section-label"><strong>Datos automáticos</strong><small>Tomados de la ficha del paciente</small></div>
+              <div class="document-auto-grid">
+                <div><span>N.º historia</span><strong>{{ selectedPet.id?.slice(0, 8).toUpperCase() }}</strong></div>
+                <div><span>Propietario</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
+                <div><span>Teléfono</span><strong>{{ selectedClient?.phone || '-' }}</strong></div>
+                <div><span>DNI</span><strong>{{ selectedClient?.documentNumber || selectedClient?.dni || '-' }}</strong></div>
+                <div><span>Paciente</span><strong>{{ selectedPet.name }}</strong></div>
+                <div><span>Especie / raza</span><strong>{{ selectedPet.species || '-' }} · {{ selectedPet.breed || '-' }}</strong></div>
+                <div><span>Sexo / edad</span><strong>{{ sexLabel(selectedPet.sex) }} · {{ selectedPet.age || '-' }}</strong></div>
+                <div><span>Color</span><strong>{{ selectedPet.color || '-' }}</strong></div>
+              </div>
+            </div>
+            <div class="document-manual-section">
+              <div class="document-section-label"><strong>Consulta actual</strong><small>Información que completa el doctor</small></div>
+              <div class="document-vitals-grid">
+                <label>Fecha<input :value="formatShortDate()" readonly></label>
+                <label>Peso<input v-model.number="form.weightKg" type="number" step="0.01" placeholder="kg"></label>
+                <label>FC<input v-model="form.fc" placeholder="lpm"></label>
+                <label>FR<input v-model="form.fr" placeholder="rpm"></label>
+                <label>Temperatura<input v-model.number="form.temperatureC" type="number" step="0.1" placeholder="°C"></label>
+              </div>
+              <label>Anamnesis y exploración física<textarea v-model="form.anamnesis" placeholder="Antecedentes, síntomas y hallazgos de la exploración"></textarea></label>
+              <div class="document-diagnosis-grid">
+                <label>Diagnóstico presuntivo<textarea v-model="form.presumptiveDx"></textarea></label>
+                <label>Diagnóstico definitivo<textarea v-model="form.definitiveDx"></textarea></label>
+              </div>
+              <label>Tratamiento<textarea v-model="form.treatment"></textarea></label>
+              <label>Frecuencia<input v-model="form.frequency" placeholder="Cada 12 h, durante 5 días..."></label>
+              <div class="document-editor-links">
+                <button type="button" class="secondary small" @click="consultationTab = 'diagnosis'">Seleccionar exámenes complementarios</button>
+                <span>{{ checkedExams().length ? checkedExams().join(', ') : 'Sin exámenes seleccionados' }}</span>
+              </div>
+            </div>
+            <div class="preventive-data-note">
+              <strong>Vacunas y desparasitaciones</strong>
+              <span>Estas tablas aparecerán en el documento. Se completarán automáticamente cuando el sistema tenga registros preventivos estructurados para la mascota.</span>
+            </div>
           </section>
 
           <section v-if="selectedDocuments.prescription" class="prescription-box">
