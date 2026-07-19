@@ -8,6 +8,7 @@ import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 const auth = useAuthStore();
 const appointments = ref([]);
 const history = ref([]);
+const preventiveRecords = ref([]);
 const products = ref([]);
 const pets = ref([]);
 const selected = ref(null);
@@ -26,6 +27,8 @@ const consultationTabs = [
   { value: 'documents', label: 'Documentos', help: 'Receta y formatos' },
 ];
 const selectedDocuments = reactive({ prescription: false, clinicalHistory: false, surgeryConsent: false });
+const preventiveForm = reactive({ type:'DEWORMING', appliedAt:dateKey(), productName:'', weightKg:null, nextAppointmentAt:'', notes:'' });
+const preventiveSaving = ref(false);
 const accountOpen = ref(false);
 const accountLoading = ref(false);
 const accountError = ref('');
@@ -290,7 +293,9 @@ async function selectAppointment(appointment) {
   activeWorkspace.value = 'consultation';
   consultationTab.value = 'evaluation';
   try {
-    history.value = (await api.get(`/medical-records/pet/${appointment.petId}`)).data;
+    const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${appointment.petId}`),api.get(`/preventive-care/pet/${appointment.petId}`).catch(() => ({data:[]}))]);
+    history.value = historyRes.data;
+    preventiveRecords.value = preventiveRes.data;
   } catch (e) {
     error.value = 'No se pudo cargar el historial de la mascota.';
   }
@@ -306,10 +311,36 @@ async function selectPet(pet) {
   activeWorkspace.value = 'consultation';
   consultationTab.value = 'evaluation';
   try {
-    history.value = (await api.get(`/medical-records/pet/${pet.id}`)).data;
+    const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${pet.id}`),api.get(`/preventive-care/pet/${pet.id}`).catch(() => ({data:[]}))]);
+    history.value = historyRes.data;
+    preventiveRecords.value = preventiveRes.data;
   } catch (e) {
     error.value = 'No se pudo cargar el historial de la mascota.';
   }
+}
+
+async function savePreventiveRecord() {
+  if (!selectedPet.value || !preventiveForm.productName.trim()) return;
+  preventiveSaving.value = true;
+  error.value = '';
+  try {
+    const { data } = await api.post('/preventive-care', {
+      ...preventiveForm,
+      petId:selectedPet.value.id,
+      veterinarianId:auth.user.id,
+      weightKg:preventiveForm.weightKg === null || preventiveForm.weightKg === '' ? undefined : Number(preventiveForm.weightKg),
+      nextAppointmentAt:preventiveForm.nextAppointmentAt || undefined,
+    });
+    preventiveRecords.value = [data, ...preventiveRecords.value];
+    preventiveForm.productName = ''; preventiveForm.weightKg = null; preventiveForm.nextAppointmentAt = ''; preventiveForm.notes = '';
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo guardar el registro preventivo.'; }
+  finally { preventiveSaving.value = false; }
+}
+
+async function removePreventiveRecord(record) {
+  if (!window.confirm(`Eliminar el registro de ${record.productName}?`)) return;
+  try { await api.delete(`/preventive-care/${record.id}`); preventiveRecords.value = preventiveRecords.value.filter(item => item.id !== record.id); }
+  catch (e) { error.value = 'No se pudo eliminar el registro preventivo.'; }
 }
 
 async function startConsultation() {
@@ -485,6 +516,13 @@ function generateClinicalHistoryPdf() {
     return;
   }
   const blankRows = (count, columns) => Array.from({ length: count }, () => `<tr>${'<td>&nbsp;</td>'.repeat(columns)}</tr>`).join('');
+  const preventiveRows = (type, minimumRows) => {
+    const records = preventiveRecords.value.filter(record => record.type === type);
+    const rows = records.map(record => type === 'DEWORMING'
+      ? `<tr><td>${escapeHtml(formatShortDate(record.appliedAt))}</td><td>${escapeHtml(record.productName)}</td><td>${escapeHtml(record.weightKg || '')}</td><td>${escapeHtml(record.veterinarian?.fullName || '')}</td><td>${escapeHtml(record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '')}</td></tr>`
+      : `<tr><td>${escapeHtml(formatShortDate(record.appliedAt))}</td><td>${escapeHtml(record.productName)}</td><td>${escapeHtml(record.veterinarian?.fullName || '')}</td><td>${escapeHtml(record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '')}</td></tr>`);
+    return rows.join('') + blankRows(Math.max(0, minimumRows - records.length), type === 'DEWORMING' ? 5 : 4);
+  };
   const selectedExams = checkedExams().join(', ');
   const noteValue = (text, label) => String(text || '').split('\n').find(line => line.startsWith(`${label}:`))?.slice(label.length + 1).trim() || '';
   const consultation = data => `<table class="consult"><tr><th>FECHA</th><th>PESO</th><th>FC</th><th>FR</th><th>T°</th></tr><tr><td>${escapeHtml(data.date || '')}</td><td>${escapeHtml(data.weight || '')}</td><td>${escapeHtml(data.fc || '')}</td><td>${escapeHtml(data.fr || '')}</td><td>${escapeHtml(data.temperature || '')}</td></tr><tr><th colspan="2">Anamnesis y exploración física</th><td colspan="3" class="text">${escapeHtml(data.anamnesis || '')}</td></tr><tr><th colspan="2">Exámenes complementarios</th><td colspan="3" class="text">${escapeHtml(data.exams || '')}</td></tr><tr><th>Dx. P-P</th><td colspan="2" class="text">${escapeHtml(data.presumptiveDx || '')}</td><th>Dx. P-D</th><td class="text">${escapeHtml(data.definitiveDx || '')}</td></tr><tr><th colspan="2">Tratamiento</th><td colspan="3" class="text">${escapeHtml(data.treatment || '')}</td></tr><tr><th colspan="2">Frecuencia</th><td colspan="3" class="text">${escapeHtml(data.frequency || '')}</td></tr></table>`;
@@ -509,7 +547,7 @@ function generateClinicalHistoryPdf() {
 
   printWindow.document.write(`<!doctype html><html><head><title>Historia clínica Happy Dog - ${escapeHtml(pet.name || 'Paciente')}</title><style>
     @page{size:A4 portrait;margin:10mm 16mm 12mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#111;font-size:8px}.sheet{width:100%}.title{display:grid;grid-template-columns:70px 1fr 145px;align-items:center;margin-bottom:3mm}.title img{width:56px;height:42px;object-fit:cover}.title h1{text-align:center;font-size:13px;margin:0}.title strong{text-align:right;font-size:9px}.line{margin:1.4mm 0;line-height:1.45}.section-title{font-size:9px;font-weight:800;margin:2.2mm 0 1mm}table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:2mm}th,td{border:1px solid #111;padding:2px 3px;height:4mm;text-align:center;vertical-align:middle}th{font-weight:800}.schedule td{height:3.3mm}.text{text-align:left;white-space:pre-wrap}.consult{break-inside:avoid;page-break-inside:avoid}.consult th{width:auto}.consult tr:nth-child(3) td,.consult tr:nth-child(4) td,.consult tr:nth-child(6) td{height:7mm}.owner-line{display:flex;justify-content:space-between;gap:15px}.owner-line span:first-child{flex:1}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body><main class="sheet"><header class="title"><img src="${happyDogLogo}" alt="Happy Dog"><h1>HISTORIA CLÍNICA HAPPY DOG</h1><strong>N° Historia: ${escapeHtml(String(pet.id || '').slice(0, 8).toUpperCase())}</strong></header><div class="line"><b>Fecha ingreso:</b> ${escapeHtml(formatShortDate(pet.createdAt || new Date()))}</div><div class="section-title">1. Datos del propietario:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(client.fullName || '')}</span><span><b>Teléfono:</b> ${escapeHtml(client.phone || '')}</span></div><div class="line owner-line"><span><b>Dirección:</b> ${escapeHtml(client.address || '')}</span><span><b>DNI:</b> ${escapeHtml(client.documentNumber || client.dni || '')}</span></div><div class="section-title">2. Datos del paciente:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(pet.name || '')}</span><span><b>Especie:</b> ${escapeHtml(pet.species || '')}</span><span><b>Edad:</b> ${escapeHtml(pet.age || '')}</span></div><div class="line owner-line"><span><b>Raza:</b> ${escapeHtml(pet.breed || '')}</span><span><b>Sexo:</b> ${escapeHtml(sexLabel(pet.sex))}</span><span><b>Color:</b> ${escapeHtml(pet.color || '')}</span><span><b>Peso:</b> ${escapeHtml(form.value.weightKg || pet.weightKg || '')}</span></div><div class="section-title">3. Desparasitaciones:</div><table class="schedule"><tr><th>FECHA</th><th>DESPARASITANTE</th><th>PESO</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${blankRows(12,5)}</table><div class="section-title">4. Vacunas:</div><table class="schedule"><tr><th>FECHA</th><th>VACUNA</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${blankRows(11,4)}</table><div class="section-title">5. Consultas (${consultationBlocks.length}):</div>${renderedConsultations}</main><script>window.onload=function(){window.print()}<\/script></body></html>`);
+  </style></head><body><main class="sheet"><header class="title"><img src="${happyDogLogo}" alt="Happy Dog"><h1>HISTORIA CLÍNICA HAPPY DOG</h1><strong>N° Historia: ${escapeHtml(String(pet.id || '').slice(0, 8).toUpperCase())}</strong></header><div class="line"><b>Fecha ingreso:</b> ${escapeHtml(formatShortDate(pet.createdAt || new Date()))}</div><div class="section-title">1. Datos del propietario:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(client.fullName || '')}</span><span><b>Teléfono:</b> ${escapeHtml(client.phone || '')}</span></div><div class="line owner-line"><span><b>Dirección:</b> ${escapeHtml(client.address || '')}</span><span><b>DNI:</b> ${escapeHtml(client.documentNumber || client.dni || '')}</span></div><div class="section-title">2. Datos del paciente:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(pet.name || '')}</span><span><b>Especie:</b> ${escapeHtml(pet.species || '')}</span><span><b>Edad:</b> ${escapeHtml(pet.age || '')}</span></div><div class="line owner-line"><span><b>Raza:</b> ${escapeHtml(pet.breed || '')}</span><span><b>Sexo:</b> ${escapeHtml(sexLabel(pet.sex))}</span><span><b>Color:</b> ${escapeHtml(pet.color || '')}</span><span><b>Peso:</b> ${escapeHtml(form.value.weightKg || pet.weightKg || '')}</span></div><div class="section-title">3. Desparasitaciones:</div><table class="schedule"><tr><th>FECHA</th><th>DESPARASITANTE</th><th>PESO</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${preventiveRows('DEWORMING',12)}</table><div class="section-title">4. Vacunas:</div><table class="schedule"><tr><th>FECHA</th><th>VACUNA</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${preventiveRows('VACCINE',11)}</table><div class="section-title">5. Consultas (${consultationBlocks.length}):</div>${renderedConsultations}</main><script>window.onload=function(){window.print()}<\/script></body></html>`);
   printWindow.document.close();
 }
 
@@ -1054,9 +1092,20 @@ onMounted(loadData);
                 <span>{{ checkedExams().length ? checkedExams().join(', ') : 'Sin exámenes seleccionados' }}</span>
               </div>
             </div>
-            <div class="preventive-data-note">
-              <strong>Vacunas y desparasitaciones</strong>
-              <span>Estas tablas aparecerán en el documento. Se completarán automáticamente cuando el sistema tenga registros preventivos estructurados para la mascota.</span>
+            <div class="preventive-editor">
+              <div class="document-section-label"><strong>Vacunas y desparasitaciones</strong><small>Se guardan en la ficha de {{ selectedPet.name }}</small></div>
+              <form class="preventive-form" @submit.prevent="savePreventiveRecord">
+                <label>Registro<select v-model="preventiveForm.type"><option value="DEWORMING">Desparasitación</option><option value="VACCINE">Vacuna</option></select></label>
+                <label>Fecha<input v-model="preventiveForm.appliedAt" type="date" required></label>
+                <label>{{ preventiveForm.type === 'VACCINE' ? 'Vacuna' : 'Desparasitante' }}<input v-model="preventiveForm.productName" required placeholder="Nombre del producto"></label>
+                <label v-if="preventiveForm.type === 'DEWORMING'">Peso<input v-model.number="preventiveForm.weightKg" type="number" step="0.01" placeholder="kg"></label>
+                <label>Próxima cita<input v-model="preventiveForm.nextAppointmentAt" type="date"></label>
+                <button :disabled="preventiveSaving">{{ preventiveSaving ? 'Guardando...' : 'Agregar registro' }}</button>
+              </form>
+              <h4>3. Desparasitaciones</h4>
+              <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Desparasitante</th><th>Peso</th><th>Firma y sello</th><th>Próxima cita</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'DEWORMING')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.weightKg ? record.weightKg + ' kg' : '-' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'DEWORMING')"><td colspan="6" class="muted-text">Sin desparasitaciones registradas.</td></tr></tbody></table></div>
+              <h4>4. Vacunas</h4>
+              <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Vacuna</th><th>Firma y sello</th><th>Próxima cita</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'VACCINE')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'VACCINE')"><td colspan="5" class="muted-text">Sin vacunas registradas.</td></tr></tbody></table></div>
             </div>
           </section>
 

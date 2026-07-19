@@ -12,6 +12,7 @@ import { SalesModule } from './modules/sales/sales.module';
 import { FilesModule } from './modules/files/files.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CashModule } from './modules/cash/cash.module';
+import { PreventiveCareModule } from './modules/preventive-care/preventive-care.module';
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, ClientsModule, PetsModule, AppointmentsModule, MedicalRecordsModule, InventoryModule, SalesModule, FilesModule, ReportsModule, CashModule], providers: [PrismaService] })
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, ClientsModule, PetsModule, AppointmentsModule, MedicalRecordsModule, PreventiveCareModule, InventoryModule, SalesModule, FilesModule, ReportsModule, CashModule], providers: [PrismaService] })
 export class AppModule {}

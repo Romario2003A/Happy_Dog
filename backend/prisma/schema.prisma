@@ -78,6 +78,11 @@ enum MovementType {
   SALE
 }
 
+enum PreventiveCareType {
+  VACCINE
+  DEWORMING
+}
+
 model User {
   id String @id @default(uuid())
   fullName String
@@ -87,6 +92,7 @@ model User {
   active Boolean @default(true)
   appointments Appointment[] @relation("VetAppointments")
   medicalRecords MedicalRecord[]
+  preventiveCareRecords PreventiveCareRecord[]
   sales Sale[]
   cashMovements CashMovement[]
   cashClosings CashClosing[]
@@ -133,12 +139,31 @@ model Pet {
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   appointments Appointment[]
   medicalRecords MedicalRecord[]
+  preventiveCareRecords PreventiveCareRecord[]
   cashMovements CashMovement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([clientId])
   @@index([name])
   @@index([cardStatus])
+}
+
+model PreventiveCareRecord {
+  id String @id @default(uuid())
+  type PreventiveCareType
+  appliedAt DateTime
+  productName String
+  weightKg Float?
+  nextAppointmentAt DateTime?
+  notes String?
+  petId String
+  veterinarianId String
+  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  veterinarian User @relation(fields: [veterinarianId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([petId, type])
+  @@index([appliedAt])
 }
 
 model Service {

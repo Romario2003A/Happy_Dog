@@ -13,4 +13,4 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 RUN mkdir -p uploads
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "export DIRECT_URL=${DIRECT_URL:-$DATABASE_URL} && npx prisma migrate deploy && node dist/main.js"]
