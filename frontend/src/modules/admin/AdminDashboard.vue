@@ -197,9 +197,12 @@ async function loadCash() {
   }
 
   if (pendingRes.status === 'fulfilled') pendingCharges.value = pendingRes.value.data;
+  else pendingCharges.value = [];
 
-  if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected' || pendingRes.status === 'rejected') {
-    const status = rejectedStatus(summaryRes) || rejectedStatus(movementsRes) || rejectedStatus(pendingRes);
+  // La bandeja de cobros es complementaria. Si el backend nuevo todavía está
+  // desplegándose, el saldo y los movimientos deben continuar disponibles.
+  if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected') {
+    const status = rejectedStatus(summaryRes) || rejectedStatus(movementsRes);
     error.value = status === 401 || status === 403
       ? 'Tu sesion no tiene permisos para Caja. Ingresa otra vez con la cuenta de recepcion o administracion.'
       : 'No se pudo cargar caja. Intenta actualizar la pagina en unos segundos.';
@@ -834,9 +837,12 @@ onMounted(async () => {
 .cash-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
+
+.cash-actions button { white-space: nowrap; }
 
 .cash-date {
   max-width: 180px;
@@ -1129,6 +1135,12 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
+  .cash-actions {
+    align-items: stretch;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
   .cash-cards,
   .cash-form,
   .cash-split,
