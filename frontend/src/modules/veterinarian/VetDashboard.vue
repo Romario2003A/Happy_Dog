@@ -17,6 +17,13 @@ const saving = ref(false);
 const error = ref('');
 const success = ref('');
 const activeWorkspace = ref('agenda');
+const consultationTab = ref('evaluation');
+const consultationTabs = [
+  { value: 'evaluation', label: 'Evaluación', help: 'Motivo y signos' },
+  { value: 'diagnosis', label: 'Diagnóstico', help: 'Exámenes y hallazgos' },
+  { value: 'plan', label: 'Plan médico', help: 'Tratamiento y control' },
+  { value: 'documents', label: 'Documentos', help: 'Receta y formatos' },
+];
 const accountOpen = ref(false);
 const accountLoading = ref(false);
 const accountError = ref('');
@@ -254,6 +261,7 @@ async function selectAppointment(appointment) {
   expandedRecordId.value = null;
   if (!appointment?.petId) return;
   activeWorkspace.value = 'consultation';
+  consultationTab.value = 'evaluation';
   try {
     history.value = (await api.get(`/medical-records/pet/${appointment.petId}`)).data;
   } catch (e) {
@@ -269,6 +277,7 @@ async function selectPet(pet) {
   historySearch.value = '';
   expandedRecordId.value = null;
   activeWorkspace.value = 'consultation';
+  consultationTab.value = 'evaluation';
   try {
     history.value = (await api.get(`/medical-records/pet/${pet.id}`)).data;
   } catch (e) {
@@ -689,6 +698,8 @@ onMounted(loadData);
       <button :class="{ active: accountOpen }" @click="accountOpen = true">Mi cuenta</button>
     </template>
 
+    <div class="doctor-page">
+
     <div v-if="accountOpen" class="account-overlay" @click.self="accountOpen = false">
       <aside class="account-drawer glass-card" role="dialog" aria-modal="true" aria-labelledby="doctor-account-title">
         <div class="account-drawer-head">
@@ -853,7 +864,12 @@ onMounted(loadData);
               </button>
             </div>
           </section>
-          <section class="clinical-sheet">
+          <nav class="consultation-tabs" aria-label="Secciones de la atención">
+            <button v-for="(tab, index) in consultationTabs" :key="tab.value" type="button" :class="{ active: consultationTab === tab.value }" @click="consultationTab = tab.value">
+              <span>{{ index + 1 }}</span><div><strong>{{ tab.label }}</strong><small>{{ tab.help }}</small></div>
+            </button>
+          </nav>
+          <section v-show="consultationTab !== 'documents'" class="clinical-sheet">
             <div class="sheet-top">
               <div class="sheet-code">FECHA: {{ dateKey() }}</div>
               <div class="sheet-brand">
@@ -864,6 +880,7 @@ onMounted(loadData);
             </div>
 
             <h3 class="sheet-title">Historia clínica</h3>
+            <div v-show="consultationTab === 'evaluation'" class="clinical-step-content">
             <div class="sheet-subtitle">Datos del propietario</div>
             <div class="clinical-table owner-grid">
               <div><span>Nombre:</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
@@ -899,7 +916,9 @@ onMounted(loadData);
               <span>Anamnesis</span>
               <textarea v-model="form.anamnesis" placeholder="Qué comenta el dueño, evolución, apetito, ánimo, vómitos, diarrea, etc."></textarea>
             </label>
+            </div>
 
+            <div v-show="consultationTab === 'diagnosis'" class="clinical-step-content">
             <div class="exam-section">
               <span class="clinical-label">Exámenes complementarios</span>
               <label v-for="option in examOptions" :key="option.key" class="exam-option">
@@ -914,7 +933,9 @@ onMounted(loadData);
               <label>DX definitivo<textarea v-model="form.definitiveDx" placeholder="Diagnóstico definitivo"></textarea></label>
               <label>Pronóstico<textarea v-model="form.prognosis" placeholder="Reservado, favorable..."></textarea></label>
             </div>
+            </div>
 
+            <div v-show="consultationTab === 'plan'" class="clinical-step-content">
             <label class="clinical-line tall">
               <span>Tratamiento</span>
               <textarea v-model="form.treatment" placeholder="Procedimientos, medicación aplicada y evolución durante consulta"></textarea>
@@ -923,6 +944,7 @@ onMounted(loadData);
             <div class="frequency-row">
               <label>Frecuencia<input v-model="form.frequency" placeholder="Cada 12 h, cada 24 h, por 5 días..."></label>
               <label>Recomendaciones<textarea v-model="form.recommendations" placeholder="Cuidados en casa, dieta, reposo, señales de alerta"></textarea></label>
+            </div>
             </div>
 
             <div class="doctor-sign">Médico: {{ auth.user?.fullName || 'Doctor veterinario' }}</div>
@@ -957,6 +979,7 @@ onMounted(loadData);
             </div>
           </section>
 
+          <div v-show="consultationTab === 'documents'" class="document-step">
           <section class="prescription-box">
             <div class="prescription-head">
               <div>
@@ -1005,9 +1028,14 @@ onMounted(loadData);
               <textarea v-model="surgeryConsent.staffNotes" placeholder="Anotaciones u observaciones del personal"></textarea>
             </div>
           </section>
+          </div>
 
-          <button :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención y cerrar cita' : 'Guardar atención directa' }}</button>
-          <p v-if="!selected" class="direct-care-note">Atención directa: se guardará en el historial sin depender de una cita de recepción.</p>
+          <div class="consultation-actions">
+            <button v-if="consultationTab !== 'evaluation'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.max(0, consultationTabs.findIndex(tab => tab.value === consultationTab) - 1)].value">Anterior</button>
+            <button v-if="consultationTab !== 'documents'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.min(consultationTabs.length - 1, consultationTabs.findIndex(tab => tab.value === consultationTab) + 1)].value">Continuar</button>
+            <button :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Guardar atención directa' }}</button>
+          </div>
+          <p v-if="!selected" class="direct-care-note">Esta atención se guardará directamente en el historial del paciente.</p>
         </form>
       </section>
 
@@ -1049,6 +1077,7 @@ onMounted(loadData);
           </article>
         </template>
       </section>
+    </div>
     </div>
   </VeterinarianLayout>
 </template>
