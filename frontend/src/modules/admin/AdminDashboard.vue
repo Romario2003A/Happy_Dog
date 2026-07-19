@@ -478,34 +478,25 @@ onMounted(async () => {
     </div>
 
     <div v-if="active==='resumen'" class="admin-overview-grid">
-      <section class="glass-card admin-focus-card">
-        <div class="admin-focus-copy">
-          <span class="badge">Centro de trabajo</span>
-          <h2>¿Qué necesitas revisar?</h2>
-          <p>Accede directamente a la tarea administrativa sin recorrer todo el sistema.</p>
-        </div>
-        <div class="admin-quick-actions">
-          <button type="button" @click="openInventory"><span>01</span><div><strong>Revisar inventario</strong><small>Productos, precios y existencias</small></div></button>
-          <button type="button" @click="setActive('caja')"><span>02</span><div><strong>Abrir caja</strong><small>Movimientos y cierre del día</small></div></button>
-          <button type="button" @click="setActive('clientes')"><span>03</span><div><strong>Consultar clientes</strong><small>Propietarios y mascotas</small></div></button>
-        </div>
-      </section>
-
       <section class="glass-card admin-today-card">
         <div class="section-title compact">
-          <div><span class="badge">Próximamente</span><h3>Agenda cercana</h3></div>
+          <div><span class="badge">Información útil</span><h3>Agenda cercana y alertas</h3></div>
           <button type="button" class="secondary small" @click="$router.push('/recepcion')">Ver agenda</button>
         </div>
-        <div v-if="upcomingAdminAppointments.length" class="admin-agenda-list">
-          <article v-for="item in upcomingAdminAppointments" :key="item.id">
-            <span>{{ formatAdminAppointment(item.scheduledAt) }}</span>
-            <div><strong>{{ item.pet?.name || 'Mascota' }}</strong><small>{{ item.client?.fullName || 'Cliente' }}</small></div>
-          </article>
-        </div>
-        <div v-else class="calm-empty"><strong>Agenda despejada</strong><span>No hay citas próximas pendientes.</span></div>
-        <div class="admin-stock-note" :class="{ ok: !lowStockProducts.length }">
-          <strong>{{ lowStockProducts.length ? `${lowStockProducts.length} producto${lowStockProducts.length === 1 ? '' : 's'} requiere atención` : 'Inventario en orden' }}</strong>
-          <span>{{ lowStockProducts.length ? 'Revisa las existencias antes de la siguiente atención.' : 'No hay productos con stock bajo.' }}</span>
+        <div class="admin-information-columns">
+          <div>
+            <div v-if="upcomingAdminAppointments.length" class="admin-agenda-list">
+              <article v-for="item in upcomingAdminAppointments" :key="item.id">
+                <span>{{ formatAdminAppointment(item.scheduledAt) }}</span>
+                <div><strong>{{ item.pet?.name || 'Mascota' }}</strong><small>{{ item.client?.fullName || 'Cliente' }}</small></div>
+              </article>
+            </div>
+            <div v-else class="calm-empty"><strong>Agenda despejada</strong><span>No hay citas próximas pendientes.</span></div>
+          </div>
+          <div class="admin-stock-note" :class="{ ok: !lowStockProducts.length }">
+            <strong>{{ lowStockProducts.length ? `${lowStockProducts.length} producto${lowStockProducts.length === 1 ? '' : 's'} requiere atención` : 'Inventario en orden' }}</strong>
+            <span>{{ lowStockProducts.length ? 'Revisa las existencias antes de la siguiente atención.' : 'No hay productos con stock bajo.' }}</span>
+          </div>
         </div>
       </section>
     </div>
