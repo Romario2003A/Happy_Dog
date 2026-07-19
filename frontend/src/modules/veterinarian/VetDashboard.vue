@@ -17,6 +17,11 @@ const saving = ref(false);
 const error = ref('');
 const success = ref('');
 const activeWorkspace = ref('agenda');
+const accountOpen = ref(false);
+const accountLoading = ref(false);
+const accountError = ref('');
+const accountSuccess = ref('');
+const accountForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const petSearch = ref('');
 const historySearch = ref('');
 const expandedRecordId = ref(null);
@@ -139,6 +144,28 @@ function fileUrl(url) {
 
 function toggleRecord(recordId) {
   expandedRecordId.value = expandedRecordId.value === recordId ? null : recordId;
+}
+
+async function changeAccountPassword() {
+  accountError.value = '';
+  accountSuccess.value = '';
+  if (accountForm.value.newPassword !== accountForm.value.confirmPassword) {
+    accountError.value = 'La nueva contraseña no coincide.';
+    return;
+  }
+  accountLoading.value = true;
+  try {
+    const data = await auth.changePassword({
+      currentPassword: accountForm.value.currentPassword,
+      newPassword: accountForm.value.newPassword,
+    });
+    accountForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' };
+    accountSuccess.value = data.message || 'Contraseña actualizada correctamente.';
+  } catch (e) {
+    accountError.value = e.response?.data?.message || 'No se pudo cambiar la contraseña.';
+  } finally {
+    accountLoading.value = false;
+  }
 }
 
 function formatShortDate(value = new Date()) {
@@ -659,8 +686,32 @@ onMounted(loadData);
   <VeterinarianLayout title="Doctor Veterinario" subtitle="Citas, pacientes, historial clínico y receta">
     <template #nav>
       <button @click="loadData">Actualizar</button>
-      <button @click="$router.push('/veterinario/cuenta')">Mi cuenta</button>
+      <button :class="{ active: accountOpen }" @click="accountOpen = true">Mi cuenta</button>
     </template>
+
+    <div v-if="accountOpen" class="account-overlay" @click.self="accountOpen = false">
+      <aside class="account-drawer glass-card" role="dialog" aria-modal="true" aria-labelledby="doctor-account-title">
+        <div class="account-drawer-head">
+          <div><span class="badge">Mi cuenta</span><h2 id="doctor-account-title">Perfil y seguridad</h2></div>
+          <button type="button" class="secondary small" aria-label="Cerrar mi cuenta" @click="accountOpen = false">Cerrar</button>
+        </div>
+        <div class="account-identity">
+          <span>{{ (auth.user?.fullName || 'D').slice(0, 1).toUpperCase() }}</span>
+          <div><strong>{{ auth.user?.fullName || 'Doctor veterinario' }}</strong><small>{{ auth.user?.email || '' }}</small><small>Doctor veterinario</small></div>
+        </div>
+        <div class="account-divider"></div>
+        <h3>Cambiar contraseña</h3>
+        <p class="muted-text">Actualiza tu acceso sin salir del panel ni perder la atención actual.</p>
+        <form class="stack" @submit.prevent="changeAccountPassword">
+          <label>Contraseña actual<input v-model="accountForm.currentPassword" type="password" required minlength="6" autocomplete="current-password"></label>
+          <label>Nueva contraseña<input v-model="accountForm.newPassword" type="password" required minlength="8" autocomplete="new-password"></label>
+          <label>Confirmar contraseña<input v-model="accountForm.confirmPassword" type="password" required minlength="8" autocomplete="new-password"></label>
+          <p v-if="accountError" class="error">{{ accountError }}</p>
+          <p v-if="accountSuccess" class="success">{{ accountSuccess }}</p>
+          <button :disabled="accountLoading">{{ accountLoading ? 'Guardando...' : 'Guardar nueva contraseña' }}</button>
+        </form>
+      </aside>
+    </div>
 
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
