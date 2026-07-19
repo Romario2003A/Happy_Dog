@@ -265,6 +265,7 @@ function createFollowUpFromPastAppointment() {
   quick.value.reason = appointment.reason ? `Control: ${appointment.reason}` : 'Control';
   selectedDate.value = dateKey();
   agendaView.value = 'day';
+  selectedAppointment.value = null;
   showQuick.value = true;
 }
 
@@ -692,7 +693,7 @@ onMounted(loadData);
         </div>
         <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar formulario' : '+ Nueva cita por llamada o WhatsApp' }}</button>
 
-        <div class="detail-box upcoming-summary">
+        <div v-if="!showQuick" class="detail-box upcoming-summary">
           <span class="badge">Aceptadas</span>
           <h3>{{ acceptedAppointments.length }} citas aceptadas</h3>
           <button
