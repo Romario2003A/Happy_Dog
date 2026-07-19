@@ -22,11 +22,11 @@ let refreshInProgress = false;
 const activeWorkspace = ref('agenda');
 const consultationTab = ref('evaluation');
 const taskChosen = ref(false);
+const activeTask = ref('');
 const consultationTabs = [
   { value: 'evaluation', label: 'Evaluación', help: 'Motivo y signos' },
   { value: 'diagnosis', label: 'Diagnóstico', help: 'Exámenes y hallazgos' },
   { value: 'plan', label: 'Plan médico', help: 'Tratamiento y control' },
-  { value: 'documents', label: 'Documentos', help: 'Receta y formatos' },
 ];
 const selectedDocuments = reactive({ prescription: false, clinicalHistory: false, surgeryConsent: false });
 const preventiveForm = reactive({ type:'DEWORMING', appliedAt:dateKey(), productName:'', weightKg:null, nextAppointmentAt:'', notes:'' });
@@ -161,6 +161,7 @@ function toggleRecord(recordId) {
 }
 
 function startClinicalTask(task) {
+  activeTask.value = task;
   selectedDocuments.prescription = false;
   selectedDocuments.clinicalHistory = false;
   selectedDocuments.surgeryConsent = false;
@@ -170,6 +171,9 @@ function startClinicalTask(task) {
   } else if (task === 'prescription') {
     consultationTab.value = 'documents';
     selectedDocuments.prescription = true;
+  } else if (task === 'preventive') {
+    consultationTab.value = 'documents';
+    selectedDocuments.clinicalHistory = true;
   } else if (task === 'history') {
     consultationTab.value = 'documents';
     selectedDocuments.clinicalHistory = true;
@@ -179,6 +183,18 @@ function startClinicalTask(task) {
     selectedDocuments.surgeryConsent = true;
   }
   taskChosen.value = true;
+}
+
+function returnToPatients() {
+  activeWorkspace.value = 'agenda';
+  taskChosen.value = false;
+  activeTask.value = '';
+}
+
+function returnToPatientActions() {
+  activeWorkspace.value = 'consultation';
+  taskChosen.value = false;
+  activeTask.value = '';
 }
 
 async function changeAccountPassword() {
@@ -261,6 +277,7 @@ function resetForm(appointment) {
   selectedDocuments.clinicalHistory = false;
   selectedDocuments.surgeryConsent = false;
   taskChosen.value = false;
+  activeTask.value = '';
   success.value = '';
   error.value = '';
 }
@@ -824,25 +841,25 @@ onUnmounted(() => {
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
-    <header class="doctor-toolbar">
-      <div>
-        <h2>{{ activeWorkspace === 'agenda' ? 'Pacientes' : activeWorkspace === 'consultation' ? `Atención · ${selectedPet?.name || ''}` : `Historial · ${selectedPet?.name || ''}` }}</h2>
-        <p>{{ activeWorkspace === 'agenda' ? 'Selecciona una cita o busca una mascota.' : selectedClient?.fullName || '' }}</p>
-      </div>
-      <nav aria-label="Secciones del doctor">
-        <button type="button" :class="{ active: activeWorkspace === 'agenda' }" @click="activeWorkspace = 'agenda'">Pacientes</button>
-        <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'consultation' }" @click="activeWorkspace = 'consultation'">Atención</button>
-        <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'history' }" @click="activeWorkspace = 'history'">Historial</button>
-      </nav>
+    <header class="workflow-progress" aria-label="Flujo de atención">
+      <div :class="{ active: activeWorkspace === 'agenda' }"><span>1</span><strong>Elegir paciente</strong></div>
+      <div :class="{ active: activeWorkspace === 'consultation' && !taskChosen }"><span>2</span><strong>Elegir necesidad</strong></div>
+      <div :class="{ active: taskChosen || activeWorkspace === 'history' }"><span>3</span><strong>Completar atención</strong></div>
     </header>
 
-    <div v-show="activeWorkspace === 'agenda'" class="clinical-grid">
+    <div v-if="activeWorkspace !== 'agenda'" class="patient-context-bar">
+      <button type="button" class="secondary small" @click="returnToPatients">← Cambiar paciente</button>
+      <div><strong>{{ selectedPet?.name }}</strong><span>{{ selectedClient?.fullName || 'Sin propietario registrado' }}</span></div>
+      <button v-if="taskChosen || activeWorkspace === 'history'" type="button" class="secondary small" @click="returnToPatientActions">Cambiar necesidad</button>
+    </div>
+
+    <div v-show="activeWorkspace === 'agenda'" class="patient-selection-step">
       <section class="glass-card appointment-list">
         <div class="section-title">
-          <span class="badge">Agenda</span>
-          <h2>Citas listas para atender</h2>
+          <span class="badge">Paso 1 de 3</span>
+          <h2>¿A qué paciente atenderás?</h2>
         </div>
-        <p class="muted-text">Recepción envía aquí las citas confirmadas, en espera o en consulta.</p>
+        <p class="muted-text">Elige una cita de hoy o busca directamente a la mascota.</p>
         <div v-if="groomingAppointments.length" class="grooming-note">
           <strong>{{ groomingAppointments.length }} servicio{{ groomingAppointments.length === 1 ? '' : 's' }} de baño y corte</strong>
           <span>No requieren historia médica y continúan en el flujo de recepción/peluquería.</span>
@@ -894,27 +911,6 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section class="glass-card patient-card">
-        <div class="section-title">
-          <span class="badge">Paciente</span>
-          <h2>{{ selectedPet?.name || 'Ficha del paciente' }}</h2>
-        </div>
-        <div v-if="!selectedPet" class="empty-state patient-empty">
-          <strong>Selecciona una cita o un paciente</strong>
-          <span>La ficha, historial y receta se activan cuando eliges una mascota.</span>
-        </div>
-        <div v-if="selectedPet" class="patient-grid">
-          <div><span>Especie</span><strong>{{ selectedPet?.species || '-' }}</strong></div>
-          <div><span>Raza</span><strong>{{ selectedPet?.breed || '-' }}</strong></div>
-          <div><span>Sexo</span><strong>{{ sexLabel(selectedPet?.sex) }}</strong></div>
-          <div><span>Edad</span><strong>{{ selectedPet?.age || '-' }}</strong></div>
-          <div><span>Peso</span><strong>{{ selectedPet?.weightKg || '-' }} kg</strong></div>
-          <div><span>Dueño</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
-          <div><span>Teléfono</span><strong>{{ selectedClient?.phone || '-' }}</strong></div>
-          <div><span>Motivo</span><strong>{{ selected?.reason || 'Revisión de historial' }}</strong></div>
-        </div>
-        <button v-if="selected && selected.status !== 'IN_CONSULTATION'" class="secondary full" @click="startConsultation">Iniciar atención</button>
-      </section>
     </div>
 
     <div v-show="activeWorkspace !== 'agenda'" class="clinical-grid main focused-workspace">
@@ -931,28 +927,30 @@ onUnmounted(() => {
         </div>
         <section v-else-if="!taskChosen" class="clinical-task-launcher">
           <div class="task-launcher-copy">
-            <span class="badge">Paciente seleccionado</span>
+            <span class="badge">Paso 2 de 3</span>
             <h2>¿Qué necesitas hacer hoy con {{ selectedPet.name }}?</h2>
-            <p>Elige una acción para abrir únicamente las herramientas necesarias.</p>
+            <p>Abre solamente la herramienta que vas a utilizar.</p>
           </div>
           <div class="clinical-task-grid">
-            <button type="button" @click="startClinicalTask('consultation')"><span>01</span><div><strong>Registrar consulta</strong><small>Evaluación, diagnóstico y tratamiento</small></div></button>
-            <button type="button" @click="startClinicalTask('prescription')"><span>02</span><div><strong>Emitir receta</strong><small>Medicamento, dosis e indicaciones</small></div></button>
-            <button type="button" @click="startClinicalTask('history')"><span>03</span><div><strong>Historia clínica Happy Dog</strong><small>Formato fiel al documento Word</small></div></button>
-            <button type="button" @click="startClinicalTask('surgery')"><span>04</span><div><strong>Preparar cirugía</strong><small>Evaluación y autorización quirúrgica</small></div></button>
+            <button type="button" @click="startClinicalTask('consultation')"><span>01</span><div><strong>Consulta médica</strong><small>Evaluación, diagnóstico y tratamiento</small></div></button>
+            <button type="button" @click="startClinicalTask('preventive')"><span>02</span><div><strong>Vacuna o desparasitación</strong><small>Registrar aplicación y próxima cita</small></div></button>
+            <button type="button" @click="startClinicalTask('prescription')"><span>03</span><div><strong>Emitir receta</strong><small>Medicamento, dosis e indicaciones</small></div></button>
+            <button type="button" @click="startClinicalTask('history')"><span>04</span><div><strong>Historia clínica</strong><small>Completar o generar el documento Happy Dog</small></div></button>
+            <button type="button" @click="activeWorkspace = 'history'"><span>05</span><div><strong>Consultas anteriores</strong><small>Revisar antecedentes del paciente</small></div></button>
+            <button type="button" class="task-secondary" @click="startClinicalTask('surgery')"><span>06</span><div><strong>Cirugía</strong><small>Evaluación y autorización quirúrgica</small></div></button>
           </div>
         </section>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
-          <div class="current-task-bar"><span>Atención de <strong>{{ selectedPet.name }}</strong></span><button type="button" class="secondary small" @click="taskChosen = false">Cambiar acción</button></div>
-          <section class="attention-type-box">
+          <div class="current-task-bar"><span><strong>Paso 3 de 3</strong> · {{ activeTask === 'consultation' ? 'Consulta médica' : activeTask === 'preventive' ? 'Vacuna o desparasitación' : activeTask === 'prescription' ? 'Receta médica' : activeTask === 'history' ? 'Historia clínica' : 'Cirugía' }}</span></div>
+          <section v-if="activeTask === 'consultation'" class="attention-type-box">
             <label>Tipo de atención
               <select v-model="attentionType"><option v-for="type in attentionTypes" :key="type.value" :value="type.value">{{ type.label }} — {{ type.help }}</option></select>
             </label>
           </section>
-          <label class="consultation-section-select">Sección
+          <label v-if="activeTask === 'consultation'" class="consultation-section-select">Sección
             <select v-model="consultationTab"><option v-for="tab in consultationTabs" :key="tab.value" :value="tab.value">{{ tab.label }} — {{ tab.help }}</option></select>
           </label>
-          <section v-show="consultationTab !== 'documents'" class="clinical-sheet">
+          <section v-show="activeTask === 'consultation'" class="clinical-sheet">
             <div class="sheet-top">
               <div class="sheet-code">FECHA: {{ dateKey() }}</div>
               <div class="sheet-brand">
@@ -1062,23 +1060,10 @@ onUnmounted(() => {
             </div>
           </section>
 
-          <div v-show="consultationTab === 'documents'" class="document-step">
-          <section class="document-picker">
-            <div><span class="badge">Opcional</span><h3>¿Qué documento necesita esta atención?</h3><p class="muted-text">Selecciona únicamente los documentos que vas a preparar.</p></div>
-            <div class="document-picker-grid">
-              <button type="button" :class="{ active: selectedDocuments.prescription }" @click="selectedDocuments.prescription = !selectedDocuments.prescription">
-                <span>Rx</span><div><strong>Receta médica</strong><small>Medicamento, dosis e indicaciones</small></div>
-              </button>
-              <button type="button" :class="{ active: selectedDocuments.clinicalHistory }" @click="selectedDocuments.clinicalHistory = !selectedDocuments.clinicalHistory">
-                <span>HC</span><div><strong>Historia clínica Happy Dog</strong><small>Formato del documento Word</small></div>
-              </button>
-              <button v-if="attentionType === 'SURGERY'" type="button" :class="{ active: selectedDocuments.surgeryConsent }" @click="selectedDocuments.surgeryConsent = !selectedDocuments.surgeryConsent">
-                <span>CX</span><div><strong>Autorización quirúrgica</strong><small>Documento de consentimiento</small></div>
-              </button>
-            </div>
-          </section>
+          <div v-show="activeTask !== 'consultation'" class="document-step">
 
-          <section v-if="selectedDocuments.clinicalHistory" class="clinical-document-editor">
+          <section v-if="activeTask === 'history' || activeTask === 'preventive'" class="clinical-document-editor">
+            <template v-if="activeTask === 'history'">
             <div class="document-editor-head">
               <div><span class="badge">Documento editable</span><h3>Historia clínica Happy Dog</h3><p>Los datos del paciente se completan automáticamente. El doctor registra únicamente la información médica.</p></div>
               <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar PDF</button>
@@ -1117,7 +1102,8 @@ onUnmounted(() => {
                 <span>{{ checkedExams().length ? checkedExams().join(', ') : 'Sin exámenes seleccionados' }}</span>
               </div>
             </div>
-            <div class="preventive-editor">
+            </template>
+            <div v-if="activeTask === 'preventive'" class="preventive-editor standalone-preventive">
               <div class="document-section-label"><strong>Vacunas y desparasitaciones</strong><small>Se guardan en la ficha de {{ selectedPet.name }}</small></div>
               <form class="preventive-form" @submit.prevent="savePreventiveRecord">
                 <label>Registro<select v-model="preventiveForm.type"><option value="DEWORMING">Desparasitación</option><option value="VACCINE">Vacuna</option></select></label>
@@ -1134,7 +1120,7 @@ onUnmounted(() => {
             </div>
           </section>
 
-          <section v-if="selectedDocuments.prescription" class="prescription-box">
+          <section v-if="activeTask === 'prescription'" class="prescription-box">
             <div class="prescription-head">
               <div>
                 <h3>Receta / inventario</h3>
@@ -1153,7 +1139,7 @@ onUnmounted(() => {
             <input v-model="prescription.instructions" placeholder="Indicaciones">
           </section>
 
-          <section v-if="attentionType === 'SURGERY' && selectedDocuments.surgeryConsent" class="surgery-consent-box">
+          <section v-if="activeTask === 'surgery'" class="surgery-consent-box">
             <div class="prescription-head">
               <div>
                 <h3>Autorizacion de cirugia</h3>
@@ -1185,11 +1171,11 @@ onUnmounted(() => {
           </div>
 
           <div class="consultation-actions">
-            <button v-if="consultationTab !== 'evaluation'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.max(0, consultationTabs.findIndex(tab => tab.value === consultationTab) - 1)].value">Anterior</button>
-            <button v-if="consultationTab !== 'documents'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.min(consultationTabs.length - 1, consultationTabs.findIndex(tab => tab.value === consultationTab) + 1)].value">Continuar</button>
-            <button :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Guardar atención directa' }}</button>
+            <button v-if="activeTask === 'consultation' && consultationTab !== 'evaluation'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.max(0, consultationTabs.findIndex(tab => tab.value === consultationTab) - 1)].value">Anterior</button>
+            <button v-if="activeTask === 'consultation' && consultationTab !== 'plan'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.min(consultationTabs.length - 1, consultationTabs.findIndex(tab => tab.value === consultationTab) + 1)].value">Continuar</button>
+            <button v-if="activeTask === 'consultation'" :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Guardar atención directa' }}</button>
           </div>
-          <p v-if="!selected" class="direct-care-note">Esta atención se guardará directamente en el historial del paciente.</p>
+          <p v-if="activeTask === 'consultation' && !selected" class="direct-care-note">Esta atención se guardará directamente en el historial del paciente.</p>
         </form>
       </section>
 
