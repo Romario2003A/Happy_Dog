@@ -21,7 +21,7 @@ const routes=[
  {path:'/recepcion', component:ReceptionDashboard, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/personal/login'}},
  {path:'/recepcion/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['RECEPTIONIST','ADMIN'], loginPath:'/personal/login'}},
  {path:'/veterinario', component:VetDashboard, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/personal/login'}},
- {path:'/veterinario/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['VETERINARIAN','ADMIN'], loginPath:'/personal/login'}},
+ {path:'/veterinario/cuenta', redirect:'/veterinario'},
  {path:'/admin', component:AdminDashboard, meta:{requiresAuth:true, roles:['ADMIN'], loginPath:'/personal/login'}},
  {path:'/admin/cuenta', component:AccountSettings, meta:{requiresAuth:true, roles:['ADMIN'], loginPath:'/personal/login'}}
 ];

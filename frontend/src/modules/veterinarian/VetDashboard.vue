@@ -697,7 +697,7 @@ onMounted(loadData);
         </div>
         <div class="account-identity">
           <span>{{ (auth.user?.fullName || 'D').slice(0, 1).toUpperCase() }}</span>
-          <div><strong>{{ auth.user?.fullName || 'Doctor veterinario' }}</strong><small>{{ auth.user?.email || '' }}</small><small>Doctor veterinario</small></div>
+          <div><strong>{{ auth.user?.fullName || 'Doctor veterinario' }}</strong><small>{{ auth.user?.email || '' }}</small><small>{{ auth.role === 'ADMIN' ? 'Administrador con acceso al panel médico' : 'Doctor veterinario' }}</small></div>
         </div>
         <div class="account-divider"></div>
         <h3>Cambiar contraseña</h3>
