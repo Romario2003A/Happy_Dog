@@ -24,6 +24,7 @@ const cashDate = ref(todayInputDate());
 const cashMovements = ref([]);
 const cashSummary = ref(defaultCashSummary());
 const showCashForm = ref(false);
+const showClosingForm = ref(false);
 const cashForm = ref(defaultCashForm());
 const closingForm = ref({ openingAmount: 0, countedAmount: 0, notes: '' });
 
@@ -183,6 +184,8 @@ async function loadCash() {
         countedAmount: Number(closing.countedAmount || 0),
         notes: closing.notes || '',
       };
+    } else {
+      closingForm.value = { openingAmount: 0, countedAmount: 0, notes: '' };
     }
   }
 
@@ -387,6 +390,7 @@ async function closeCashDay() {
     });
     success.value = 'Cierre de caja guardado.';
     await loadCash();
+    showClosingForm.value = false;
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo cerrar caja.';
   } finally {
@@ -577,46 +581,42 @@ onMounted(async () => {
       <div class="section-title">
         <div>
           <span class="badge">Caja diaria</span>
-          <h2>Movimientos de caja</h2>
-          <p class="muted-text">Registra consultas, vacunas, cirugias, bano y corte, productos, deudas y gastos.</p>
+          <h2>Caja del día</h2>
+          <p class="muted-text">Tus ingresos, gastos y saldo en un solo lugar.</p>
         </div>
         <div class="cash-actions">
           <input v-model="cashDate" class="cash-date" type="date">
           <button class="secondary small" type="button" @click="showCashForm = !showCashForm">
-            {{ showCashForm ? 'Ocultar' : 'Nuevo movimiento' }}
+            {{ showCashForm ? 'Cancelar registro' : '+ Registrar movimiento' }}
+          </button>
+          <button class="small" type="button" @click="showClosingForm = !showClosingForm">
+            {{ showClosingForm ? 'Ocultar cierre' : cashSummary.closing ? 'Ver cierre' : 'Cerrar caja' }}
           </button>
         </div>
       </div>
 
-      <div class="cash-flow">
-        <article class="cash-step active">
-          <span>1</span>
-          <div>
-            <strong>Abrir caja</strong>
-            <small>Coloca el efectivo inicial del turno.</small>
-          </div>
-        </article>
-        <article class="cash-step" :class="{ active: sortedCashMovements.length }">
-          <span>2</span>
-          <div>
-            <strong>Registrar ventas y gastos</strong>
-            <small>{{ cashActivityLabel }}</small>
-          </div>
-        </article>
-        <article class="cash-step" :class="closingStatus.tone">
-          <span>3</span>
-          <div>
-            <strong>Cerrar turno</strong>
-            <small>{{ closingStatus.label }}</small>
-          </div>
-        </article>
+      <div class="cash-cards">
+        <div class="cash-metric income"><span>Ingresos</span><strong>S/ {{ formatMoney(cashSummary.income + cashSummary.debtPayments) }}</strong><small>Ventas y cobros</small></div>
+        <div class="cash-metric expense"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
+        <div class="cash-metric emphasis"><span>Saldo del día</span><strong>S/ {{ formatMoney(cashSummary.net) }}</strong><small>{{ cashActivityLabel }}</small></div>
       </div>
 
-      <div class="cash-cards">
-        <div class="cash-metric income"><span>Ventas y cobros</span><strong>S/ {{ formatMoney(cashSummary.income + cashSummary.debtPayments) }}</strong></div>
-        <div class="cash-metric expense"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
-        <div class="cash-metric"><span>Movimientos</span><strong>{{ sortedCashMovements.length }}</strong></div>
-        <div class="cash-metric emphasis"><span>Saldo operativo</span><strong>S/ {{ formatMoney(cashSummary.net) }}</strong></div>
+      <div v-if="cashSummary.byPaymentMethod?.length" class="cash-payment-summary">
+        <span class="cash-payment-label">Cobros por método</span>
+        <div class="cash-methods">
+          <span v-for="item in cashSummary.byPaymentMethod" :key="item.key" class="cash-chip">
+            {{ paymentLabels[item.key] || item.key }} <strong>S/ {{ formatMoney(item.total) }}</strong>
+          </span>
+        </div>
+      </div>
+
+      <div v-if="cashSummary.closing && !showClosingForm" class="cash-closed-summary">
+        <div>
+          <span :class="['closing-status', closingStatus.tone]">Día cerrado</span>
+          <strong>{{ closingStatus.label }}</strong>
+          <small>Contado: S/ {{ formatMoney(cashSummary.closing.countedAmount) }}</small>
+        </div>
+        <button class="secondary small" type="button" @click="showClosingForm = true">Revisar cierre</button>
       </div>
 
       <form v-if="showCashForm" class="cash-form" @submit.prevent="saveCashMovement">
@@ -659,18 +659,7 @@ onMounted(async () => {
         </div>
       </form>
 
-      <div class="cash-split">
-        <section class="cash-box">
-          <h3>Resumen de cobros</h3>
-          <p class="muted-text compact-text">Revisa cuanto entro por efectivo, Yape, tarjeta u otros medios.</p>
-          <div v-if="cashSummary.byPaymentMethod?.length" class="cash-methods">
-            <span v-for="item in cashSummary.byPaymentMethod" :key="item.key" class="cash-chip">
-              {{ paymentLabels[item.key] || item.key }} <strong>S/ {{ formatMoney(item.total) }}</strong>
-            </span>
-          </div>
-          <p v-else class="empty compact">Aun no hay cobros registrados para este dia.</p>
-        </section>
-        <section class="cash-box cash-close-box">
+      <section v-if="showClosingForm" class="cash-box cash-close-box cash-close-focus">
           <div class="cash-close-header">
             <div>
               <h3>Cierre de caja</h3>
@@ -707,12 +696,14 @@ onMounted(async () => {
               <small>Opcional, solo si hubo diferencia.</small>
               <input v-model="closingForm.notes" placeholder="Ej. falta vuelto, pago pendiente o caja conforme">
             </label>
-            <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar cierre del dia' }}</button>
+            <button :disabled="saving">{{ saving ? 'Guardando...' : cashSummary.closing ? 'Actualizar cierre' : 'Guardar cierre del día' }}</button>
           </form>
-        </section>
-      </div>
+      </section>
 
-      <table>
+      <div class="cash-activity-heading">
+        <div><h3>Actividad del día</h3><p class="muted-text">{{ cashActivityLabel }}</p></div>
+      </div>
+      <table class="cash-table">
         <thead><tr><th>Hora</th><th>Concepto</th><th>Categoria</th><th>Metodo</th><th>Monto</th><th>Acciones</th></tr></thead>
         <tbody>
           <tr v-if="!sortedCashMovements.length"><td colspan="6" class="empty">Caja limpia para este dia. Agrega el primer movimiento cuando haya una venta, pago o gasto.</td></tr>
@@ -757,7 +748,7 @@ onMounted(async () => {
 
 .cash-cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -784,13 +775,66 @@ onMounted(async () => {
   font-size: 1.6rem;
 }
 
+.cash-metric small {
+  display: block;
+  margin-top: 5px;
+  color: #6b7b77;
+}
+
 .cash-metric.emphasis {
   background: linear-gradient(135deg, #0f766e, #12a28d);
 }
 
 .cash-metric.emphasis span,
-.cash-metric.emphasis strong {
+.cash-metric.emphasis strong,
+.cash-metric.emphasis small {
   color: #fff;
+}
+
+.cash-payment-summary,
+.cash-closed-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 16px;
+  border: 1px solid rgba(13, 95, 96, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.cash-payment-label {
+  color: #60716d;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cash-closed-summary > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cash-closed-summary small {
+  color: #60716d;
+}
+
+.cash-close-focus {
+  max-width: 920px;
+  margin: 0 auto;
+  width: 100%;
+  box-shadow: 0 24px 55px rgba(13, 79, 80, 0.11);
+}
+
+.cash-activity-heading h3,
+.cash-activity-heading p {
+  margin: 0;
+}
+
+.cash-activity-heading p {
+  margin-top: 3px;
+  font-size: 0.84rem;
 }
 
 .cash-form {
@@ -893,6 +937,13 @@ onMounted(async () => {
   .cash-split,
   .cash-closing-form {
     grid-template-columns: 1fr;
+  }
+
+  .cash-payment-summary,
+  .cash-closed-summary,
+  .cash-closed-summary > div {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .cash-form .wide {
