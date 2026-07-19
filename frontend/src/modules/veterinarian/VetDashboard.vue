@@ -735,39 +735,17 @@ onMounted(loadData);
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
-    <section class="doctor-hero glass-card">
+    <header class="doctor-toolbar">
       <div>
-        <span class="badge">Consultorio</span>
-        <h2>{{ greeting() }}, {{ auth.user?.fullName || 'Doctor' }}</h2>
-        <p class="muted-text">Gestiona tus atenciones del día, revisa pacientes y registra historias clínicas desde un solo lugar.</p>
+        <h2>{{ activeWorkspace === 'agenda' ? 'Pacientes' : activeWorkspace === 'consultation' ? `Atención · ${selectedPet?.name || ''}` : `Historial · ${selectedPet?.name || ''}` }}</h2>
+        <p>{{ activeWorkspace === 'agenda' ? 'Selecciona una cita o busca una mascota.' : selectedClient?.fullName || '' }}</p>
       </div>
-      <div class="doctor-stats">
-        <div><span>Citas hoy</span><strong>{{ todayAppointments.length }}</strong></div>
-        <div><span>Listas para atender</span><strong>{{ visibleAppointments.length }}</strong></div>
-        <div><span>Atenciones cerradas</span><strong>{{ attendedCount }}</strong></div>
-      </div>
-    </section>
-
-    <nav class="doctor-workflow glass-card" aria-label="Flujo de atención médica">
-      <button type="button" :class="{ active: activeWorkspace === 'agenda' }" @click="activeWorkspace = 'agenda'">
-        <span>1</span><div><strong>Elegir paciente</strong><small>Agenda y búsqueda</small></div>
-      </button>
-      <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'consultation' }" @click="activeWorkspace = 'consultation'">
-        <span>2</span><div><strong>Registrar atención</strong><small>{{ selectedPet ? selectedPet.name : 'Selecciona una mascota' }}</small></div>
-      </button>
-      <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'history' }" @click="activeWorkspace = 'history'">
-        <span>3</span><div><strong>Revisar historial</strong><small>{{ history.length }} consulta{{ history.length === 1 ? '' : 's' }}</small></div>
-      </button>
-    </nav>
-
-    <div class="workspace-heading">
-      <div>
-        <span class="badge">Paso {{ activeWorkspace === 'agenda' ? '1 de 3' : activeWorkspace === 'consultation' ? '2 de 3' : '3 de 3' }}</span>
-        <h2>{{ activeWorkspace === 'agenda' ? '¿A quién atenderás?' : activeWorkspace === 'consultation' ? `Atención de ${selectedPet?.name || 'paciente'}` : `Historial de ${selectedPet?.name || 'paciente'}` }}</h2>
-        <p>{{ activeWorkspace === 'agenda' ? 'Elige una cita confirmada o busca una mascota por nombre.' : activeWorkspace === 'consultation' ? 'Completa la ficha clínica y genera los documentos necesarios.' : 'Consulta antecedentes, recetas y próximos controles.' }}</p>
-      </div>
-      <button v-if="activeWorkspace !== 'agenda'" type="button" class="secondary small" @click="activeWorkspace = 'agenda'">Cambiar paciente</button>
-    </div>
+      <nav aria-label="Secciones del doctor">
+        <button type="button" :class="{ active: activeWorkspace === 'agenda' }" @click="activeWorkspace = 'agenda'">Pacientes</button>
+        <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'consultation' }" @click="activeWorkspace = 'consultation'">Atención</button>
+        <button type="button" :disabled="!selectedPet" :class="{ active: activeWorkspace === 'history' }" @click="activeWorkspace = 'history'">Historial</button>
+      </nav>
+    </header>
 
     <div v-show="activeWorkspace === 'agenda'" class="clinical-grid">
       <section class="glass-card appointment-list">
@@ -864,18 +842,13 @@ onMounted(loadData);
         </div>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
           <section class="attention-type-box">
-            <div><span class="badge">Tipo de atención</span><h3>¿Qué necesita hoy?</h3></div>
-            <div class="attention-type-grid">
-              <button v-for="type in attentionTypes" :key="type.value" type="button" :class="{ active: attentionType === type.value }" @click="attentionType = type.value">
-                <strong>{{ type.label }}</strong><small>{{ type.help }}</small>
-              </button>
-            </div>
+            <label>Tipo de atención
+              <select v-model="attentionType"><option v-for="type in attentionTypes" :key="type.value" :value="type.value">{{ type.label }} — {{ type.help }}</option></select>
+            </label>
           </section>
-          <nav class="consultation-tabs" aria-label="Secciones de la atención">
-            <button v-for="(tab, index) in consultationTabs" :key="tab.value" type="button" :class="{ active: consultationTab === tab.value }" @click="consultationTab = tab.value">
-              <span>{{ index + 1 }}</span><div><strong>{{ tab.label }}</strong><small>{{ tab.help }}</small></div>
-            </button>
-          </nav>
+          <label class="consultation-section-select">Sección
+            <select v-model="consultationTab"><option v-for="tab in consultationTabs" :key="tab.value" :value="tab.value">{{ tab.label }} — {{ tab.help }}</option></select>
+          </label>
           <section v-show="consultationTab !== 'documents'" class="clinical-sheet">
             <div class="sheet-top">
               <div class="sheet-code">FECHA: {{ dateKey() }}</div>
