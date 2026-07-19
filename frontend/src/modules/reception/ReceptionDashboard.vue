@@ -32,6 +32,7 @@ const cardVisibleLimit = ref(25);
 const selectedCardPetIds = ref([]);
 const selectedAppointment = ref(null);
 const duplicateOverride = ref(false);
+const reschedulingPastAppointment = ref(false);
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
 
 function dateKey(value = new Date()) {
@@ -295,6 +296,7 @@ function createFollowUpFromPastAppointment() {
   selectedDate.value = dateKey();
   agendaView.value = 'day';
   selectedAppointment.value = null;
+  reschedulingPastAppointment.value = true;
   showQuick.value = true;
 }
 
@@ -552,6 +554,7 @@ async function uploadPetPhoto(petId, event) {
 function resetQuick() {
   quick.value = { serviceType: 'MEDICAL', clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
   duplicateOverride.value = false;
+  reschedulingPastAppointment.value = false;
 }
 
 function useExistingAppointment(appointment) {
@@ -735,7 +738,7 @@ onMounted(loadData);
           <span>Cliente existente</span>
           <span>Sin cuenta web</span>
         </div>
-        <button class="full" @click="showQuick=!showQuick">{{ showQuick ? 'Ocultar formulario' : '+ Nueva cita por llamada o WhatsApp' }}</button>
+        <button class="full" @click="reschedulingPastAppointment = false; showQuick=!showQuick">{{ showQuick ? 'Ocultar formulario' : '+ Nueva cita por llamada o WhatsApp' }}</button>
 
         <div v-if="!showQuick" class="detail-box upcoming-summary">
           <span class="badge">Aceptadas</span>
@@ -755,6 +758,10 @@ onMounted(loadData);
         </div>
 
         <form v-if="showQuick" class="stack quick-form" @submit.prevent="saveQuickAppointment">
+          <div v-if="reschedulingPastAppointment" class="reschedule-notice">
+            <strong>Nueva cita después de una inasistencia</strong>
+            <span>El registro anterior se conserva. Acuerda con el cliente una nueva fecha y hora.</span>
+          </div>
           <label>¿Qué atención necesita?
             <select v-model="quick.serviceType" required>
               <option value="MEDICAL">Consulta médica</option>
@@ -801,7 +808,7 @@ onMounted(loadData);
             <label>Peso kg<input v-model.number="quick.weightKg" type="number" min="0" step="0.01" placeholder="Ej. 8.5"></label>
           </template>
 
-          <label>Fecha y hora<input v-model="quick.scheduledAt" required type="datetime-local"></label>
+          <label>{{ reschedulingPastAppointment ? 'Nueva fecha y hora' : 'Fecha y hora' }}<input v-model="quick.scheduledAt" required type="datetime-local"></label>
           <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
           <div v-if="possibleDuplicateAppointments.length" class="duplicate-alert">
             <strong>Posible cita duplicada</strong>
