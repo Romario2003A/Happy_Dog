@@ -131,7 +131,8 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .veterinarian-theme .doctor-workflow button>span,.veterinarian-theme .history-summary div,.veterinarian-theme .patient-grid div{background:rgba(21,91,102,.07)}
 .veterinarian-theme .consultation-tabs{background:#e9f0f1}.veterinarian-theme .consultation-tabs button.active{background:#fff;color:#155b66}.veterinarian-theme .consultation-tabs button.active>span{background:#155b66}
 .veterinarian-theme .attention-type-box,.veterinarian-theme .surgery-consent-box{background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(232,241,242,.82))}
-.veterinarian-theme .appointment-item{background:rgba(21,91,102,.055)}.veterinarian-theme .appointment-item:hover{background:rgba(21,91,102,.1)}.veterinarian-theme .appointment-item.active{background:#155b66}
+.veterinarian-theme .appointment-item{background:rgba(21,91,102,.055)!important;color:#162522!important}.veterinarian-theme .appointment-item span,.veterinarian-theme .appointment-item small{color:#687672!important}.veterinarian-theme .appointment-item:hover{background:rgba(21,91,102,.1)!important}.veterinarian-theme .appointment-item.active{background:#155b66!important;color:white!important}.veterinarian-theme .appointment-item.active strong,.veterinarian-theme .appointment-item.active span,.veterinarian-theme .appointment-item.active small{color:white!important}
+.veterinarian-theme .doctor-toolbar nav button:disabled{color:#6f8589!important;opacity:.72}.veterinarian-theme .muted-text{color:#687672}
 .veterinarian-theme input:focus,.veterinarian-theme textarea:focus,.veterinarian-theme select:focus{border-color:rgba(21,91,102,.5);box-shadow:0 0 0 4px rgba(21,91,102,.09)}
 .veterinarian-theme .direct-care-note,.veterinarian-theme .next-control-note{background:rgba(21,91,102,.08)}
 .doctor-hero h2{font-size:clamp(28px,4vw,44px);margin:12px 0}
