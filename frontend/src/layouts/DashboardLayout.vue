@@ -85,6 +85,20 @@ async function changeAccountPassword() {
           <button :disabled="accountLoading">{{ accountLoading ? 'Guardando...' : 'Guardar nueva contraseña' }}</button>
         </form>
         <div class="account-divider"></div>
+        <div v-if="auth.role === 'ADMIN'" class="role-switch-box">
+          <div>
+            <strong>Cambiar espacio de trabajo</strong>
+            <span>{{ accountPath === '/recepcion/cuenta' ? 'Accede al inventario, caja y control del negocio.' : 'Regresa a la agenda y coordinación diaria.' }}</span>
+          </div>
+          <button
+            type="button"
+            class="secondary full"
+            @click="accountOpen = false; $router.push(accountPath === '/recepcion/cuenta' ? '/admin' : '/recepcion')"
+          >
+            {{ accountPath === '/recepcion/cuenta' ? 'Ir a Administración' : 'Ir a Recepción' }}
+          </button>
+        </div>
+        <div v-if="auth.role === 'ADMIN'" class="account-divider"></div>
         <button type="button" class="danger full" @click="auth.logout(); $router.push('/personal/login')">Cerrar sesión</button>
       </aside>
     </div>
