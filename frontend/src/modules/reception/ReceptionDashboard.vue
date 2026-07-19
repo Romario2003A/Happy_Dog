@@ -275,6 +275,14 @@ function isPastAppointment(appointment) {
   return Boolean(appointment?.scheduledAt) && dateKey(appointment.scheduledAt) < dateKey();
 }
 
+function isFutureAppointment(appointment) {
+  return Boolean(appointment?.scheduledAt) && dateKey(appointment.scheduledAt) > dateKey();
+}
+
+function appointmentTimeHasPassed(appointment) {
+  return Boolean(appointment?.scheduledAt) && new Date(appointment.scheduledAt) < new Date();
+}
+
 function createFollowUpFromPastAppointment() {
   if (!selectedAppointment.value) return;
   const appointment = selectedAppointment.value;
@@ -826,13 +834,17 @@ onMounted(loadData);
           <p><b>Motivo:</b> {{ selectedAppointment.reason }}</p>
           <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
           <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
+          <div v-if="isFutureAppointment(selectedAppointment) && selectedAppointment.status === 'CONFIRMED'" class="future-appointment-notice">
+            <strong>Cita confirmada para una fecha futura</strong>
+            <span>No requiere ninguna acción hasta que el cliente llegue el día de la cita.</span>
+          </div>
           <div v-if="!isPastAppointment(selectedAppointment)" class="detail-actions">
             <button v-if="selectedAppointment.status==='PENDING'" class="small" @click="setStatus(selectedAppointment,'CONFIRMED')">Confirmar</button>
-            <button v-if="!isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">En espera</button>
-            <button v-if="!isGroomingAppointment(selectedAppointment) && ['CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Enviar al doctor</button>
-            <button v-if="isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Iniciar servicio</button>
+            <button v-if="!isFutureAppointment(selectedAppointment) && !isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">Registrar llegada</button>
+            <button v-if="!isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='WAITING'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Enviar al doctor</button>
+            <button v-if="!isFutureAppointment(selectedAppointment) && isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Iniciar servicio</button>
             <button v-if="isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='IN_CONSULTATION'" class="small" @click="setStatus(selectedAppointment,'ATTENDED')">Completar servicio</button>
-            <button v-if="!isGroomingAppointment(selectedAppointment) && ['PENDING','CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="markNoShow(selectedAppointment)">No asistió</button>
+            <button v-if="!isFutureAppointment(selectedAppointment) && appointmentTimeHasPassed(selectedAppointment) && ['PENDING','CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="markNoShow(selectedAppointment)">No asistió</button>
             <button v-if="['PENDING','CONFIRMED','WAITING','IN_CONSULTATION'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
             <button v-if="selectedAppointment.status==='CANCELLED'" class="small" @click="setStatus(selectedAppointment,'PENDING')">Reactivar</button>
           </div>
