@@ -22,10 +22,12 @@ const inventorySearch = ref('');
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
 const cashDate = ref(todayInputDate());
 const cashMovements = ref([]);
+const pendingCharges = ref([]);
 const cashSummary = ref(defaultCashSummary());
 const showCashForm = ref(false);
 const showClosingForm = ref(false);
 const cashForm = ref(defaultCashForm());
+const chargeForm = ref({ appointmentId: '', amount: 0, paymentMethod: 'CASH' });
 const closingForm = ref({ openingAmount: 0, countedAmount: 0, notes: '' });
 
 const cashTypeOptions = [
@@ -170,9 +172,10 @@ function rejectedStatus(result) {
 
 async function loadCash() {
   error.value = '';
-  const [summaryRes, movementsRes] = await Promise.allSettled([
+  const [summaryRes, movementsRes, pendingRes] = await Promise.allSettled([
     api.get(`/cash/summary?date=${cashDate.value}`),
     api.get(`/cash?from=${cashDate.value}&to=${cashDate.value}`),
+    api.get(`/cash/pending?date=${cashDate.value}`),
   ]);
 
   if (summaryRes.status === 'fulfilled') {
@@ -193,8 +196,10 @@ async function loadCash() {
     cashMovements.value = movementsRes.value.data;
   }
 
-  if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected') {
-    const status = rejectedStatus(summaryRes) || rejectedStatus(movementsRes);
+  if (pendingRes.status === 'fulfilled') pendingCharges.value = pendingRes.value.data;
+
+  if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected' || pendingRes.status === 'rejected') {
+    const status = rejectedStatus(summaryRes) || rejectedStatus(movementsRes) || rejectedStatus(pendingRes);
     error.value = status === 401 || status === 403
       ? 'Tu sesion no tiene permisos para Caja. Ingresa otra vez con la cuenta de recepcion o administracion.'
       : 'No se pudo cargar caja. Intenta actualizar la pagina en unos segundos.';
@@ -411,6 +416,59 @@ function formatCashDateTime(value) {
   return new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
 
+function appointmentServiceLabel(appointment) {
+  if (appointment.service?.name) return appointment.service.name;
+  const type = String(appointment.notes || '').match(/SERVICE_TYPE:([A-Z_]+)/)?.[1];
+  return ({ GROOMING: 'Baño y corte', VACCINE: 'Vacuna o desparasitación', SURGERY: 'Cirugía', MEDICAL: 'Consulta médica' })[type] || appointment.reason || 'Atención';
+}
+
+function appointmentCashCategory(appointment) {
+  const text = `${appointment.service?.name || ''} ${appointment.notes || ''} ${appointment.reason || ''}`.toUpperCase();
+  if (text.includes('GROOM') || text.includes('BAÑO') || text.includes('BANO') || text.includes('CORTE')) return 'GROOMING';
+  if (text.includes('VACUN') || text.includes('DESPARASIT')) return 'VACCINE';
+  if (text.includes('CIRUG')) return 'SURGERY';
+  return 'CONSULTATION';
+}
+
+function selectPendingCharge(appointment) {
+  chargeForm.value = {
+    appointmentId: appointment.id,
+    amount: Number(appointment.suggestedAmount || 0),
+    paymentMethod: 'CASH',
+  };
+}
+
+async function collectAppointment(appointment) {
+  if (Number(chargeForm.value.amount) <= 0) {
+    error.value = 'Ingresa el importe que se cobrará por esta atención.';
+    return;
+  }
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post('/cash/movements', {
+      type: 'INCOME',
+      category: appointmentCashCategory(appointment),
+      description: appointmentServiceLabel(appointment),
+      amount: Number(chargeForm.value.amount),
+      paymentMethod: chargeForm.value.paymentMethod,
+      clientId: appointment.clientId,
+      petId: appointment.petId,
+      clientName: appointment.client?.fullName || '',
+      petName: appointment.pet?.name || '',
+      appointmentId: appointment.id,
+    });
+    success.value = `Cobro de ${appointment.pet?.name || 'la atención'} registrado.`;
+    chargeForm.value = { appointmentId: '', amount: 0, paymentMethod: 'CASH' };
+    await loadCash();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo registrar el cobro.';
+  } finally {
+    saving.value = false;
+  }
+}
+
 function formatAdminAppointment(value) {
   if (!value) return '-';
   return new Intl.DateTimeFormat('es-PE', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
@@ -618,6 +676,44 @@ onMounted(async () => {
         </div>
         <button class="secondary small" type="button" @click="showClosingForm = true">Revisar cierre</button>
       </div>
+
+      <section class="pending-charges">
+        <div class="pending-charges-heading">
+          <div>
+            <span class="badge">Por cobrar</span>
+            <h3>Atenciones terminadas</h3>
+            <p class="muted-text">Solo aparecen servicios ya completados que todavía no tienen un cobro.</p>
+          </div>
+          <strong class="pending-count">{{ pendingCharges.length }}</strong>
+        </div>
+
+        <div v-if="pendingCharges.length" class="pending-charge-list">
+          <article v-for="appointment in pendingCharges" :key="appointment.id" class="pending-charge-card">
+            <div class="pending-charge-main">
+              <div class="pet-initial">{{ appointment.pet?.name?.charAt(0) || 'M' }}</div>
+              <div>
+                <strong>{{ appointment.pet?.name || 'Mascota' }}</strong>
+                <span>{{ appointmentServiceLabel(appointment) }}</span>
+                <small>{{ appointment.client?.fullName || 'Cliente' }}</small>
+              </div>
+            </div>
+            <div v-if="chargeForm.appointmentId !== appointment.id" class="pending-charge-action">
+              <strong>{{ appointment.suggestedAmount ? `S/ ${formatMoney(appointment.suggestedAmount)}` : 'Importe pendiente' }}</strong>
+              <button class="small" type="button" @click="selectPendingCharge(appointment)">Cobrar</button>
+            </div>
+            <form v-else class="quick-charge-form" @submit.prevent="collectAppointment(appointment)">
+              <label>Importe<input v-model.number="chargeForm.amount" type="number" min="0.01" step="0.01" required></label>
+              <label>Método<select v-model="chargeForm.paymentMethod"><option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+              <button class="small" :disabled="saving">{{ saving ? 'Guardando...' : 'Confirmar cobro' }}</button>
+              <button class="secondary small" type="button" @click="chargeForm.appointmentId = ''">Cancelar</button>
+            </form>
+          </article>
+        </div>
+        <div v-else class="pending-empty">
+          <strong>Todo está al día</strong>
+          <span>No hay atenciones terminadas pendientes de cobro.</span>
+        </div>
+      </section>
 
       <form v-if="showCashForm" class="cash-form" @submit.prevent="saveCashMovement">
         <label>Tipo
@@ -827,6 +923,107 @@ onMounted(async () => {
   box-shadow: 0 24px 55px rgba(13, 79, 80, 0.11);
 }
 
+.pending-charges {
+  padding: 18px;
+  border: 1px solid rgba(13, 95, 96, 0.13);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.pending-charges-heading,
+.pending-charge-card,
+.pending-charge-main,
+.pending-charge-action,
+.quick-charge-form {
+  display: flex;
+  align-items: center;
+}
+
+.pending-charges-heading,
+.pending-charge-card {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pending-charges-heading h3,
+.pending-charges-heading p {
+  margin: 5px 0 0;
+}
+
+.pending-count {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #e5f5f1;
+  color: #0d6765;
+  font-size: 1.15rem;
+}
+
+.pending-charge-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.pending-charge-card {
+  padding: 13px;
+  border: 1px solid rgba(13, 95, 96, 0.12);
+  border-radius: 17px;
+  background: rgba(246, 252, 250, 0.9);
+}
+
+.pending-charge-main,
+.pending-charge-action,
+.quick-charge-form {
+  gap: 10px;
+}
+
+.pending-charge-main > div:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.pending-charge-main span,
+.pending-charge-main small,
+.pending-empty span {
+  color: #667773;
+}
+
+.pet-initial {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: #176b70;
+  color: #fff;
+  font-weight: 900;
+}
+
+.quick-charge-form label {
+  display: grid;
+  gap: 3px;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.quick-charge-form input,
+.quick-charge-form select {
+  min-width: 120px;
+  padding: 8px 10px;
+}
+
+.pending-empty {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 15px;
+  border-radius: 16px;
+  background: rgba(229, 245, 241, 0.72);
+}
+
 .cash-activity-heading h3,
 .cash-activity-heading p {
   margin: 0;
@@ -943,6 +1140,13 @@ onMounted(async () => {
   .cash-closed-summary,
   .cash-closed-summary > div {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pending-charge-card,
+  .quick-charge-form,
+  .pending-charge-action {
+    align-items: stretch;
     flex-direction: column;
   }
 

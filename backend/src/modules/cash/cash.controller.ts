@@ -24,6 +24,11 @@ export class CashController {
     return this.service.summary(date);
   }
 
+  @Get('pending')
+  pendingAppointments(@Query('date') date?: string) {
+    return this.service.pendingAppointments(date);
+  }
+
   @Get('closings')
   closings() {
     return this.service.findClosings();

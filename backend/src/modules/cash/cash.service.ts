@@ -21,6 +21,28 @@ export class CashService {
     });
   }
 
+  async pendingAppointments(date?: string) {
+    const { start, end } = this.dayRange(date);
+    const appointments = await (this.prisma as any).appointment.findMany({
+      where: {
+        status: 'ATTENDED',
+        scheduledAt: { gte: start, lte: end },
+        cashMovements: { none: { type: { in: ['INCOME', 'DEBT_PAYMENT'] } } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+      include: {
+        client: { select: { id: true, fullName: true, phone: true, email: true } },
+        pet: { select: { id: true, name: true, species: true, breed: true } },
+        service: { select: { id: true, name: true, price: true } },
+      },
+    });
+
+    return appointments.map((appointment: any) => ({
+      ...appointment,
+      suggestedAmount: appointment.service ? Number(appointment.service.price) : null,
+    }));
+  }
+
   async summary(date?: string) {
     const { start, end } = this.dayRange(date);
     const movements = await (this.prisma as any).cashMovement.findMany({
@@ -60,8 +82,19 @@ export class CashService {
     return totals;
   }
 
-  createMovement(dto: CreateCashMovementDto, userId?: string) {
+  async createMovement(dto: CreateCashMovementDto, userId?: string) {
     if (Number(dto.amount) <= 0) throw new BadRequestException('El monto debe ser mayor a cero.');
+
+    if (dto.appointmentId && dto.type !== CashMovementType.EXPENSE) {
+      const existing = await (this.prisma as any).cashMovement.findFirst({
+        where: {
+          appointmentId: dto.appointmentId,
+          type: { in: [CashMovementType.INCOME, CashMovementType.DEBT_PAYMENT] },
+        },
+      });
+      if (existing) throw new BadRequestException('Esta atención ya fue cobrada.');
+    }
+
     return (this.prisma as any).cashMovement.create({
       data: {
         type: dto.type,
