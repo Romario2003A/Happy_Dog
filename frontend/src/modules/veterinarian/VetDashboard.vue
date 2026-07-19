@@ -197,6 +197,14 @@ function returnToPatientActions() {
   activeTask.value = '';
 }
 
+function goBackOneStep() {
+  if (taskChosen.value || activeWorkspace.value === 'history') {
+    returnToPatientActions();
+    return;
+  }
+  returnToPatients();
+}
+
 async function changeAccountPassword() {
   accountError.value = '';
   accountSuccess.value = '';
@@ -866,9 +874,8 @@ onUnmounted(() => {
     </header>
 
     <div v-if="activeWorkspace !== 'agenda'" class="patient-context-bar">
-      <button type="button" class="secondary small" @click="returnToPatients">← Cambiar paciente</button>
+      <button type="button" class="secondary small" @click="goBackOneStep">← Retroceder</button>
       <div><strong>{{ selectedPet?.name }}</strong><span>{{ selectedClient?.fullName || 'Sin propietario registrado' }}</span></div>
-      <button v-if="taskChosen || activeWorkspace === 'history'" type="button" class="secondary small" @click="returnToPatientActions">Cambiar necesidad</button>
     </div>
 
     <div v-show="activeWorkspace === 'agenda'" class="patient-selection-step">
