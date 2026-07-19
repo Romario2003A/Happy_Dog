@@ -53,6 +53,14 @@ async function changeAccountPassword() {
         </div>
         <div class="topbar-actions">
           <slot name="top-actions" />
+          <button
+            v-if="auth.role === 'ADMIN' && accountPath"
+            type="button"
+            class="secondary role-switch-trigger"
+            @click="$router.push(accountPath === '/recepcion/cuenta' ? '/admin' : '/recepcion')"
+          >
+            {{ accountPath === '/recepcion/cuenta' ? 'Administración' : 'Recepción' }}
+          </button>
           <button v-if="!hideUserPill && accountPath" type="button" class="user-pill account-pill" :aria-expanded="accountOpen" @click="accountOpen = true">
             <span>{{ (auth.user?.fullName || 'U').slice(0, 1).toUpperCase() }}</span>
             <div><strong>{{ auth.user?.fullName || 'Usuario' }}</strong><small>Mi cuenta</small></div>
@@ -85,20 +93,6 @@ async function changeAccountPassword() {
           <button :disabled="accountLoading">{{ accountLoading ? 'Guardando...' : 'Guardar nueva contraseña' }}</button>
         </form>
         <div class="account-divider"></div>
-        <div v-if="auth.role === 'ADMIN'" class="role-switch-box">
-          <div>
-            <strong>Cambiar espacio de trabajo</strong>
-            <span>{{ accountPath === '/recepcion/cuenta' ? 'Accede al inventario, caja y control del negocio.' : 'Regresa a la agenda y coordinación diaria.' }}</span>
-          </div>
-          <button
-            type="button"
-            class="secondary full"
-            @click="accountOpen = false; $router.push(accountPath === '/recepcion/cuenta' ? '/admin' : '/recepcion')"
-          >
-            {{ accountPath === '/recepcion/cuenta' ? 'Ir a Administración' : 'Ir a Recepción' }}
-          </button>
-        </div>
-        <div v-if="auth.role === 'ADMIN'" class="account-divider"></div>
         <button type="button" class="danger full" @click="auth.logout(); $router.push('/personal/login')">Cerrar sesión</button>
       </aside>
     </div>
