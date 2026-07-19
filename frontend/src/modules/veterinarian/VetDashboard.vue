@@ -22,6 +22,13 @@ const historySearch = ref('');
 const expandedRecordId = ref(null);
 const patientSearch = ref(null);
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
+const attentionType = ref('CONSULTATION');
+const attentionTypes = [
+  { value: 'CONSULTATION', label: 'Consulta', help: 'Evaluación, diagnóstico y tratamiento' },
+  { value: 'VACCINE', label: 'Vacunación', help: 'Aplicación y próximo control' },
+  { value: 'SURGERY', label: 'Cirugía', help: 'Incluye autorización quirúrgica' },
+  { value: 'FOLLOW_UP', label: 'Control', help: 'Seguimiento o procedimiento médico' },
+];
 const surgeryConsent = reactive({
   ownerDni: '',
   ownerAddress: '',
@@ -74,7 +81,12 @@ const form = ref({
 });
 
 const readyStatuses = ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'];
-const visibleAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status)));
+function isGroomingAppointment(appointment) {
+  const text = `${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
+  return ['baño', 'bano', 'corte', 'grooming', 'peluquer'].some(word => text.includes(word));
+}
+const visibleAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status) && !isGroomingAppointment(a)));
+const groomingAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status) && isGroomingAppointment(a)));
 const pendingAppointments = computed(() => appointments.value
   .filter(a => a.status === 'PENDING')
   .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
@@ -162,6 +174,8 @@ function sexLabel(sex) {
 }
 
 function resetForm(appointment) {
+  const serviceText = `${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
+  attentionType.value = serviceText.includes('vacun') ? 'VACCINE' : serviceText.includes('cirug') || serviceText.includes('esteriliz') || serviceText.includes('castr') ? 'SURGERY' : 'CONSULTATION';
   form.value = {
     reason: appointment?.reason || '',
     weightKg: appointment?.pet?.weightKg ?? null,
@@ -281,6 +295,7 @@ function buildTreatmentText() {
 function buildObservationNotes() {
   const exams = checkedExams();
   return [
+    `Tipo de atención: ${attentionTypes.find(type => type.value === attentionType.value)?.label || 'Consulta'}`,
     form.value.fc && `FC: ${form.value.fc}`,
     form.value.fr && `FR: ${form.value.fr}`,
     form.value.mucosas && `Mucosas: ${form.value.mucosas}`,
@@ -591,8 +606,8 @@ function generateSurgeryConsentPdf() {
 }
 
 async function saveRecord() {
-  if (!selected.value) return;
-  const diagnosis = buildDiagnosisText();
+  if (!selectedPet.value) return;
+  const diagnosis = buildDiagnosisText() || (attentionType.value === 'VACCINE' ? 'Vacunación preventiva' : '');
   if (!diagnosis) {
     error.value = 'Completa al menos un diagnóstico presuntivo o definitivo.';
     return;
@@ -602,7 +617,7 @@ async function saveRecord() {
   success.value = '';
   try {
     await api.post('/medical-records', {
-      appointmentId: selected.value.id,
+      appointmentId: selected.value?.id,
       petId: selected.value.petId,
       veterinarianId: auth.user.id,
       reason: form.value.reason,
@@ -691,6 +706,10 @@ onMounted(loadData);
           <h2>Citas listas para atender</h2>
         </div>
         <p class="muted-text">Recepción envía aquí las citas confirmadas, en espera o en consulta.</p>
+        <div v-if="groomingAppointments.length" class="grooming-note">
+          <strong>{{ groomingAppointments.length }} servicio{{ groomingAppointments.length === 1 ? '' : 's' }} de baño y corte</strong>
+          <span>No requieren historia médica y continúan en el flujo de recepción/peluquería.</span>
+        </div>
         <p v-if="loading" class="muted-text">Cargando citas...</p>
         <div v-else-if="!visibleAppointments.length" class="empty-state">
           <strong>Sin citas por atender ahora</strong>
@@ -775,6 +794,14 @@ onMounted(loadData);
           <span>Selecciona una cita lista o busca un paciente para activar el registro, la receta y el historial.</span>
         </div>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
+          <section class="attention-type-box">
+            <div><span class="badge">Tipo de atención</span><h3>¿Qué necesita hoy?</h3></div>
+            <div class="attention-type-grid">
+              <button v-for="type in attentionTypes" :key="type.value" type="button" :class="{ active: attentionType === type.value }" @click="attentionType = type.value">
+                <strong>{{ type.label }}</strong><small>{{ type.help }}</small>
+              </button>
+            </div>
+          </section>
           <section class="clinical-sheet">
             <div class="sheet-top">
               <div class="sheet-code">FECHA: {{ dateKey() }}</div>
@@ -898,7 +925,7 @@ onMounted(loadData);
             <input v-model="prescription.instructions" placeholder="Indicaciones">
           </section>
 
-          <section class="surgery-consent-box">
+          <section v-if="attentionType === 'SURGERY'" class="surgery-consent-box">
             <div class="prescription-head">
               <div>
                 <h3>Autorizacion de cirugia</h3>
@@ -928,8 +955,8 @@ onMounted(loadData);
             </div>
           </section>
 
-          <button :disabled="!selected || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Selecciona una cita para guardar atención' }}</button>
-          <p v-if="!selected" class="muted-text">Puedes revisar historial y generar receta al buscar un paciente, pero para guardar una atención necesitas una cita seleccionada.</p>
+          <button :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención y cerrar cita' : 'Guardar atención directa' }}</button>
+          <p v-if="!selected" class="direct-care-note">Atención directa: se guardará en el historial sin depender de una cita de recepción.</p>
         </form>
       </section>
 
