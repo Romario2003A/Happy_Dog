@@ -1,10 +1,11 @@
 <script setup>
 import DashboardLayout from './DashboardLayout.vue';
-const props = defineProps({ title:String, subtitle:String });
+defineProps({ title:String, subtitle:String, hideUserPill:Boolean, hideSidebar:Boolean });
 </script>
 <template>
-  <DashboardLayout :title="title" :subtitle="subtitle" shell-class="veterinarian-theme">
+  <DashboardLayout :title="title" :subtitle="subtitle" :hide-user-pill="hideUserPill" :hide-sidebar="hideSidebar" shell-class="veterinarian-theme">
     <template #nav><slot name="nav" /></template>
+    <template #top-actions><slot name="top-actions" /></template>
     <slot />
   </DashboardLayout>
 </template>

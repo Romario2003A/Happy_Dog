@@ -833,9 +833,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <VeterinarianLayout title="Doctor Veterinario" subtitle="Citas, pacientes, historial clínico y receta">
-    <template #nav>
-      <button :class="{ active: accountOpen }" @click="accountOpen = true">Mi cuenta</button>
+  <VeterinarianLayout title="Doctor Veterinario" subtitle="Tu espacio de atención médica" hide-user-pill hide-sidebar>
+    <template #top-actions>
+      <button type="button" class="doctor-account-trigger" :aria-expanded="accountOpen" @click="accountOpen = true">
+        <span>{{ (auth.user?.fullName || 'D').slice(0, 1).toUpperCase() }}</span>
+        <div><strong>{{ auth.user?.fullName || 'Doctor veterinario' }}</strong><small>Mi cuenta</small></div>
+      </button>
     </template>
 
     <div class="doctor-page">
@@ -861,6 +864,8 @@ onUnmounted(() => {
           <p v-if="accountSuccess" class="success">{{ accountSuccess }}</p>
           <button :disabled="accountLoading">{{ accountLoading ? 'Guardando...' : 'Guardar nueva contraseña' }}</button>
         </form>
+        <div class="account-divider"></div>
+        <button type="button" class="danger full" @click="auth.logout(); $router.push('/personal/login')">Cerrar sesión</button>
       </aside>
     </div>
 
