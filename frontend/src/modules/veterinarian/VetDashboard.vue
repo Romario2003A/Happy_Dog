@@ -18,6 +18,7 @@ const error = ref('');
 const success = ref('');
 const activeWorkspace = ref('agenda');
 const consultationTab = ref('evaluation');
+const taskChosen = ref(false);
 const consultationTabs = [
   { value: 'evaluation', label: 'Evaluación', help: 'Motivo y signos' },
   { value: 'diagnosis', label: 'Diagnóstico', help: 'Exámenes y hallazgos' },
@@ -154,6 +155,27 @@ function toggleRecord(recordId) {
   expandedRecordId.value = expandedRecordId.value === recordId ? null : recordId;
 }
 
+function startClinicalTask(task) {
+  selectedDocuments.prescription = false;
+  selectedDocuments.clinicalHistory = false;
+  selectedDocuments.surgeryConsent = false;
+  if (task === 'consultation') {
+    attentionType.value = 'CONSULTATION';
+    consultationTab.value = 'evaluation';
+  } else if (task === 'prescription') {
+    consultationTab.value = 'documents';
+    selectedDocuments.prescription = true;
+  } else if (task === 'history') {
+    consultationTab.value = 'documents';
+    selectedDocuments.clinicalHistory = true;
+  } else if (task === 'surgery') {
+    attentionType.value = 'SURGERY';
+    consultationTab.value = 'documents';
+    selectedDocuments.surgeryConsent = true;
+  }
+  taskChosen.value = true;
+}
+
 async function changeAccountPassword() {
   accountError.value = '';
   accountSuccess.value = '';
@@ -233,6 +255,7 @@ function resetForm(appointment) {
   selectedDocuments.prescription = false;
   selectedDocuments.clinicalHistory = false;
   selectedDocuments.surgeryConsent = false;
+  taskChosen.value = false;
   success.value = '';
   error.value = '';
 }
@@ -840,7 +863,21 @@ onMounted(loadData);
           <strong>Elige primero una mascota</strong>
           <span>Selecciona una cita lista o busca un paciente para activar el registro, la receta y el historial.</span>
         </div>
+        <section v-else-if="!taskChosen" class="clinical-task-launcher">
+          <div class="task-launcher-copy">
+            <span class="badge">Paciente seleccionado</span>
+            <h2>¿Qué necesitas hacer hoy con {{ selectedPet.name }}?</h2>
+            <p>Elige una acción para abrir únicamente las herramientas necesarias.</p>
+          </div>
+          <div class="clinical-task-grid">
+            <button type="button" @click="startClinicalTask('consultation')"><span>01</span><div><strong>Registrar consulta</strong><small>Evaluación, diagnóstico y tratamiento</small></div></button>
+            <button type="button" @click="startClinicalTask('prescription')"><span>02</span><div><strong>Emitir receta</strong><small>Medicamento, dosis e indicaciones</small></div></button>
+            <button type="button" @click="startClinicalTask('history')"><span>03</span><div><strong>Imprimir historia clínica</strong><small>Generar la ficha completa en PDF</small></div></button>
+            <button type="button" @click="startClinicalTask('surgery')"><span>04</span><div><strong>Preparar cirugía</strong><small>Evaluación y autorización quirúrgica</small></div></button>
+          </div>
+        </section>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
+          <div class="current-task-bar"><span>Atención de <strong>{{ selectedPet.name }}</strong></span><button type="button" class="secondary small" @click="taskChosen = false">Cambiar acción</button></div>
           <section class="attention-type-box">
             <label>Tipo de atención
               <select v-model="attentionType"><option v-for="type in attentionTypes" :key="type.value" :value="type.value">{{ type.label }} — {{ type.help }}</option></select>
