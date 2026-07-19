@@ -24,6 +24,7 @@ const consultationTabs = [
   { value: 'plan', label: 'Plan médico', help: 'Tratamiento y control' },
   { value: 'documents', label: 'Documentos', help: 'Receta y formatos' },
 ];
+const selectedDocuments = reactive({ prescription: false, clinicalHistory: false, surgeryConsent: false });
 const accountOpen = ref(false);
 const accountLoading = ref(false);
 const accountError = ref('');
@@ -229,6 +230,9 @@ function resetForm(appointment) {
     nextControlAt: '',
   };
   prescription.value = { productId: '', quantity: 1, dosage: '', instructions: '' };
+  selectedDocuments.prescription = false;
+  selectedDocuments.clinicalHistory = false;
+  selectedDocuments.surgeryConsent = false;
   success.value = '';
   error.value = '';
 }
@@ -297,7 +301,7 @@ async function startConsultation() {
 }
 
 function buildPrescriptions() {
-  if (!prescription.value.productId) return [];
+  if (!selectedDocuments.prescription || !prescription.value.productId) return [];
   return [{
     productId: prescription.value.productId,
     quantity: Number(prescription.value.quantity || 1),
@@ -688,6 +692,10 @@ watch(selectedClient, (client) => {
   surgeryConsent.ownerDni = client?.dni || '';
 });
 
+watch(attentionType, (type) => {
+  if (type !== 'SURGERY') selectedDocuments.surgeryConsent = false;
+});
+
 onMounted(loadData);
 </script>
 
@@ -849,7 +857,6 @@ onMounted(loadData);
             <span class="badge">Nueva atención</span>
             <h2 class="medical-title">{{ selectedPet ? 'Registro médico' : 'Iniciar registro médico' }}</h2>
           </div>
-          <button v-if="selectedPet" type="button" class="secondary small" @click="generateClinicalHistoryPdf">Generar historia clínica PDF</button>
         </div>
         <div v-if="!selectedPet" class="empty-state medical-empty">
           <strong>Elige primero una mascota</strong>
@@ -980,7 +987,27 @@ onMounted(loadData);
           </section>
 
           <div v-show="consultationTab === 'documents'" class="document-step">
-          <section class="prescription-box">
+          <section class="document-picker">
+            <div><span class="badge">Opcional</span><h3>¿Qué documento necesita esta atención?</h3><p class="muted-text">Selecciona únicamente los documentos que vas a preparar.</p></div>
+            <div class="document-picker-grid">
+              <button type="button" :class="{ active: selectedDocuments.prescription }" @click="selectedDocuments.prescription = !selectedDocuments.prescription">
+                <span>Rx</span><div><strong>Receta médica</strong><small>Medicamento, dosis e indicaciones</small></div>
+              </button>
+              <button type="button" :class="{ active: selectedDocuments.clinicalHistory }" @click="selectedDocuments.clinicalHistory = !selectedDocuments.clinicalHistory">
+                <span>HC</span><div><strong>Historia clínica PDF</strong><small>Ficha completa para imprimir</small></div>
+              </button>
+              <button v-if="attentionType === 'SURGERY'" type="button" :class="{ active: selectedDocuments.surgeryConsent }" @click="selectedDocuments.surgeryConsent = !selectedDocuments.surgeryConsent">
+                <span>CX</span><div><strong>Autorización quirúrgica</strong><small>Documento de consentimiento</small></div>
+              </button>
+            </div>
+          </section>
+
+          <section v-if="selectedDocuments.clinicalHistory" class="selected-document-card">
+            <div><h3>Historia clínica PDF</h3><p class="muted-text">Genera la ficha con la información registrada en esta atención.</p></div>
+            <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar PDF</button>
+          </section>
+
+          <section v-if="selectedDocuments.prescription" class="prescription-box">
             <div class="prescription-head">
               <div>
                 <h3>Receta / inventario</h3>
@@ -999,7 +1026,7 @@ onMounted(loadData);
             <input v-model="prescription.instructions" placeholder="Indicaciones">
           </section>
 
-          <section v-if="attentionType === 'SURGERY'" class="surgery-consent-box">
+          <section v-if="attentionType === 'SURGERY' && selectedDocuments.surgeryConsent" class="surgery-consent-box">
             <div class="prescription-head">
               <div>
                 <h3>Autorizacion de cirugia</h3>
