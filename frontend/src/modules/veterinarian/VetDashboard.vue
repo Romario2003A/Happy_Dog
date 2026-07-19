@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import VeterinarianLayout from '../../layouts/VeterinarianLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
@@ -17,6 +17,8 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 const success = ref('');
+let automaticRefreshId = null;
+let refreshInProgress = false;
 const activeWorkspace = ref('agenda');
 const consultationTab = ref('evaluation');
 const taskChosen = ref(false);
@@ -263,9 +265,13 @@ function resetForm(appointment) {
   error.value = '';
 }
 
-async function loadData() {
-  loading.value = true;
-  error.value = '';
+async function loadData({ background = false } = {}) {
+  if (refreshInProgress) return;
+  refreshInProgress = true;
+  if (!background) {
+    loading.value = true;
+    error.value = '';
+  }
   try {
     const [appointmentsRes, productsRes, petsRes] = await Promise.all([
       api.get('/appointments'),
@@ -275,11 +281,20 @@ async function loadData() {
     appointments.value = appointmentsRes.data;
     products.value = productsRes.data.filter(p => p.active !== false);
     pets.value = petsRes.data;
+    if (selected.value?.id) {
+      const updatedSelection = appointments.value.find(appointment => appointment.id === selected.value.id);
+      if (updatedSelection) selected.value = updatedSelection;
+    }
   } catch (e) {
-    error.value = 'No se pudieron cargar las citas del doctor.';
+    if (!background) error.value = 'No se pudieron cargar las citas del doctor.';
   } finally {
-    loading.value = false;
+    refreshInProgress = false;
+    if (!background) loading.value = false;
   }
+}
+
+function refreshWhenVisible() {
+  if (document.visibilityState === 'visible') loadData({ background: true });
 }
 
 async function selectAppointment(appointment) {
@@ -760,13 +775,23 @@ watch(attentionType, (type) => {
   if (type !== 'SURGERY') selectedDocuments.surgeryConsent = false;
 });
 
-onMounted(loadData);
+onMounted(() => {
+  loadData();
+  automaticRefreshId = window.setInterval(refreshWhenVisible, 10000);
+  document.addEventListener('visibilitychange', refreshWhenVisible);
+  window.addEventListener('focus', refreshWhenVisible);
+});
+
+onUnmounted(() => {
+  if (automaticRefreshId) window.clearInterval(automaticRefreshId);
+  document.removeEventListener('visibilitychange', refreshWhenVisible);
+  window.removeEventListener('focus', refreshWhenVisible);
+});
 </script>
 
 <template>
   <VeterinarianLayout title="Doctor Veterinario" subtitle="Citas, pacientes, historial clínico y receta">
     <template #nav>
-      <button @click="loadData">Actualizar</button>
       <button :class="{ active: accountOpen }" @click="accountOpen = true">Mi cuenta</button>
     </template>
 
