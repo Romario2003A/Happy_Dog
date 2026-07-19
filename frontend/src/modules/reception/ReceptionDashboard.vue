@@ -49,6 +49,7 @@ function toIsoDateTime(value) {
 
 const selectedDate = ref(dateKey());
 const quick = ref({
+  serviceType: 'MEDICAL',
   clientId: '',
   petId: '',
   fullName: '',
@@ -251,6 +252,25 @@ function statusLabel(status) {
   return labels[status] || status;
 }
 
+function appointmentType(appointment) {
+  const text = `${appointment?.notes || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
+  if (text.includes('service_type:grooming') || ['baño', 'bano', 'corte', 'grooming', 'peluquer'].some(word => text.includes(word))) return 'GROOMING';
+  if (text.includes('service_type:vaccine') || text.includes('vacun') || text.includes('desparasit')) return 'VACCINE';
+  if (text.includes('service_type:surgery') || ['cirug', 'esteriliz', 'castr'].some(word => text.includes(word))) return 'SURGERY';
+  return 'MEDICAL';
+}
+
+function isGroomingAppointment(appointment) {
+  return appointmentType(appointment) === 'GROOMING';
+}
+
+function appointmentStatusLabel(appointment) {
+  if (appointment?.notes?.includes('OUTCOME:NO_SHOW')) return 'No asistió';
+  if (isGroomingAppointment(appointment) && appointment?.status === 'IN_CONSULTATION') return 'En servicio';
+  if (isGroomingAppointment(appointment) && appointment?.status === 'ATTENDED') return 'Completada';
+  return statusLabel(appointment?.status);
+}
+
 function isPastAppointment(appointment) {
   return Boolean(appointment?.scheduledAt) && dateKey(appointment.scheduledAt) < dateKey();
 }
@@ -258,6 +278,7 @@ function isPastAppointment(appointment) {
 function createFollowUpFromPastAppointment() {
   if (!selectedAppointment.value) return;
   const appointment = selectedAppointment.value;
+  quick.value.serviceType = appointmentType(appointment);
   quickMode.value = 'existing';
   quick.value.clientId = appointment.clientId || appointment.client?.id || '';
   quick.value.petId = appointment.petId || appointment.pet?.id || '';
@@ -267,6 +288,20 @@ function createFollowUpFromPastAppointment() {
   agendaView.value = 'day';
   selectedAppointment.value = null;
   showQuick.value = true;
+}
+
+async function markNoShow(appointment) {
+  error.value = '';
+  success.value = '';
+  try {
+    const notes = [appointment.notes, 'OUTCOME:NO_SHOW'].filter(Boolean).join('\n');
+    const { data } = await api.patch(`/appointments/${appointment.id}`, { status: 'CANCELLED', notes });
+    appointments.value = appointments.value.map(item => item.id === appointment.id ? data : item);
+    selectedAppointment.value = data;
+    success.value = 'La cita fue cerrada como no asistió.';
+  } catch (e) {
+    error.value = 'No se pudo cerrar la cita como no asistió.';
+  }
 }
 
 function cardStatusLabel(status) {
@@ -507,7 +542,7 @@ async function uploadPetPhoto(petId, event) {
 }
 
 function resetQuick() {
-  quick.value = { clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
+  quick.value = { serviceType: 'MEDICAL', clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
   duplicateOverride.value = false;
 }
 
@@ -562,6 +597,7 @@ async function saveQuickAppointment() {
       petId,
       scheduledAt: toIsoDateTime(quick.value.scheduledAt),
       reason: quick.value.reason.trim(),
+      notes: `SERVICE_TYPE:${quick.value.serviceType}`,
     });
     success.value = 'Cita creada desde recepción correctamente.';
     resetQuick();
@@ -636,7 +672,7 @@ onMounted(loadData);
                   <span>{{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
                 </div>
                 <div class="event-actions">
-                  <span class="status">{{ statusLabel(item.status) }}</span>
+                  <span class="status">{{ appointmentStatusLabel(item) }}</span>
                   <button class="small secondary" @click.stop="selectAppointment(item)">Ver</button>
                 </div>
               </article>
@@ -656,7 +692,7 @@ onMounted(loadData);
               <button v-for="item in day.items" :key="item.id" class="week-event" type="button" @click="selectAppointment(item)">
                 <strong>{{ formatTime(item.scheduledAt) }} - {{ item.pet?.name || 'Mascota' }}</strong>
                 <span>{{ item.client?.fullName || 'Cliente' }}</span>
-                <small>{{ statusLabel(item.status) }}</small>
+                <small>{{ appointmentStatusLabel(item) }}</small>
               </button>
               <span v-if="!day.items.length" class="empty-slot">Sin citas</span>
             </div>
@@ -670,7 +706,7 @@ onMounted(loadData);
               <span>{{ item.pet?.name || 'Mascota' }} · {{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
             </div>
             <div class="event-actions">
-              <span class="status">{{ statusLabel(item.status) }}</span>
+              <span class="status">{{ appointmentStatusLabel(item) }}</span>
               <button class="small secondary" @click.stop="selectAppointment(item)">Ver</button>
             </div>
           </article>
@@ -704,13 +740,21 @@ onMounted(loadData);
             @click="selectAppointment(item); agendaView='upcoming'"
           >
             <strong>{{ formatDate(item.scheduledAt) }} · {{ formatTime(item.scheduledAt) }}</strong>
-            <span>{{ item.pet?.name || 'Mascota' }} - {{ statusLabel(item.status) }}</span>
+            <span>{{ item.pet?.name || 'Mascota' }} - {{ appointmentStatusLabel(item) }}</span>
           </button>
           <button v-if="acceptedAppointments.length > 4" class="secondary small full" type="button" @click="agendaView='upcoming'">Ver todas</button>
           <p v-if="!acceptedAppointments.length" class="muted-text">Cuando confirmes una cita, aparecerá aquí como aceptada.</p>
         </div>
 
         <form v-if="showQuick" class="stack quick-form" @submit.prevent="saveQuickAppointment">
+          <label>¿Qué atención necesita?
+            <select v-model="quick.serviceType" required>
+              <option value="MEDICAL">Consulta médica</option>
+              <option value="VACCINE">Vacuna o desparasitación</option>
+              <option value="GROOMING">Baño o corte</option>
+              <option value="SURGERY">Cirugía</option>
+            </select>
+          </label>
           <div class="segmented">
             <button type="button" :class="{active:quickMode==='new'}" @click="quickMode='new'">Registrar cliente nuevo</button>
             <button type="button" :class="{active:quickMode==='existing'}" @click="quickMode='existing'">Agendar cliente existente</button>
@@ -762,7 +806,7 @@ onMounted(loadData);
               @click="useExistingAppointment(item)"
             >
               <strong>{{ formatDate(item.scheduledAt) }} · {{ formatTime(item.scheduledAt) }}</strong>
-              <span>{{ item.pet?.name || 'Mascota' }} - {{ item.client?.fullName || 'Cliente' }} - {{ statusLabel(item.status) }}</span>
+              <span>{{ item.pet?.name || 'Mascota' }} - {{ item.client?.fullName || 'Cliente' }} - {{ appointmentStatusLabel(item) }}</span>
             </button>
             <button class="small secondary" type="button" :disabled="saving" @click="saveIgnoringDuplicate">Crear de todos modos</button>
           </div>
@@ -780,14 +824,19 @@ onMounted(loadData);
           <p><b>Contacto:</b> {{ selectedAppointment.client?.phone || selectedAppointment.client?.email || '-' }}</p>
           <p><b>Hora:</b> {{ formatTime(selectedAppointment.scheduledAt) }}</p>
           <p><b>Motivo:</b> {{ selectedAppointment.reason }}</p>
-          <p><b>Estado:</b> {{ statusLabel(selectedAppointment.status) }}</p>
+          <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
+          <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
           <div v-if="!isPastAppointment(selectedAppointment)" class="detail-actions">
             <button v-if="selectedAppointment.status==='PENDING'" class="small" @click="setStatus(selectedAppointment,'CONFIRMED')">Confirmar</button>
-            <button v-if="selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">En espera</button>
-            <button v-if="['CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">En consulta</button>
+            <button v-if="!isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">En espera</button>
+            <button v-if="!isGroomingAppointment(selectedAppointment) && ['CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Enviar al doctor</button>
+            <button v-if="isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Iniciar servicio</button>
+            <button v-if="isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='IN_CONSULTATION'" class="small" @click="setStatus(selectedAppointment,'ATTENDED')">Completar servicio</button>
+            <button v-if="!isGroomingAppointment(selectedAppointment) && ['PENDING','CONFIRMED','WAITING'].includes(selectedAppointment.status)" class="small secondary" @click="markNoShow(selectedAppointment)">No asistió</button>
             <button v-if="['PENDING','CONFIRMED','WAITING','IN_CONSULTATION'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
             <button v-if="selectedAppointment.status==='CANCELLED'" class="small" @click="setStatus(selectedAppointment,'PENDING')">Reactivar</button>
           </div>
+          <button v-else-if="!selectedAppointment.notes?.includes('OUTCOME:NO_SHOW') && !['ATTENDED','CANCELLED'].includes(selectedAppointment.status)" type="button" class="secondary full" @click="markNoShow(selectedAppointment)">Cerrar como no asistió</button>
           <button v-else-if="['ATTENDED','CANCELLED'].includes(selectedAppointment.status)" type="button" class="secondary full" @click="createFollowUpFromPastAppointment">Agendar nueva cita</button>
         </div>
       </section>

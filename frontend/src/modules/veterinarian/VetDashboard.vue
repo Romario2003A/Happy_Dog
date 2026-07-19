@@ -101,7 +101,7 @@ const form = ref({
 
 const readyStatuses = ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'];
 function isGroomingAppointment(appointment) {
-  const text = `${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
+  const text = `${appointment?.notes || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
   return ['baño', 'bano', 'corte', 'grooming', 'peluquer'].some(word => text.includes(word));
 }
 const visibleAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status) && !isGroomingAppointment(a)));
