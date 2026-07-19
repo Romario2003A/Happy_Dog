@@ -47,9 +47,12 @@ async function changeAccountPassword() {
     </aside>
     <main class="dashboard-main">
       <header class="topbar glass-panel">
-        <div>
-          <h1>{{ title }}</h1>
-          <p>{{ subtitle }}</p>
+        <div class="topbar-brand-block">
+          <img v-if="hideSidebar" :src="happyDogLogo" alt="Happy Dog">
+          <div>
+            <h1>{{ title }}</h1>
+            <p>{{ subtitle }}</p>
+          </div>
         </div>
         <div class="topbar-actions">
           <slot name="top-actions" />
