@@ -772,9 +772,9 @@ onMounted(loadData);
         <div v-if="selectedAppointment" class="detail-box">
           <span class="badge">Detalle</span>
           <h3>{{ selectedAppointment.pet?.name || 'Mascota' }}</h3>
-          <div v-if="isPastAppointment(selectedAppointment)" class="past-appointment-notice">
-            <strong>Cita pasada</strong>
-            <span>Este registro es solo de consulta y ya no puede cambiar de estado.</span>
+          <div v-if="isPastAppointment(selectedAppointment)" class="past-appointment-notice" :class="{ warning: !['ATTENDED','CANCELLED'].includes(selectedAppointment.status) }">
+            <strong>{{ ['ATTENDED','CANCELLED'].includes(selectedAppointment.status) ? 'Cita pasada' : 'Cita pasada sin cierre' }}</strong>
+            <span>{{ ['ATTENDED','CANCELLED'].includes(selectedAppointment.status) ? 'Este registro es solo de consulta y ya no puede cambiar de estado.' : `Esta cita todavía figura como ${statusLabel(selectedAppointment.status).toLowerCase()}. No se debe crear otra hasta resolver su estado.` }}</span>
           </div>
           <p><b>Cliente:</b> {{ selectedAppointment.client?.fullName || '-' }}</p>
           <p><b>Contacto:</b> {{ selectedAppointment.client?.phone || selectedAppointment.client?.email || '-' }}</p>
@@ -788,7 +788,7 @@ onMounted(loadData);
             <button v-if="['PENDING','CONFIRMED','WAITING','IN_CONSULTATION'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
             <button v-if="selectedAppointment.status==='CANCELLED'" class="small" @click="setStatus(selectedAppointment,'PENDING')">Reactivar</button>
           </div>
-          <button v-else type="button" class="secondary full" @click="createFollowUpFromPastAppointment">Agendar nueva cita</button>
+          <button v-else-if="['ATTENDED','CANCELLED'].includes(selectedAppointment.status)" type="button" class="secondary full" @click="createFollowUpFromPastAppointment">Agendar nueva cita</button>
         </div>
       </section>
     </div>
