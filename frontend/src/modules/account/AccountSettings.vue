@@ -87,6 +87,11 @@ async function submit() {
         <p v-if="success" class="success">{{ success }}</p>
         <button :disabled="loading">{{ loading ? 'Guardando...' : 'Guardar nueva contraseña' }}</button>
       </form>
+      <div class="account-divider"></div>
+      <div class="account-session-row">
+        <div><strong>Sesión actual</strong><span>Sal de forma segura cuando termines tu jornada.</span></div>
+        <button type="button" class="danger" @click="auth.logout(); router.push('/personal/login')">Cerrar sesión</button>
+      </div>
     </section>
 
     <section v-if="isAdmin && receptionContext" class="glass-card account-admin-tools">
