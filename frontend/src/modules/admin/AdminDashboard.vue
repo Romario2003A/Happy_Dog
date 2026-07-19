@@ -441,11 +441,10 @@ onMounted(async () => {
 <template>
   <AdminLayout title="Administración" subtitle="Control del negocio, inventario, caja y reportes" hide-user-pill>
     <template #nav>
-      <button @click="setActive('resumen')">Resumen</button>
-      <button @click="openInventory">Inventario</button>
-      <button @click="setActive('clientes')">Clientes</button>
-      <button @click="setActive('caja')">Caja</button>
-      <button @click="$router.push('/admin/cuenta')">Mi cuenta</button>
+      <button :class="{ active: active === 'resumen' }" @click="setActive('resumen')">Resumen</button>
+      <button :class="{ active: active === 'inventario' }" @click="openInventory">Inventario</button>
+      <button :class="{ active: active === 'clientes' }" @click="setActive('clientes')">Clientes</button>
+      <button :class="{ active: active === 'caja' }" @click="setActive('caja')">Caja</button>
     </template>
 
     <template #top-actions>
@@ -461,14 +460,6 @@ onMounted(async () => {
 
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
-
-    <div class="admin-hero glass-card">
-      <div>
-        <span class="badge">Panel administrativo</span>
-        <h2>Control general de Happy Dog</h2>
-        <p class="muted-text">Administra inventario, clientes y reportes sin mezclarlo con la agenda diaria.</p>
-      </div>
-    </div>
 
     <div v-if="active==='resumen'" class="cards">
       <div class="glass-card metric"><span>Clientes</span><strong>{{ adminStats.clients }}</strong></div>

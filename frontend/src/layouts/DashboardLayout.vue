@@ -2,7 +2,7 @@
 import { useAuthStore } from '../stores/auth';
 import happyDogLogo from '../assets/images/happy-dog-logo.jpeg';
 
-defineProps({ title: String, subtitle: String, hideUserPill: Boolean, hideSidebar: Boolean, shellClass: String });
+defineProps({ title: String, subtitle: String, hideUserPill: Boolean, hideSidebar: Boolean, accountPath: String, shellClass: String });
 
 const auth = useAuthStore();
 </script>
@@ -25,9 +25,14 @@ const auth = useAuthStore();
         </div>
         <div class="topbar-actions">
           <slot name="top-actions" />
-          <div v-if="!hideUserPill" class="user-pill">{{ auth.user?.fullName || 'Usuario' }}</div>
+          <button v-if="!hideUserPill && accountPath" type="button" class="user-pill account-pill" @click="$router.push(accountPath)">
+            <span>{{ (auth.user?.fullName || 'U').slice(0, 1).toUpperCase() }}</span>
+            <div><strong>{{ auth.user?.fullName || 'Usuario' }}</strong><small>Mi cuenta</small></div>
+          </button>
+          <div v-else-if="!hideUserPill" class="user-pill">{{ auth.user?.fullName || 'Usuario' }}</div>
         </div>
       </header>
+      <nav v-if="hideSidebar && $slots.nav" class="calm-section-nav"><slot name="nav" /></nav>
       <slot />
     </main>
   </div>

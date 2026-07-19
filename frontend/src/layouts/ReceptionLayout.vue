@@ -1,9 +1,9 @@
 <script setup>
 import DashboardLayout from './DashboardLayout.vue';
-const props = defineProps({ title:String, subtitle:String, hideUserPill:Boolean });
+defineProps({ title:String, subtitle:String, hideUserPill:Boolean });
 </script>
 <template>
-  <DashboardLayout :title="title" :subtitle="subtitle" :hide-user-pill="hideUserPill">
+  <DashboardLayout :title="title" :subtitle="subtitle" hide-sidebar account-path="/recepcion/cuenta" shell-class="calm-workspace-theme reception-calm-theme">
     <template #nav><slot name="nav" /></template>
     <template #top-actions><slot name="top-actions" /></template>
     <slot />
