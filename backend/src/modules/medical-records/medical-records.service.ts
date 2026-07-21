@@ -2,40 +2,121 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { AppointmentStatus, MovementType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateMedicalRecordDto } from './dto/create-medical-record.dto';
+
 @Injectable()
 export class MedicalRecordsService {
   constructor(private prisma: PrismaService) {}
-  findAll(){ return this.prisma.medicalRecord.findMany({ include:{ pet:{include:{client:true}}, veterinarian:true, prescriptions:{include:{product:true}}, files:true }, orderBy:{visitDate:'desc'} }); }
-  findByPet(petId:string){ return this.prisma.medicalRecord.findMany({ where:{petId}, include:{veterinarian:true, prescriptions:{include:{product:true}}, files:true}, orderBy:{visitDate:'desc'} }); }
-  async create(dto:CreateMedicalRecordDto){
-    return this.prisma.$transaction(async tx => {
+
+  findAll() {
+    return this.prisma.medicalRecord.findMany({
+      include: { pet: { include: { client: true } }, veterinarian: true, prescriptions: { include: { product: true } }, files: true },
+      orderBy: { visitDate: 'desc' },
+    });
+  }
+
+  findByPet(petId: string) {
+    return this.prisma.medicalRecord.findMany({
+      where: { petId },
+      include: { veterinarian: true, prescriptions: { include: { product: true } }, files: true },
+      orderBy: { visitDate: 'desc' },
+    });
+  }
+
+  async create(dto: CreateMedicalRecordDto) {
+    return this.prisma.$transaction(async (tx) => {
       let appointmentId = dto.appointmentId;
       if (!appointmentId) {
-        const pet = await tx.pet.findUnique({ where:{ id:dto.petId }, select:{ clientId:true } });
+        const pet = await tx.pet.findUnique({ where: { id: dto.petId }, select: { clientId: true } });
         if (!pet) throw new BadRequestException('Paciente no encontrado');
         const directAppointment = await tx.appointment.create({
-          data:{
-            scheduledAt:new Date(), reason:dto.reason, status:AppointmentStatus.ATTENDED,
-            clientId:pet.clientId, petId:dto.petId, veterinarianId:dto.veterinarianId,
-            notes:'Atención directa registrada por el veterinario',
+          data: {
+            scheduledAt: new Date(),
+            reason: dto.reason,
+            status: AppointmentStatus.ATTENDED,
+            clientId: pet.clientId,
+            petId: dto.petId,
+            veterinarianId: dto.veterinarianId,
+            notes: 'Atención directa registrada por el veterinario',
           },
         });
         appointmentId = directAppointment.id;
       }
+
+      // --- Pre-check: validate stock before creating any record ---
       for (const item of dto.prescriptions ?? []) {
-        const product = await tx.product.findUnique({ where:{ id:item.productId } });
-        if (!product) throw new BadRequestException('Producto no encontrado');
-        if (product.stock < item.quantity) throw new BadRequestException(`Stock insuficiente: ${product.name}`);
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!product) throw new BadRequestException('Producto no encontrado.');
+        if (product.stock <= 0) throw new BadRequestException(`Sin stock: ${product.name}.`);
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Stock insuficiente: ${product.name} (disponible: ${product.stock}, solicitado: ${item.quantity}).`,
+          );
+        }
       }
-      const record = await tx.medicalRecord.create({ data:{ appointmentId, petId:dto.petId, veterinarianId:dto.veterinarianId, reason:dto.reason, weightKg:dto.weightKg, temperatureC:dto.temperatureC, diagnosis:dto.diagnosis, treatment:dto.treatment, observations:dto.observations, nextControlAt:dto.nextControlAt ? new Date(dto.nextControlAt) : undefined, prescriptions:{ create:(dto.prescriptions ?? []).map(i=>({productId:i.productId, quantity:i.quantity, dosage:i.dosage, instructions:i.instructions})) } }, include:{ prescriptions:true } });
+
+      // --- Create medical record ---
+      const record = await tx.medicalRecord.create({
+        data: {
+          appointmentId,
+          petId: dto.petId,
+          veterinarianId: dto.veterinarianId,
+          reason: dto.reason,
+          weightKg: dto.weightKg,
+          temperatureC: dto.temperatureC,
+          diagnosis: dto.diagnosis,
+          treatment: dto.treatment,
+          observations: dto.observations,
+          nextControlAt: dto.nextControlAt ? new Date(dto.nextControlAt) : undefined,
+          prescriptions: {
+            create: (dto.prescriptions ?? []).map((i) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+              dosage: i.dosage,
+              instructions: i.instructions,
+            })),
+          },
+        },
+        include: { prescriptions: true },
+      });
+
+      // --- Update pet weight if provided ---
       if (dto.weightKg !== undefined) {
-        await tx.pet.update({ where:{ id:dto.petId }, data:{ weightKg:dto.weightKg } });
+        await tx.pet.update({ where: { id: dto.petId }, data: { weightKg: dto.weightKg } });
       }
+
+      // --- Atomic stock decrement ---
       for (const item of dto.prescriptions ?? []) {
-        await tx.product.update({ where:{ id:item.productId }, data:{ stock:{ decrement:item.quantity } } });
-        await tx.inventoryMovement.create({ data:{ productId:item.productId, type:MovementType.PRESCRIPTION, quantity:-item.quantity, reason:'Receta médica', referenceId:record.id } });
+        const updated = await tx.product.updateMany({
+          where: { id: item.productId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        });
+
+        if (updated.count === 0) {
+          throw new BadRequestException(
+            `Stock insuficiente al intentar descontar "${item.productId}". ` +
+            `Otro proceso redujo el stock disponible. Revisa el inventario e intenta nuevamente.`,
+          );
+        }
+
+        await tx.inventoryMovement.create({
+          data: {
+            productId: item.productId,
+            type: MovementType.PRESCRIPTION,
+            quantity: -item.quantity,
+            reason: 'Receta médica',
+            referenceId: record.id,
+          },
+        });
       }
-      if (dto.appointmentId) await tx.appointment.update({ where:{ id:dto.appointmentId }, data:{ status: AppointmentStatus.ATTENDED } });
+
+      // --- Mark appointment as attended if explicit appointmentId was provided ---
+      if (dto.appointmentId) {
+        await tx.appointment.update({
+          where: { id: dto.appointmentId },
+          data: { status: AppointmentStatus.ATTENDED },
+        });
+      }
+
       return record;
     });
   }
