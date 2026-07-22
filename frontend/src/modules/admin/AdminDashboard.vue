@@ -13,6 +13,7 @@ const staff = ref([]);
 const clients = ref([]);
 const appointments = ref([]);
 const pets = ref([]);
+const preventiveFollowUps = ref([]);
 const adminTabs = ['resumen', 'servicios', 'inventario', 'clientes', 'caja', 'personal'];
 const active = ref(tabFromRoute());
 const error = ref('');
@@ -304,7 +305,7 @@ async function payReceivable(receivable) {
 
 async function loadData() {
   error.value = '';
-  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes] = await Promise.allSettled([
+  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes, followUpsRes] = await Promise.allSettled([
     api.get('/reports/summary'),
     api.get('/inventory'),
     api.get('/clients'),
@@ -312,7 +313,9 @@ async function loadData() {
     api.get('/pets'),
     api.get('/services'),
     api.get('/users'),
+    api.get('/preventive-care/follow-ups'),
   ]);
+  preventiveFollowUps.value = followUpsRes.status === 'fulfilled' ? followUpsRes.value.data : [];
 
   if (inventoryRes.status === 'fulfilled') inventory.value = inventoryRes.value.data;
   if (clientsRes.status === 'fulfilled') clients.value = clientsRes.value.data;
@@ -1143,6 +1146,14 @@ onMounted(async () => {
             <label>Método del adelanto<select v-model="receivableForm.paymentMethod" :disabled="!receivableForm.initialPayment"><option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
             <label class="wide">Nota opcional<input v-model="receivableForm.notes" placeholder="Fecha prometida, responsable o detalle"></label>
           </div>
+          <div class="preventive-followups">
+            <strong>Seguimientos preventivos</strong>
+            <span v-if="!preventiveFollowUps.length">Sin vacunas, desparasitaciones o recomendaciones pendientes en los próximos 30 días.</span>
+            <article v-for="item in preventiveFollowUps.slice(0, 5)" :key="item.id">
+              <div><b>{{ item.pet?.name || 'Mascota' }}</b><small>{{ item.pet?.client?.fullName || 'Cliente' }}</small></div>
+              <span>{{ item.nextAppointmentAt ? formatAdminAppointment(item.nextAppointmentAt) : 'Conversar sobre esterilización' }}</span>
+            </article>
+          </div>
           <div class="receivable-preview"><span>Quedará pendiente</span><strong>S/ {{ formatMoney(Math.max(0, Number(receivableForm.total || 0) - Number(receivableForm.initialPayment || 0))) }}</strong></div>
           <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar cuenta por cobrar' }}</button>
         </form>
@@ -1303,6 +1314,11 @@ onMounted(async () => {
 }
 
 .cash-category-summary { display: grid; grid-template-columns: minmax(220px,.7fr) 1.5fr; gap: 18px; align-items: center; padding: 17px; border: 1px solid rgba(13,95,96,.12); border-radius: 20px; background: rgba(255,255,255,.7); }
+.preventive-followups { grid-column: 1 / -1; display: grid; gap: 8px; padding: 14px; border: 1px solid rgba(13,95,96,.12); border-radius: 16px; background: rgba(236,248,245,.7); }
+.preventive-followups > span { color: #60716d; }
+.preventive-followups article { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding-top: 8px; border-top: 1px solid rgba(13,95,96,.1); }
+.preventive-followups article div { display: grid; }
+.preventive-followups small { color: #6d7b78; }
 .cash-category-summary h3,.cash-category-summary p { margin: 5px 0 0; }
 .cash-category-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 8px; }
 .cash-category-grid span { display: grid; gap: 3px; padding: 11px; border-radius: 14px; background: #e7f5f1; }

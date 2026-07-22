@@ -8,6 +8,7 @@ import { PreventiveCareService } from './preventive-care.service';
 @UseGuards(JwtAuthGuard,RolesGuard) @Controller('preventive-care')
 export class PreventiveCareController {
   constructor(private service:PreventiveCareService){}
+  @Roles(Role.ADMIN,Role.VETERINARIAN,Role.RECEPTIONIST) @Get('follow-ups') followUps(){return this.service.findFollowUps()}
   @Roles(Role.ADMIN,Role.VETERINARIAN,Role.RECEPTIONIST) @Get('pet/:petId') byPet(@Param('petId') petId:string){return this.service.findByPet(petId)}
   @Roles(Role.ADMIN,Role.VETERINARIAN) @Post() create(@Body() dto:CreatePreventiveCareDto){return this.service.create(dto)}
   @Roles(Role.ADMIN,Role.VETERINARIAN) @Delete(':id') remove(@Param('id') id:string){return this.service.remove(id)}
