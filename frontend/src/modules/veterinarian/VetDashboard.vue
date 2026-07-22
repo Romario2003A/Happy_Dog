@@ -29,7 +29,7 @@ const consultationTabs = [
   { value: 'plan', label: 'Plan médico', help: 'Tratamiento y control' },
 ];
 const selectedDocuments = reactive({ prescription: false, clinicalHistory: false, surgeryConsent: false });
-const preventiveForm = reactive({ type:'DEWORMING', appliedAt:dateKey(), productName:'', weightKg:null, nextAppointmentAt:'', notes:'' });
+const preventiveForm = reactive({ type:'DEWORMING', appliedAt:dateKey(), productName:'', nextProductName:'', weightKg:null, amountCharged:null, nextAppointmentAt:'', sterilizationRecommended:false, notes:'' });
 const preventiveSaving = ref(false);
 const accountOpen = ref(false);
 const accountLoading = ref(false);
@@ -231,6 +231,10 @@ function formatShortDate(value = new Date()) {
   return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value));
 }
 
+function formatPrice(value) {
+  return Number(value || 0).toFixed(2);
+}
+
 function greeting() {
   const hour = new Date().getHours();
   if (hour < 12) return 'Buenos dias';
@@ -369,10 +373,11 @@ async function savePreventiveRecord() {
       petId:selectedPet.value.id,
       veterinarianId:auth.user.id,
       weightKg:preventiveForm.weightKg === null || preventiveForm.weightKg === '' ? undefined : Number(preventiveForm.weightKg),
+      amountCharged:preventiveForm.amountCharged === null || preventiveForm.amountCharged === '' ? undefined : Number(preventiveForm.amountCharged),
       nextAppointmentAt:preventiveForm.nextAppointmentAt || undefined,
     });
     preventiveRecords.value = [data, ...preventiveRecords.value];
-    preventiveForm.productName = ''; preventiveForm.weightKg = null; preventiveForm.nextAppointmentAt = ''; preventiveForm.notes = '';
+    preventiveForm.productName = ''; preventiveForm.nextProductName = ''; preventiveForm.weightKg = null; preventiveForm.amountCharged = null; preventiveForm.nextAppointmentAt = ''; preventiveForm.sterilizationRecommended = false; preventiveForm.notes = '';
   } catch (e) { error.value = e.response?.data?.message || 'No se pudo guardar el registro preventivo.'; }
   finally { preventiveSaving.value = false; }
 }
@@ -1140,13 +1145,16 @@ onUnmounted(() => {
                 <label>Fecha<input v-model="preventiveForm.appliedAt" type="date" required></label>
                 <label>{{ preventiveForm.type === 'VACCINE' ? 'Vacuna' : 'Desparasitante' }}<input v-model="preventiveForm.productName" required placeholder="Nombre del producto"></label>
                 <label v-if="preventiveForm.type === 'DEWORMING'">Peso<input v-model.number="preventiveForm.weightKg" type="number" step="0.01" placeholder="kg"></label>
+                <label>Costo histórico<input v-model.number="preventiveForm.amountCharged" type="number" min="0" step="0.01" placeholder="S/ 0.00"></label>
+                <label v-if="preventiveForm.type === 'VACCINE'">Próxima vacuna<input v-model="preventiveForm.nextProductName" placeholder="Ej. Refuerzo quíntuple"></label>
                 <label>Próxima cita<input v-model="preventiveForm.nextAppointmentAt" type="date"></label>
+                <label class="preventive-check"><input v-model="preventiveForm.sterilizationRecommended" type="checkbox"> Recomendar llamada para esterilización</label>
                 <button :disabled="preventiveSaving">{{ preventiveSaving ? 'Guardando...' : 'Agregar registro' }}</button>
               </form>
               <h4>3. Desparasitaciones</h4>
-              <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Desparasitante</th><th>Peso</th><th>Firma y sello</th><th>Próxima cita</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'DEWORMING')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.weightKg ? record.weightKg + ' kg' : '-' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'DEWORMING')"><td colspan="6" class="muted-text">Sin desparasitaciones registradas.</td></tr></tbody></table></div>
+              <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Desparasitante</th><th>Peso</th><th>Costo</th><th>Firma y sello</th><th>Próxima cita</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'DEWORMING')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.weightKg ? record.weightKg + ' kg' : '-' }}</td><td>{{ record.amountCharged != null ? 'S/ ' + formatPrice(record.amountCharged) : '-' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'DEWORMING')"><td colspan="7" class="muted-text">Sin desparasitaciones registradas.</td></tr></tbody></table></div>
               <h4>4. Vacunas</h4>
-              <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Vacuna</th><th>Firma y sello</th><th>Próxima cita</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'VACCINE')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'VACCINE')"><td colspan="5" class="muted-text">Sin vacunas registradas.</td></tr></tbody></table></div>
+              <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Vacuna</th><th>Costo</th><th>Próxima vacuna</th><th>Próxima cita</th><th>Firma y sello</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'VACCINE')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.amountCharged != null ? 'S/ ' + formatPrice(record.amountCharged) : '-' }}</td><td>{{ record.nextProductName || '-' }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'VACCINE')"><td colspan="7" class="muted-text">Sin vacunas registradas.</td></tr></tbody></table></div>
             </div>
           </section>
 

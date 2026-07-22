@@ -162,8 +162,11 @@ model PreventiveCareRecord {
   type PreventiveCareType
   appliedAt DateTime
   productName String
+  nextProductName String?
   weightKg Float?
+  amountCharged Decimal? @db.Decimal(10,2)
   nextAppointmentAt DateTime?
+  sterilizationRecommended Boolean @default(false)
   notes String?
   petId String
   veterinarianId String
