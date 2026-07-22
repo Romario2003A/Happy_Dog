@@ -7,6 +7,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { CashService } from './cash.service';
 import { CreateCashClosingDto } from './dto/create-cash-closing.dto';
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto';
+import { CreateReceivableDto } from './dto/create-receivable.dto';
+import { PayReceivableDto } from './dto/pay-receivable.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.RECEPTIONIST)
@@ -32,6 +34,21 @@ export class CashController {
   @Get('closings')
   closings() {
     return this.service.findClosings();
+  }
+
+  @Get('receivables')
+  receivables() {
+    return this.service.findReceivables();
+  }
+
+  @Post('receivables')
+  createReceivable(@Body() dto: CreateReceivableDto, @CurrentUser('sub') userId?: string) {
+    return this.service.createReceivable(dto, userId);
+  }
+
+  @Post('receivables/:id/payments')
+  payReceivable(@Param('id') id: string, @Body() dto: PayReceivableDto, @CurrentUser('sub') userId?: string) {
+    return this.service.payReceivable(id, dto, userId);
   }
 
   @Post('movements')

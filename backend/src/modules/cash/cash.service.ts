@@ -3,6 +3,8 @@ import { CashMovementType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateCashClosingDto } from './dto/create-cash-closing.dto';
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto';
+import { CreateReceivableDto } from './dto/create-receivable.dto';
+import { PayReceivableDto } from './dto/pay-receivable.dto';
 
 @Injectable()
 export class CashService {
@@ -162,6 +164,100 @@ export class CashService {
 
   findClosings() {
     return (this.prisma as any).cashClosing.findMany({ orderBy: { businessDate: 'desc' }, take: 60 });
+  }
+
+  async findReceivables() {
+    const sales = await (this.prisma as any).sale.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        client: { select: { id: true, fullName: true, phone: true, email: true } },
+        appointment: { include: { pet: { select: { id: true, name: true, species: true } } } },
+        items: true,
+        cashMovements: { orderBy: { occurredAt: 'asc' } },
+      },
+    });
+    return sales.map((sale: any) => this.receivableView(sale));
+  }
+
+  async createReceivable(dto: CreateReceivableDto, userId?: string) {
+    const total = Number(dto.total);
+    const initialPayment = Number(dto.initialPayment || 0);
+    if (initialPayment > total) throw new BadRequestException('El adelanto no puede superar el total.');
+
+    const [client, pet] = await Promise.all([
+      (this.prisma as any).client.findUnique({ where: { id: dto.clientId } }),
+      dto.petId ? (this.prisma as any).pet.findUnique({ where: { id: dto.petId } }) : null,
+    ]);
+    if (!client) throw new BadRequestException('El cliente seleccionado no existe.');
+    if (dto.petId && (!pet || pet.clientId !== dto.clientId)) throw new BadRequestException('La mascota no pertenece al cliente seleccionado.');
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const sale = await tx.sale.create({
+        data: {
+          clientId: dto.clientId,
+          appointmentId: dto.appointmentId || null,
+          cashierId: userId || null,
+          status: initialPayment >= total ? 'PAID' : 'PENDING',
+          paymentMethod: initialPayment ? dto.paymentMethod || 'CASH' : null,
+          subtotal: total,
+          total,
+          items: { create: [{ description: dto.description.trim(), quantity: 1, unitPrice: total, total }] },
+        },
+      });
+      if (initialPayment > 0) {
+        await tx.cashMovement.create({
+          data: {
+            type: 'DEBT_PAYMENT', category: 'DEBT', description: `Adelanto: ${dto.description.trim()}`,
+            amount: initialPayment, paymentMethod: dto.paymentMethod || 'CASH', clientId: dto.clientId,
+            petId: dto.petId || null, clientName: client.fullName, petName: pet?.name || null,
+            saleId: sale.id, appointmentId: dto.appointmentId || null, notes: dto.notes?.trim() || null,
+            registeredById: userId || null,
+          },
+        });
+      }
+      return sale;
+    });
+  }
+
+  async payReceivable(id: string, dto: PayReceivableDto, userId?: string) {
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const sale = await tx.sale.findUnique({
+        where: { id },
+        include: { client: true, appointment: { include: { pet: true } }, items: true, cashMovements: true },
+      });
+      if (!sale || sale.status !== 'PENDING') throw new BadRequestException('La cuenta ya no está pendiente.');
+      const paid = sale.cashMovements.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+      const balance = Number(sale.total) - paid;
+      const amount = Number(dto.amount);
+      if (amount > balance + 0.001) throw new BadRequestException(`El saldo pendiente es S/ ${balance.toFixed(2)}.`);
+      const description = sale.items[0]?.description || 'Cuenta pendiente';
+      const movement = await tx.cashMovement.create({
+        data: {
+          type: 'DEBT_PAYMENT', category: 'DEBT', description: `Abono: ${description}`, amount,
+          paymentMethod: dto.paymentMethod, clientId: sale.clientId,
+          petId: sale.appointment?.pet?.id || null, clientName: sale.client.fullName,
+          petName: sale.appointment?.pet?.name || null, saleId: sale.id,
+          appointmentId: sale.appointmentId || null, notes: dto.notes?.trim() || null,
+          registeredById: userId || null,
+        },
+      });
+      if (amount >= balance - 0.001) {
+        await tx.sale.update({ where: { id }, data: { status: 'PAID', paymentMethod: dto.paymentMethod } });
+      }
+      return movement;
+    });
+  }
+
+  private receivableView(sale: any) {
+    const paid = sale.cashMovements.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+    const total = Number(sale.total || 0);
+    return {
+      id: sale.id, createdAt: sale.createdAt, client: sale.client,
+      pet: sale.appointment?.pet || null, appointmentId: sale.appointmentId,
+      description: sale.items[0]?.description || 'Cuenta pendiente', total, paid,
+      balance: Math.max(0, total - paid), payments: sale.cashMovements,
+    };
   }
 
   private rangeFromQuery(from?: string, to?: string) {

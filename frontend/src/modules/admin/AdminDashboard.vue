@@ -28,11 +28,17 @@ const serviceForm = ref({ name: '', description: '', price: 0 });
 const cashDate = ref(todayInputDate());
 const cashMovements = ref([]);
 const pendingCharges = ref([]);
+const receivables = ref([]);
 const cashSummary = ref(defaultCashSummary());
+const cashWorkspace = ref('day');
 const showCashForm = ref(false);
 const showClosingForm = ref(false);
 const cashForm = ref(defaultCashForm());
 const chargeForm = ref({ appointmentId: '', amount: 0, paymentMethod: 'CASH' });
+const showReceivableForm = ref(false);
+const receivableForm = ref({ clientId: '', petId: '', description: '', total: 0, initialPayment: 0, paymentMethod: 'CASH', notes: '' });
+const payingReceivableId = ref('');
+const receivablePayment = ref({ amount: 0, paymentMethod: 'CASH', notes: '' });
 const closingForm = ref({ openingAmount: 0, countedAmount: 0, notes: '' });
 
 const cashTypeOptions = [
@@ -44,10 +50,19 @@ const cashTypeOptions = [
 const cashCategoryOptions = [
   { value: 'CONSULTATION', label: 'Consulta' },
   { value: 'VACCINE', label: 'Vacuna' },
+  { value: 'DEWORMING', label: 'Desparasitación' },
   { value: 'SURGERY', label: 'Cirugia' },
   { value: 'GROOMING', label: 'Bano y corte' },
   { value: 'TREATMENT', label: 'Tratamiento' },
   { value: 'PRODUCT', label: 'Producto' },
+  { value: 'PHARMACY', label: 'Farmacia' },
+  { value: 'LABORATORY', label: 'Laboratorio' },
+  { value: 'IMAGING', label: 'Ecografía o radiografía' },
+  { value: 'SEDATION', label: 'Sedación' },
+  { value: 'BOARDING', label: 'Hospedaje' },
+  { value: 'FOOD', label: 'Comida' },
+  { value: 'PET_SHOP', label: 'Pet shop' },
+  { value: 'EUTHANASIA', label: 'Eutanasia' },
   { value: 'CAMPAIGN', label: 'Campana' },
   { value: 'DEBT', label: 'Deuda' },
   { value: 'OTHER', label: 'Otro' },
@@ -114,6 +129,8 @@ const cashActivityLabel = computed(() => {
   if (cashMovements.value.length === 1) return '1 movimiento registrado';
   return `${cashMovements.value.length} movimientos registrados`;
 });
+const receivableTotal = computed(() => receivables.value.reduce((sum, item) => sum + Number(item.balance || 0), 0));
+const receivablePets = computed(() => clients.value.find(client => client.id === receivableForm.value.clientId)?.pets || []);
 
 function openInventory() {
   setActive('inventario');
@@ -187,10 +204,11 @@ function rejectedStatus(result) {
 
 async function loadCash() {
   error.value = '';
-  const [summaryRes, movementsRes, pendingRes] = await Promise.allSettled([
+  const [summaryRes, movementsRes, pendingRes, receivablesRes] = await Promise.allSettled([
     api.get(`/cash/summary?date=${cashDate.value}`),
     api.get(`/cash?from=${cashDate.value}&to=${cashDate.value}`),
     api.get(`/cash/pending?date=${cashDate.value}`),
+    api.get('/cash/receivables'),
   ]);
 
   if (summaryRes.status === 'fulfilled') {
@@ -213,6 +231,7 @@ async function loadCash() {
 
   if (pendingRes.status === 'fulfilled') pendingCharges.value = pendingRes.value.data;
   else pendingCharges.value = [];
+  if (receivablesRes.status === 'fulfilled') receivables.value = receivablesRes.value.data;
 
   // La bandeja de cobros es complementaria. Si el backend nuevo todavía está
   // desplegándose, el saldo y los movimientos deben continuar disponibles.
@@ -221,6 +240,59 @@ async function loadCash() {
     error.value = status === 401 || status === 403
       ? 'Tu sesion no tiene permisos para Caja. Ingresa otra vez con la cuenta de recepcion o administracion.'
       : 'No se pudo cargar caja. Intenta actualizar la pagina en unos segundos.';
+  }
+}
+
+function resetReceivableForm() {
+  receivableForm.value = { clientId: '', petId: '', description: '', total: 0, initialPayment: 0, paymentMethod: 'CASH', notes: '' };
+}
+
+async function saveReceivable() {
+  if (!receivableForm.value.clientId || Number(receivableForm.value.total) <= 0) {
+    error.value = 'Selecciona un cliente e ingresa el total de la cuenta.';
+    return;
+  }
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post('/cash/receivables', {
+      ...receivableForm.value,
+      total: Number(receivableForm.value.total),
+      initialPayment: Number(receivableForm.value.initialPayment || 0),
+    });
+    success.value = 'Cuenta por cobrar registrada.';
+    resetReceivableForm();
+    showReceivableForm.value = false;
+    await loadCash();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo registrar la cuenta.';
+  } finally {
+    saving.value = false;
+  }
+}
+
+function startReceivablePayment(receivable) {
+  payingReceivableId.value = receivable.id;
+  receivablePayment.value = { amount: Number(receivable.balance || 0), paymentMethod: 'CASH', notes: '' };
+}
+
+async function payReceivable(receivable) {
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post(`/cash/receivables/${receivable.id}/payments`, {
+      ...receivablePayment.value,
+      amount: Number(receivablePayment.value.amount),
+    });
+    success.value = 'Abono registrado en Caja.';
+    payingReceivableId.value = '';
+    await loadCash();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo registrar el abono.';
+  } finally {
+    saving.value = false;
   }
 }
 
@@ -766,11 +838,11 @@ onMounted(async () => {
     <section v-else-if="active==='caja'" class="glass-card cash-panel">
       <div class="section-title">
         <div>
-          <span class="badge">Caja diaria</span>
-          <h2>Caja del día</h2>
-          <p class="muted-text">Tus ingresos, gastos y saldo en un solo lugar.</p>
+          <span class="badge">Control financiero</span>
+          <h2>{{ cashWorkspace === 'day' ? 'Caja del día' : 'Cuentas por cobrar' }}</h2>
+          <p class="muted-text">{{ cashWorkspace === 'day' ? 'Tus ingresos, gastos y saldo en un solo lugar.' : 'Adelantos, abonos y saldos pendientes sin cálculos manuales.' }}</p>
         </div>
-        <div class="cash-actions">
+        <div v-if="cashWorkspace === 'day'" class="cash-actions">
           <input v-model="cashDate" class="cash-date" type="date">
           <button class="secondary small" type="button" @click="showCashForm = !showCashForm">
             {{ showCashForm ? 'Cancelar registro' : '+ Registrar movimiento' }}
@@ -779,8 +851,15 @@ onMounted(async () => {
             {{ showClosingForm ? 'Ocultar cierre' : cashSummary.closing ? 'Ver cierre' : 'Cerrar caja' }}
           </button>
         </div>
+        <button v-else class="small" type="button" @click="showReceivableForm = !showReceivableForm">{{ showReceivableForm ? 'Cancelar' : '+ Nueva cuenta' }}</button>
       </div>
 
+      <nav class="cash-subnav" aria-label="Secciones de caja">
+        <button type="button" :class="{ active: cashWorkspace === 'day' }" @click="cashWorkspace = 'day'">Movimientos del día</button>
+        <button type="button" :class="{ active: cashWorkspace === 'receivables' }" @click="cashWorkspace = 'receivables'">Por cobrar <span v-if="receivables.length">{{ receivables.length }}</span></button>
+      </nav>
+
+      <div v-if="cashWorkspace === 'day'" class="cash-day-view">
       <div class="cash-cards">
         <div class="cash-metric income"><span>Ingresos</span><strong>S/ {{ formatMoney(cashSummary.income + cashSummary.debtPayments) }}</strong><small>Ventas y cobros</small></div>
         <div class="cash-metric expense"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
@@ -944,6 +1023,45 @@ onMounted(async () => {
           </tr>
         </tbody>
       </table>
+      </div>
+
+      <section v-else class="receivables-workspace">
+        <div class="receivable-metrics">
+          <article><span>Saldo pendiente</span><strong>S/ {{ formatMoney(receivableTotal) }}</strong></article>
+          <article><span>Cuentas abiertas</span><strong>{{ receivables.length }}</strong></article>
+        </div>
+
+        <form v-if="showReceivableForm" class="receivable-editor" @submit.prevent="saveReceivable">
+          <div class="receivable-editor-heading"><div><span class="badge">Nueva cuenta</span><h3>Registrar deuda o adelanto</h3></div><button class="ghost small" type="button" @click="showReceivableForm=false; resetReceivableForm()">Cerrar</button></div>
+          <div class="receivable-form-grid">
+            <label>Cliente<select v-model="receivableForm.clientId" required @change="receivableForm.petId=''">
+              <option value="" disabled>Selecciona un cliente</option><option v-for="client in clients" :key="client.id" :value="client.id">{{ client.fullName }}</option>
+            </select></label>
+            <label>Mascota<select v-model="receivableForm.petId" :disabled="!receivableForm.clientId"><option value="">Sin mascota</option><option v-for="pet in receivablePets" :key="pet.id" :value="pet.id">{{ pet.name }}</option></select></label>
+            <label class="wide">Servicio o concepto<input v-model="receivableForm.description" required placeholder="Ej. Cirugía, tratamiento u hospedaje"></label>
+            <label>Total de la cuenta<input v-model.number="receivableForm.total" type="number" min="0.01" step="0.01" required></label>
+            <label>Adelanto recibido<input v-model.number="receivableForm.initialPayment" type="number" min="0" step="0.01"></label>
+            <label>Método del adelanto<select v-model="receivableForm.paymentMethod" :disabled="!receivableForm.initialPayment"><option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+            <label class="wide">Nota opcional<input v-model="receivableForm.notes" placeholder="Fecha prometida, responsable o detalle"></label>
+          </div>
+          <div class="receivable-preview"><span>Quedará pendiente</span><strong>S/ {{ formatMoney(Math.max(0, Number(receivableForm.total || 0) - Number(receivableForm.initialPayment || 0))) }}</strong></div>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar cuenta por cobrar' }}</button>
+        </form>
+
+        <div v-if="receivables.length" class="receivable-list">
+          <article v-for="receivable in receivables" :key="receivable.id" class="receivable-card">
+            <div class="receivable-person"><div class="pet-initial">{{ (receivable.pet?.name || receivable.client?.fullName || 'C').charAt(0) }}</div><div><strong>{{ receivable.pet?.name || receivable.client?.fullName }}</strong><span v-if="receivable.pet">{{ receivable.client?.fullName }}</span><small>{{ receivable.description }}</small></div></div>
+            <div class="receivable-progress"><div><span>Pagado S/ {{ formatMoney(receivable.paid) }}</span><strong>Pendiente S/ {{ formatMoney(receivable.balance) }}</strong></div><progress :value="receivable.paid" :max="receivable.total"></progress><small>Total S/ {{ formatMoney(receivable.total) }}</small></div>
+            <button v-if="payingReceivableId !== receivable.id" class="small" type="button" @click="startReceivablePayment(receivable)">Registrar abono</button>
+            <form v-else class="receivable-payment" @submit.prevent="payReceivable(receivable)">
+              <label>Importe<input v-model.number="receivablePayment.amount" type="number" min="0.01" :max="receivable.balance" step="0.01" required></label>
+              <label>Método<select v-model="receivablePayment.paymentMethod"><option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+              <button class="small" :disabled="saving">Confirmar</button><button class="ghost small" type="button" @click="payingReceivableId=''">Cancelar</button>
+            </form>
+          </article>
+        </div>
+        <div v-else class="receivable-empty"><strong>No hay cuentas pendientes</strong><span>Cuando un cliente deje un saldo o pague un adelanto aparecerá aquí.</span></div>
+      </section>
     </section>
 
     <section v-else class="glass-card">
@@ -958,6 +1076,35 @@ onMounted(async () => {
   display: grid;
   gap: 18px;
 }
+
+.cash-day-view { display: grid; gap: 18px; }
+.cash-subnav { display: flex; gap: 6px; width: fit-content; padding: 5px; border: 1px solid rgba(13,95,96,.12); border-radius: 16px; background: rgba(229,242,239,.72); }
+.cash-subnav button { display: flex; align-items: center; gap: 7px; padding: 9px 14px; border: 0; background: transparent; color: #5d716d; box-shadow: none; }
+.cash-subnav button.active { background: #fff; color: #155f66; box-shadow: 0 8px 20px rgba(15,74,76,.1); }
+.cash-subnav span { min-width: 20px; padding: 2px 6px; border-radius: 999px; background: #dff2ed; font-size: .75rem; }
+.receivables-workspace { display: grid; gap: 16px; }
+.receivable-metrics { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+.receivable-metrics article { padding: 18px; border: 1px solid rgba(13,95,96,.13); border-radius: 20px; background: linear-gradient(145deg,rgba(255,255,255,.94),rgba(231,248,243,.7)); }
+.receivable-metrics span { display: block; color: #657671; font-size: .8rem; font-weight: 800; text-transform: uppercase; }
+.receivable-metrics strong { display: block; margin-top: 6px; color: #12302b; font-size: 1.65rem; }
+.receivable-editor { display: grid; gap: 15px; padding: 18px; border: 1px solid rgba(13,95,96,.14); border-radius: 22px; background: rgba(247,252,250,.92); }
+.receivable-editor-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.receivable-editor-heading h3 { margin: 6px 0 0; }
+.receivable-form-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.receivable-form-grid label,.receivable-payment label { display: grid; gap: 5px; font-weight: 800; }
+.receivable-form-grid .wide { grid-column: span 2; }
+.receivable-preview { display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; border-radius: 15px; background: #e4f4f0; color: #155f5d; }
+.receivable-list { display: grid; gap: 10px; }
+.receivable-card { display: grid; grid-template-columns: minmax(220px,1.2fr) minmax(230px,1fr) auto; align-items: center; gap: 18px; padding: 16px; border: 1px solid rgba(13,95,96,.13); border-radius: 20px; background: rgba(255,255,255,.8); }
+.receivable-person { display: flex; align-items: center; gap: 11px; }
+.receivable-person > div:last-child { display: grid; gap: 2px; }
+.receivable-person span,.receivable-person small,.receivable-progress small { color: #687a75; }
+.receivable-progress { display: grid; gap: 7px; }
+.receivable-progress > div { display: flex; justify-content: space-between; gap: 10px; font-size: .84rem; }
+.receivable-progress progress { width: 100%; height: 8px; accent-color: #159482; }
+.receivable-payment { display: grid; grid-template-columns: 110px 130px auto auto; align-items: end; gap: 7px; grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid rgba(13,95,96,.1); }
+.receivable-payment input,.receivable-payment select { padding: 8px 9px; }
+.receivable-empty { display: grid; gap: 4px; padding: 24px; border: 1px dashed rgba(13,95,96,.2); border-radius: 20px; text-align: center; color: #60736e; }
 
 .cash-actions {
   display: flex;
@@ -1271,6 +1418,10 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
+  .receivable-metrics,.receivable-form-grid,.receivable-card,.receivable-payment { grid-template-columns: 1fr; }
+  .receivable-form-grid .wide { grid-column: auto; }
+  .cash-subnav { width: 100%; }
+  .cash-subnav button { flex: 1; justify-content: center; }
   .cash-actions {
     align-items: stretch;
     flex-wrap: wrap;
