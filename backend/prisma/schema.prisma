@@ -196,6 +196,7 @@ model Service {
   socialPrice Decimal? @db.Decimal(10,2)
   priceLabel String?
   requiresQuote Boolean @default(false)
+  durationMinutes Int @default(30)
   active Boolean @default(true)
   appointments Appointment[]
   saleItems SaleItem[]
@@ -220,6 +221,7 @@ model Appointment {
   serviceId String?
   quotedPrice Decimal? @db.Decimal(10,2)
   priceNote String?
+  durationMinutes Int @default(30)
   client Client @relation(fields: [clientId], references: [id])
   pet Pet @relation(fields: [petId], references: [id])
   veterinarian User? @relation("VetAppointments", fields: [veterinarianId], references: [id])

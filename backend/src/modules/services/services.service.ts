@@ -28,15 +28,42 @@ export class ServicesService {
     return { price:numbers[0]||0, maxPrice:numbers.length>1?numbers[1]:null, requiresQuote:/a\s*m[aá]s|desde|depende|-/i.test(label) };
   }
 
+  private normalized(value:string){
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  }
+
+  private serviceCategory(procedure:string, section:string){
+    const text=this.normalized(`${procedure} ${section}`);
+    if(/HEMOGRAMA|GLUCOSA|SCHIRMER|FLUORESCEINA|PANCREATITIS|LEUCEMIA.*SIDA|COPRO|CITOLOG|INSEMINACION|RASPADO|TEST|HERLIQUIA|ANAPLASMIA|BABESIA/.test(text)) return 'LABORATORIO';
+    if(/VACUNA|RABIA|TRIPLE FELINA|LEUCEMIA|DESPARASIT|CERTIFICADO/.test(text)) return 'VACUNACIONES';
+    if(/OVH|ORQUI|PIOMETRA|CESAREA|ENTROPION|ENUCLEACION|DISTIQUI|SONDA|TUMOR|HERNIA|URETRO|OTOHEMATOMA|AMPUTACION|PROLAPSO|CIRUG/.test(text)) return 'CIRUGIAS';
+    if(/CORTE DE UNAS|SOLO BANO|BANO \+ CORTE|BANO MEDICADO|PELUQUER/.test(text)) return 'PELUQUERIA';
+    if(/ECOGRAF|RX|RADIOGRAF/.test(text)) return 'IMAGENES';
+    if(/CONSULTA|INFORME MEDICO/.test(text)) return 'CONSULTAS';
+    if(/SEDACION/.test(text)) return 'SEDACION';
+    return 'TRATAMIENTOS';
+  }
+
+  private serviceDuration(category:string, procedure:string){
+    const text=this.normalized(procedure);
+    if(category==='CIRUGIAS') return 120;
+    if(category==='PELUQUERIA') return /CORTE DE UNAS/.test(text) ? 15 : 90;
+    if(category==='LABORATORIO' || category==='IMAGENES') return 30;
+    if(category==='VACUNACIONES' || category==='CONSULTAS') return 30;
+    if(category==='SEDACION') return 60;
+    if(/INTERNAMIENTO|GUARDIA/.test(text)) return 240;
+    return 45;
+  }
+
   async importHappyDogTariff(){
     const url='https://docs.google.com/spreadsheets/d/1yh9SQ9M2eZgeeFEVO08sjL8zZXBS0wlcUT6TrPJMuUc/export?format=csv&gid=769118406';
     const response=await fetch(url); if(!response.ok) throw new BadRequestException('No se pudo leer la hoja del tarifario.');
     const rows=this.parseCsv(await response.text()).slice(2);
     const categoryNames=new Set(['TRATAMIENTOS','LABORATORIO','VACUNACIONES','CIRUGIAS','PELUQUERIA']);
-    let category='OTROS'; let procedure=''; let imported=0;
+    let section='TRATAMIENTOS'; let procedure=''; let imported=0;
     for(const columns of rows){
       const first=(columns[0]||'').trim(); const second=(columns[1]||'').trim(); const third=(columns[2]||'').trim(); const priceLabel=(columns[3]||'').replace(/\s+/g,' ').trim();
-      if(first && categoryNames.has(first.toUpperCase())) category=first.toUpperCase();
+      if(first && categoryNames.has(first.toUpperCase())) section=first.toUpperCase();
       if(second) procedure=second;
       else if(first && !categoryNames.has(first.toUpperCase())) procedure=first;
       if(!procedure || !priceLabel) continue;
@@ -44,8 +71,10 @@ export class ServicesService {
       const condition=third || (second && first && !categoryNames.has(first.toUpperCase()) ? second : '');
       const species=/CANINO|FELINO/i.test([first,second].join(' ')) ? [first,second].join(' ').match(/CANINO[^,]*|FELINO/i)?.[0] || null : null;
       const name=[procedure,condition].filter(Boolean).join(' - ');
-      const existing=await this.prisma.service.findFirst({where:{name,category,condition:condition||null}});
-      const data={name,category,species,condition:condition||null,price,maxPrice,priceLabel,requiresQuote,active:true};
+      const category=this.serviceCategory(procedure,section);
+      const durationMinutes=this.serviceDuration(category,procedure);
+      const existing=await this.prisma.service.findFirst({where:{name,condition:condition||null}});
+      const data={name,category,species,condition:condition||null,price,maxPrice,priceLabel,requiresQuote,durationMinutes,active:true};
       if(existing) await this.prisma.service.update({where:{id:existing.id},data}); else await this.prisma.service.create({data});
       imported++;
     }
@@ -58,7 +87,7 @@ export class ServicesService {
     const duplicate = await this.prisma.service.findFirst({ where: { name, category: dto.category?.trim() || null, condition: dto.condition?.trim() || null } });
     if (duplicate) throw new BadRequestException('Ya existe un servicio con ese nombre.');
     return this.prisma.service.create({
-      data: { name, category:dto.category?.trim() || null, species:dto.species?.trim() || null, condition:dto.condition?.trim() || null, description: dto.description?.trim() || null, price: dto.price, maxPrice:dto.maxPrice ?? null, socialPrice:dto.socialPrice ?? null, priceLabel:dto.priceLabel?.trim() || null, requiresQuote:dto.requiresQuote ?? false, active: dto.active ?? true },
+      data: { name, category:dto.category?.trim() || null, species:dto.species?.trim() || null, condition:dto.condition?.trim() || null, description: dto.description?.trim() || null, price: dto.price, maxPrice:dto.maxPrice ?? null, socialPrice:dto.socialPrice ?? null, priceLabel:dto.priceLabel?.trim() || null, requiresQuote:dto.requiresQuote ?? false, durationMinutes:dto.durationMinutes ?? 30, active: dto.active ?? true },
     });
   }
 
@@ -81,6 +110,7 @@ export class ServicesService {
         socialPrice: dto.socialPrice === undefined ? undefined : Number(dto.socialPrice),
         priceLabel: dto.priceLabel === undefined ? undefined : dto.priceLabel.trim() || null,
         requiresQuote: dto.requiresQuote,
+        durationMinutes: dto.durationMinutes === undefined ? undefined : Number(dto.durationMinutes),
         active: dto.active,
       },
     });

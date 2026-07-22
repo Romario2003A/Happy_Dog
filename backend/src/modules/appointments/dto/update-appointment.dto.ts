@@ -32,6 +32,7 @@ export class UpdateAppointmentDto {
 
   @IsOptional() @IsNumber() @Min(0) quotedPrice?: number;
   @IsOptional() @IsString() priceNote?: string;
+  @IsOptional() @IsNumber() @Min(5) durationMinutes?: number;
 
   @IsOptional()
   @IsString()

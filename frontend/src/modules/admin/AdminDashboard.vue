@@ -26,7 +26,7 @@ const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minSto
 const serviceSearch = ref('');
 const showServiceForm = ref(false);
 const editingServiceId = ref('');
-const serviceForm = ref({ name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false });
+const serviceForm = ref({ name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false, durationMinutes: 30 });
 const showStaffForm = ref(false);
 const editingStaffId = ref('');
 const staffForm = ref({ fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' });
@@ -557,7 +557,7 @@ function formatCashDateTime(value) {
 }
 
 function resetServiceForm() {
-  serviceForm.value = { name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false };
+  serviceForm.value = { name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false, durationMinutes: 30 };
 }
 
 function openServiceCreator() {
@@ -574,7 +574,7 @@ function editService(service) {
     category: service.category || '', species: service.species || '', condition: service.condition || '',
     description: service.description || '',
     price: Number(service.price || 0),
-    maxPrice: service.maxPrice === null ? null : Number(service.maxPrice), socialPrice: service.socialPrice === null ? null : Number(service.socialPrice), priceLabel: service.priceLabel || '', requiresQuote: Boolean(service.requiresQuote),
+    maxPrice: service.maxPrice === null ? null : Number(service.maxPrice), socialPrice: service.socialPrice === null ? null : Number(service.socialPrice), priceLabel: service.priceLabel || '', requiresQuote: Boolean(service.requiresQuote), durationMinutes: Number(service.durationMinutes || 30),
   };
   showServiceForm.value = true;
 }
@@ -584,7 +584,7 @@ async function saveService() {
   error.value = '';
   success.value = '';
   try {
-    const payload = { ...serviceForm.value, price: Number(serviceForm.value.price), maxPrice: serviceForm.value.maxPrice === null || serviceForm.value.maxPrice === '' ? undefined : Number(serviceForm.value.maxPrice), socialPrice: serviceForm.value.socialPrice === null || serviceForm.value.socialPrice === '' ? undefined : Number(serviceForm.value.socialPrice) };
+    const payload = { ...serviceForm.value, price: Number(serviceForm.value.price), durationMinutes: Number(serviceForm.value.durationMinutes || 30), maxPrice: serviceForm.value.maxPrice === null || serviceForm.value.maxPrice === '' ? undefined : Number(serviceForm.value.maxPrice), socialPrice: serviceForm.value.socialPrice === null || serviceForm.value.socialPrice === '' ? undefined : Number(serviceForm.value.socialPrice) };
     if (editingServiceId.value) {
       await api.patch(`/services/${editingServiceId.value}`, payload);
       success.value = 'Servicio actualizado.';
@@ -866,6 +866,7 @@ onMounted(async () => {
           <label>Precio máximo<input v-model.number="serviceForm.maxPrice" type="number" min="0" step="0.01" placeholder="Opcional"></label>
           <label>Precio social<input v-model.number="serviceForm.socialPrice" type="number" min="0" step="0.01" placeholder="Opcional"></label>
           <label>Texto original del tarifario<input v-model="serviceForm.priceLabel" placeholder="Ej. S/ 60 a más"></label>
+          <label>Duración estimada (minutos)<input v-model.number="serviceForm.durationMinutes" type="number" min="5" step="5" required></label>
           <label class="check-line"><input v-model="serviceForm.requiresQuote" type="checkbox"> Confirmar precio al atender</label>
           <p class="service-price-note">El importe podrá ajustarse al cobrar si la atención requiere algo adicional.</p>
           <button :disabled="saving">{{ saving ? 'Guardando...' : editingServiceId ? 'Guardar cambios' : 'Agregar al tarifario' }}</button>

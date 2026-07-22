@@ -52,7 +52,7 @@ function toIsoDateTime(value) {
 const selectedDate = ref(dateKey());
 const quick = ref({
   serviceType: 'MEDICAL',
-  serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '',
+  serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30,
   clientId: '',
   petId: '',
   fullName: '',
@@ -78,6 +78,7 @@ watch(() => quick.value.serviceId, () => {
   quick.value.reason = [service.name, service.condition].filter(Boolean).join(' - ');
   quick.value.quotedPrice = Number(service.price || 0);
   quick.value.priceNote = service.priceLabel || '';
+  quick.value.durationMinutes = Number(service.durationMinutes || 30);
   const category = String(service.category || '').toUpperCase();
   quick.value.serviceType = category.includes('PELUQU') || category.includes('BAÑO') ? 'GROOMING' : category.includes('CIRUG') ? 'SURGERY' : category.includes('VACUN') || category.includes('DESPAR') ? 'VACCINE' : 'MEDICAL';
 });
@@ -611,7 +612,7 @@ async function uploadPetPhoto(petId, event) {
 }
 
 function resetQuick() {
-  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
+  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
   duplicateOverride.value = false;
   reschedulingPastAppointment.value = false;
 }
@@ -670,6 +671,7 @@ async function saveQuickAppointment() {
       serviceId: quick.value.serviceId || undefined,
       quotedPrice: quick.value.quotedPrice === '' ? undefined : Number(quick.value.quotedPrice),
       priceNote: quick.value.priceNote || undefined,
+      durationMinutes: Number(quick.value.durationMinutes || 30),
       reason: quick.value.reason.trim(),
       notes: `SERVICE_TYPE:${quick.value.serviceType}`,
     });
@@ -840,6 +842,10 @@ onMounted(loadData);
           <label v-if="selectedService">Precio acordado
             <input v-model.number="quick.quotedPrice" type="number" min="0" step="0.01" required>
             <small>{{ selectedService.requiresQuote || selectedService.maxPrice ? 'Confirma el importe dentro del rango antes de guardar.' : 'Precio tomado automáticamente del tarifario.' }}</small>
+          </label>
+          <label v-if="selectedService">Duración estimada
+            <input v-model.number="quick.durationMinutes" type="number" min="5" step="5" required>
+            <small>La agenda reservará este tiempo y avisará si existe un cruce.</small>
           </label>
           <div class="segmented">
             <button type="button" :class="{active:quickMode==='new'}" @click="quickMode='new'">Registrar cliente nuevo</button>

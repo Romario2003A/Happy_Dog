@@ -20,6 +20,7 @@ export class CreateServiceDto {
   @IsOptional() @IsNumber() @Min(0) socialPrice?: number;
   @IsOptional() @IsString() priceLabel?: string;
   @IsOptional() @IsBoolean() requiresQuote?: boolean;
+  @IsOptional() @IsNumber() @Min(5) durationMinutes?: number;
 
   @IsOptional()
   @IsBoolean()
