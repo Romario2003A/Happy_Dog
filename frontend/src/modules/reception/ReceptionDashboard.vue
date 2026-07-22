@@ -16,6 +16,7 @@ function tabFromRoute() {
 const appointments = ref([]);
 const clients = ref([]);
 const users = ref([]);
+const services = ref([]);
 const summary = ref({});
 const active = ref(tabFromRoute());
 const showQuick = ref(false);
@@ -51,6 +52,7 @@ function toIsoDateTime(value) {
 const selectedDate = ref(dateKey());
 const quick = ref({
   serviceType: 'MEDICAL',
+  serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '',
   clientId: '',
   petId: '',
   fullName: '',
@@ -65,6 +67,19 @@ const quick = ref({
   scheduledAt: '',
   pickupAt: '',
   reason: '',
+});
+const serviceCategories = computed(() => [...new Set(services.value.filter(item => item.active !== false).map(item => item.category || 'Otros'))].sort());
+const availableServices = computed(() => services.value.filter(item => item.active !== false && (item.category || 'Otros') === quick.value.serviceCategory));
+const selectedService = computed(() => services.value.find(item => item.id === quick.value.serviceId));
+
+watch(() => quick.value.serviceId, () => {
+  const service = selectedService.value;
+  if (!service) return;
+  quick.value.reason = [service.name, service.condition].filter(Boolean).join(' - ');
+  quick.value.quotedPrice = Number(service.price || 0);
+  quick.value.priceNote = service.priceLabel || '';
+  const category = String(service.category || '').toUpperCase();
+  quick.value.serviceType = category.includes('PELUQU') || category.includes('BAÑO') ? 'GROOMING' : category.includes('CIRUG') ? 'SURGERY' : category.includes('VACUN') || category.includes('DESPAR') ? 'VACCINE' : 'MEDICAL';
 });
 
 const searchedAppointments = computed(() => appointments.value.filter(item => {
@@ -417,16 +432,18 @@ async function loadData() {
   loading.value = true;
   error.value = '';
   try {
-    const [appointmentsRes, clientsRes, usersRes, summaryRes] = await Promise.all([
+    const [appointmentsRes, clientsRes, usersRes, summaryRes, servicesRes] = await Promise.all([
       api.get('/appointments'),
       api.get('/clients'),
       api.get('/users'),
       api.get('/reports/summary'),
+      api.get('/services'),
     ]);
     appointments.value = appointmentsRes.data;
     clients.value = clientsRes.data;
     users.value = usersRes.data;
     summary.value = summaryRes.data;
+    services.value = servicesRes.data;
   } catch (e) {
     error.value = 'No se pudo cargar la información de recepción.';
   } finally {
@@ -594,7 +611,7 @@ async function uploadPetPhoto(petId, event) {
 }
 
 function resetQuick() {
-  quick.value = { serviceType: 'MEDICAL', clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
+  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
   duplicateOverride.value = false;
   reschedulingPastAppointment.value = false;
 }
@@ -650,6 +667,9 @@ async function saveQuickAppointment() {
       petId,
       scheduledAt: toIsoDateTime(quick.value.scheduledAt),
       pickupAt: quick.value.serviceType === 'GROOMING' && quick.value.pickupAt ? toIsoDateTime(quick.value.pickupAt) : undefined,
+      serviceId: quick.value.serviceId || undefined,
+      quotedPrice: quick.value.quotedPrice === '' ? undefined : Number(quick.value.quotedPrice),
+      priceNote: quick.value.priceNote || undefined,
       reason: quick.value.reason.trim(),
       notes: `SERVICE_TYPE:${quick.value.serviceType}`,
     });
@@ -806,12 +826,20 @@ onMounted(loadData);
             <span>El registro anterior se conserva. Acuerda con el cliente una nueva fecha y hora.</span>
           </div>
           <label>¿Qué atención necesita?
-            <select v-model="quick.serviceType" required>
-              <option value="MEDICAL">Consulta médica</option>
-              <option value="VACCINE">Vacuna o desparasitación</option>
-              <option value="GROOMING">Baño o corte</option>
-              <option value="SURGERY">Cirugía</option>
+            <select v-model="quick.serviceCategory" required @change="quick.serviceId=''; quick.quotedPrice=''; quick.reason=''">
+              <option value="">Seleccionar categoría</option>
+              <option v-for="category in serviceCategories" :key="category" :value="category">{{ category }}</option>
             </select>
+          </label>
+          <label v-if="quick.serviceCategory">Servicio y condición
+            <select v-model="quick.serviceId" required>
+              <option value="">Seleccionar opción del tarifario</option>
+              <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ service.name }}{{ service.species ? ` · ${service.species}` : '' }}{{ service.condition ? ` · ${service.condition}` : '' }} — {{ service.priceLabel || `S/ ${Number(service.price).toFixed(2)}${service.maxPrice ? ` a S/ ${Number(service.maxPrice).toFixed(2)}` : ''}` }}</option>
+            </select>
+          </label>
+          <label v-if="selectedService">Precio acordado
+            <input v-model.number="quick.quotedPrice" type="number" min="0" step="0.01" required>
+            <small>{{ selectedService.requiresQuote || selectedService.maxPrice ? 'Confirma el importe dentro del rango antes de guardar.' : 'Precio tomado automáticamente del tarifario.' }}</small>
           </label>
           <div class="segmented">
             <button type="button" :class="{active:quickMode==='new'}" @click="quickMode='new'">Registrar cliente nuevo</button>
@@ -853,7 +881,7 @@ onMounted(loadData);
 
           <label>{{ reschedulingPastAppointment ? 'Nueva fecha y hora' : 'Fecha y hora' }}<input v-model="quick.scheduledAt" required type="datetime-local"></label>
           <label v-if="quick.serviceType === 'GROOMING'">Hora estimada de recojo<input v-model="quick.pickupAt" type="datetime-local"><small>Opcional; se puede completar cuando se conozca.</small></label>
-          <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
+          <label>Detalle adicional<textarea v-model="quick.reason" required placeholder="Se completa desde el servicio; puedes añadir un detalle"></textarea></label>
           <div v-if="possibleDuplicateAppointments.length" class="duplicate-alert">
             <strong>Posible cita duplicada</strong>
             <span>Ya hay una cita activa parecida en esa fecha. Revisa antes de crear otra.</span>

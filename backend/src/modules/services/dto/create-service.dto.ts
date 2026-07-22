@@ -8,9 +8,18 @@ export class CreateServiceDto {
   @IsString()
   description?: string;
 
+  @IsOptional() @IsString() category?: string;
+  @IsOptional() @IsString() species?: string;
+  @IsOptional() @IsString() condition?: string;
+
   @IsNumber()
   @Min(0)
   price: number;
+
+  @IsOptional() @IsNumber() @Min(0) maxPrice?: number;
+  @IsOptional() @IsNumber() @Min(0) socialPrice?: number;
+  @IsOptional() @IsString() priceLabel?: string;
+  @IsOptional() @IsBoolean() requiresQuote?: boolean;
 
   @IsOptional()
   @IsBoolean()

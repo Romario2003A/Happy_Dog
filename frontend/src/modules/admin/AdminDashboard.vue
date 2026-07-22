@@ -26,7 +26,7 @@ const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minSto
 const serviceSearch = ref('');
 const showServiceForm = ref(false);
 const editingServiceId = ref('');
-const serviceForm = ref({ name: '', description: '', price: 0 });
+const serviceForm = ref({ name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false });
 const showStaffForm = ref(false);
 const editingStaffId = ref('');
 const staffForm = ref({ fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' });
@@ -114,7 +114,7 @@ const filteredInventory = computed(() => {
 const filteredServices = computed(() => {
   const query = serviceSearch.value.trim().toLowerCase();
   if (!query) return services.value;
-  return services.value.filter(service => [service.name, service.description]
+  return services.value.filter(service => [service.name, service.category, service.species, service.condition, service.description]
     .some(value => String(value || '').toLowerCase().includes(query)));
 });
 const serviceStats = computed(() => ({
@@ -520,7 +520,7 @@ function formatCashDateTime(value) {
 }
 
 function resetServiceForm() {
-  serviceForm.value = { name: '', description: '', price: 0 };
+  serviceForm.value = { name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false };
 }
 
 function openServiceCreator() {
@@ -534,8 +534,10 @@ function editService(service) {
   editingServiceId.value = service.id;
   serviceForm.value = {
     name: service.name || '',
+    category: service.category || '', species: service.species || '', condition: service.condition || '',
     description: service.description || '',
     price: Number(service.price || 0),
+    maxPrice: service.maxPrice === null ? null : Number(service.maxPrice), socialPrice: service.socialPrice === null ? null : Number(service.socialPrice), priceLabel: service.priceLabel || '', requiresQuote: Boolean(service.requiresQuote),
   };
   showServiceForm.value = true;
 }
@@ -545,7 +547,7 @@ async function saveService() {
   error.value = '';
   success.value = '';
   try {
-    const payload = { ...serviceForm.value, price: Number(serviceForm.value.price) };
+    const payload = { ...serviceForm.value, price: Number(serviceForm.value.price), maxPrice: serviceForm.value.maxPrice === null || serviceForm.value.maxPrice === '' ? undefined : Number(serviceForm.value.maxPrice), socialPrice: serviceForm.value.socialPrice === null || serviceForm.value.socialPrice === '' ? undefined : Number(serviceForm.value.socialPrice) };
     if (editingServiceId.value) {
       await api.patch(`/services/${editingServiceId.value}`, payload);
       success.value = 'Servicio actualizado.';
@@ -658,6 +660,16 @@ function stockClass(product) {
   if (Number(product.stock) <= 0) return 'out';
   if (Number(product.stock) <= Number(product.minStock)) return 'low';
   return 'ok';
+}
+
+async function importTariff() {
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    const { data } = await api.post('/services/import-happy-dog-tariff');
+    success.value = `${data.imported || 0} opciones del tarifario fueron cargadas o actualizadas.`;
+    await loadData();
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo importar el tarifario.'; }
+  finally { saving.value = false; }
 }
 
 function resetStaffForm() {
@@ -779,7 +791,7 @@ onMounted(async () => {
             <h2>Servicios y precios</h2>
             <p class="muted-text">La lista central que usará Recepción al agendar y Caja al cobrar.</p>
           </div>
-          <button class="secondary small" type="button" @click="openServiceCreator">Agregar servicio</button>
+          <div class="table-actions"><button class="ghost small" type="button" :disabled="saving" @click="importTariff">Sincronizar hoja</button><button class="secondary small" type="button" @click="openServiceCreator">Agregar servicio</button></div>
         </div>
         <div class="inventory-toolbar">
           <input v-model="serviceSearch" placeholder="Buscar consulta, vacuna, cirugía o baño">
@@ -789,13 +801,13 @@ onMounted(async () => {
           </div>
         </div>
         <table>
-          <thead><tr><th>Servicio</th><th>Descripción</th><th>Precio sugerido</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Servicio</th><th>Condición</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>
             <tr v-if="!filteredServices.length"><td colspan="5" class="empty">Agrega aquí los servicios del tarifario de Happy Dog.</td></tr>
             <tr v-for="service in filteredServices" :key="service.id" :class="{ 'muted-row': service.active === false }">
-              <td><strong>{{ service.name }}</strong></td>
-              <td>{{ service.description || 'Sin descripción' }}</td>
-              <td><strong>S/ {{ formatPrice(service.price) }}</strong></td>
+              <td><strong>{{ service.name }}</strong><small>{{ service.category || 'Sin categoría' }}</small></td>
+              <td>{{ [service.species, service.condition].filter(Boolean).join(' · ') || service.description || 'Sin condición' }}</td>
+              <td><strong>{{ service.priceLabel || `S/ ${formatPrice(service.price)}${service.maxPrice ? ` – S/ ${formatPrice(service.maxPrice)}` : ''}` }}</strong><small v-if="service.socialPrice">Social: S/ {{ formatPrice(service.socialPrice) }}</small></td>
               <td><span class="stock-pill" :class="service.active === false ? 'inactive' : 'ok'">{{ service.active === false ? 'Retirado' : 'Disponible' }}</span></td>
               <td><div class="table-actions"><button class="ghost small" type="button" @click="editService(service)">Editar</button><button class="secondary small" type="button" @click="toggleService(service)">{{ service.active === false ? 'Habilitar' : 'Retirar' }}</button></div></td>
             </tr>
@@ -808,9 +820,16 @@ onMounted(async () => {
           <button class="ghost small" type="button" @click="showServiceForm=false; editingServiceId=''; resetServiceForm()">Cerrar</button>
         </div>
         <form class="stack" @submit.prevent="saveService">
-          <label>Nombre<input v-model="serviceForm.name" required placeholder="Ej. Consulta general"></label>
+          <label>Nombre<input v-model="serviceForm.name" required placeholder="Ej. Solo baño - menor a 10 kg"></label>
+          <label>Categoría<input v-model="serviceForm.category" placeholder="Ej. Peluquería"></label>
+          <label>Especie<input v-model="serviceForm.species" placeholder="Canino, felino o ambos"></label>
+          <label>Condición<input v-model="serviceForm.condition" placeholder="Ej. Menor a 10 kg"></label>
           <label>Descripción<textarea v-model="serviceForm.description" rows="3" placeholder="Qué incluye o cuándo se utiliza"></textarea></label>
-          <label>Precio sugerido<input v-model.number="serviceForm.price" type="number" min="0" step="0.01" required></label>
+          <label>Precio mínimo<input v-model.number="serviceForm.price" type="number" min="0" step="0.01" required></label>
+          <label>Precio máximo<input v-model.number="serviceForm.maxPrice" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+          <label>Precio social<input v-model.number="serviceForm.socialPrice" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+          <label>Texto original del tarifario<input v-model="serviceForm.priceLabel" placeholder="Ej. S/ 60 a más"></label>
+          <label class="check-line"><input v-model="serviceForm.requiresQuote" type="checkbox"> Confirmar precio al atender</label>
           <p class="service-price-note">El importe podrá ajustarse al cobrar si la atención requiere algo adicional.</p>
           <button :disabled="saving">{{ saving ? 'Guardando...' : editingServiceId ? 'Guardar cambios' : 'Agregar al tarifario' }}</button>
           <button class="secondary" type="button" @click="showServiceForm=false; editingServiceId=''; resetServiceForm()">Cancelar</button>

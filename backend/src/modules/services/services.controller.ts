@@ -18,6 +18,9 @@ export class ServicesController {
   @Post()
   create(@Body() dto: CreateServiceDto) { return this.service.create(dto); }
 
+  @Post('import-happy-dog-tariff')
+  importHappyDogTariff() { return this.service.importHappyDogTariff(); }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: Partial<CreateServiceDto>) { return this.service.update(id, dto); }
 }

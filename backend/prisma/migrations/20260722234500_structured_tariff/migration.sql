@@ -1,0 +1,15 @@
+ALTER TABLE "Service"
+  ADD COLUMN IF NOT EXISTS "category" TEXT,
+  ADD COLUMN IF NOT EXISTS "species" TEXT,
+  ADD COLUMN IF NOT EXISTS "condition" TEXT,
+  ADD COLUMN IF NOT EXISTS "maxPrice" DECIMAL(10,2),
+  ADD COLUMN IF NOT EXISTS "socialPrice" DECIMAL(10,2),
+  ADD COLUMN IF NOT EXISTS "priceLabel" TEXT,
+  ADD COLUMN IF NOT EXISTS "requiresQuote" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "Appointment"
+  ADD COLUMN IF NOT EXISTS "quotedPrice" DECIMAL(10,2),
+  ADD COLUMN IF NOT EXISTS "priceNote" TEXT;
+
+DROP INDEX IF EXISTS "Service_name_key";
+CREATE INDEX IF NOT EXISTS "Service_category_name_idx" ON "Service"("category", "name");

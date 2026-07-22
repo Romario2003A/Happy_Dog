@@ -41,7 +41,7 @@ export class CashService {
 
     return appointments.map((appointment: any) => ({
       ...appointment,
-      suggestedAmount: appointment.service ? Number(appointment.service.price) : null,
+      suggestedAmount: appointment.quotedPrice !== null && appointment.quotedPrice !== undefined ? Number(appointment.quotedPrice) : appointment.service ? Number(appointment.service.price) : null,
     }));
   }
 

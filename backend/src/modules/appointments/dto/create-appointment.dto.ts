@@ -1,2 +1,2 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
-export class CreateAppointmentDto { @IsDateString() scheduledAt:string; @IsString() reason:string; @IsString() clientId:string; @IsString() petId:string; @IsOptional() @IsString() veterinarianId?:string; @IsOptional() @IsString() serviceId?:string; @IsOptional() @IsString() notes?:string; @IsOptional() @IsDateString() pickupAt?:string; }
+import { IsDateString, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+export class CreateAppointmentDto { @IsDateString() scheduledAt:string; @IsString() reason:string; @IsString() clientId:string; @IsString() petId:string; @IsOptional() @IsString() veterinarianId?:string; @IsOptional() @IsString() serviceId?:string; @IsOptional() @IsNumber() @Min(0) quotedPrice?:number; @IsOptional() @IsString() priceNote?:string; @IsOptional() @IsString() notes?:string; @IsOptional() @IsDateString() pickupAt?:string; }

@@ -32,6 +32,8 @@ export class AppointmentsService {
     if (dto.petId !== undefined) data.petId = dto.petId;
     if (dto.veterinarianId?.trim()) data.veterinarianId = dto.veterinarianId.trim();
     if (dto.serviceId?.trim()) data.serviceId = dto.serviceId.trim();
+    if (dto.quotedPrice !== undefined) data.quotedPrice = Number(dto.quotedPrice);
+    if (dto.priceNote !== undefined) data.priceNote = dto.priceNote.trim() || null;
     if (dto.notes?.trim()) data.notes = dto.notes.trim();
     if (dto.status !== undefined) {
       data.status = dto.status;
