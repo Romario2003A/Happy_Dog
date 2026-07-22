@@ -9,10 +9,11 @@ const router = useRouter();
 const summary = ref({});
 const inventory = ref([]);
 const services = ref([]);
+const staff = ref([]);
 const clients = ref([]);
 const appointments = ref([]);
 const pets = ref([]);
-const adminTabs = ['resumen', 'servicios', 'inventario', 'clientes', 'caja'];
+const adminTabs = ['resumen', 'servicios', 'inventario', 'clientes', 'caja', 'personal'];
 const active = ref(tabFromRoute());
 const error = ref('');
 const success = ref('');
@@ -25,6 +26,9 @@ const serviceSearch = ref('');
 const showServiceForm = ref(false);
 const editingServiceId = ref('');
 const serviceForm = ref({ name: '', description: '', price: 0 });
+const showStaffForm = ref(false);
+const editingStaffId = ref('');
+const staffForm = ref({ fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' });
 const cashDate = ref(todayInputDate());
 const cashMovements = ref([]);
 const pendingCharges = ref([]);
@@ -298,13 +302,14 @@ async function payReceivable(receivable) {
 
 async function loadData() {
   error.value = '';
-  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes] = await Promise.allSettled([
+  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes] = await Promise.allSettled([
     api.get('/reports/summary'),
     api.get('/inventory'),
     api.get('/clients'),
     api.get('/appointments'),
     api.get('/pets'),
     api.get('/services'),
+    api.get('/users'),
   ]);
 
   if (inventoryRes.status === 'fulfilled') inventory.value = inventoryRes.value.data;
@@ -312,6 +317,7 @@ async function loadData() {
   if (appointmentsRes.status === 'fulfilled') appointments.value = appointmentsRes.value.data;
   if (petsRes.status === 'fulfilled') pets.value = petsRes.value.data;
   if (servicesRes.status === 'fulfilled') services.value = servicesRes.value.data;
+  if (staffRes.status === 'fulfilled') staff.value = staffRes.value.data.filter(user => user.role !== 'CLIENT');
 
   if (summaryRes.status === 'fulfilled') {
     summary.value = summaryRes.value.data;
@@ -649,6 +655,49 @@ function stockClass(product) {
   return 'ok';
 }
 
+function resetStaffForm() {
+  staffForm.value = { fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' };
+}
+
+function editStaff(member) {
+  editingStaffId.value = member.id;
+  staffForm.value = { fullName:member.fullName || '', email:member.email || '', password:'', role:member.role || 'RECEPTIONIST', workSchedule:member.workSchedule || '', bankAccount:member.bankAccount || '', monthlySalary:member.monthlySalary == null ? null : Number(member.monthlySalary), payDay:member.payDay || '', payrollReminder:member.payrollReminder || '' };
+  showStaffForm.value = true;
+}
+
+function maskedAccount(value) {
+  const text = String(value || '').replace(/\s/g, '');
+  return text ? `•••• ${text.slice(-4)}` : 'No registrada';
+}
+
+function staffRoleLabel(role) {
+  return ({ ADMIN:'Administración', RECEPTIONIST:'Recepción', VETERINARIAN:'Veterinaria' })[role] || role;
+}
+
+async function saveStaff() {
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    const payload = { ...staffForm.value, monthlySalary:staffForm.value.monthlySalary === null || staffForm.value.monthlySalary === '' ? undefined : Number(staffForm.value.monthlySalary) };
+    if (editingStaffId.value) {
+      delete payload.password;
+      await api.patch(`/users/${editingStaffId.value}`, payload);
+      success.value = 'Datos del trabajador actualizados.';
+    } else {
+      await api.post('/users', payload);
+      success.value = 'Trabajador y acceso creados.';
+    }
+    editingStaffId.value = ''; showStaffForm.value = false; resetStaffForm(); await loadData();
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo guardar el trabajador.'; }
+  finally { saving.value = false; }
+}
+
+async function toggleStaff(member) {
+  saving.value = true; error.value = ''; success.value = '';
+  try { await api.patch(`/users/${member.id}/active`, { active: !member.active }); success.value = member.active ? 'Acceso desactivado.' : 'Acceso activado.'; await loadData(); }
+  catch (e) { error.value = e.response?.data?.message || 'No se pudo cambiar el acceso.'; }
+  finally { saving.value = false; }
+}
+
 watch(() => route.query.tab, () => {
   setActive(tabFromRoute(), false);
 });
@@ -669,6 +718,7 @@ onMounted(async () => {
       <button :class="{ active: active === 'inventario' }" @click="openInventory">Inventario</button>
       <button :class="{ active: active === 'clientes' }" @click="setActive('clientes')">Clientes</button>
       <button :class="{ active: active === 'caja' }" @click="setActive('caja')">Caja</button>
+      <button :class="{ active: active === 'personal' }" @click="setActive('personal')">Personal</button>
     </template>
 
     <template #top-actions>
@@ -834,6 +884,41 @@ onMounted(async () => {
         </tbody>
       </table>
     </section>
+
+    <div v-else-if="active==='personal'" class="panel-grid" :class="{ single: !showStaffForm }">
+      <section class="glass-card staff-panel">
+        <div class="section-title">
+          <div><span class="badge">Solo administración</span><h2>Personal</h2><p class="muted-text">Accesos, horarios y datos de pago del equipo.</p></div>
+          <button class="secondary small" type="button" @click="editingStaffId=''; resetStaffForm(); showStaffForm=true">Agregar trabajador</button>
+        </div>
+        <div v-if="staff.length" class="staff-list">
+          <article v-for="member in staff" :key="member.id" class="staff-card" :class="{ inactive: !member.active }">
+            <div class="staff-identity"><div class="pet-initial">{{ member.fullName?.charAt(0) || 'P' }}</div><div><strong>{{ member.fullName }}</strong><span>{{ staffRoleLabel(member.role) }}</span><small>{{ member.email }}</small></div></div>
+            <div class="staff-detail"><span>Horario</span><strong>{{ member.workSchedule || 'Sin horario' }}</strong></div>
+            <div class="staff-detail"><span>Sueldo</span><strong>{{ member.monthlySalary != null ? 'S/ ' + formatPrice(member.monthlySalary) : 'Sin registrar' }}</strong><small>{{ member.payDay || '' }}</small></div>
+            <div class="staff-detail"><span>Cuenta</span><strong>{{ maskedAccount(member.bankAccount) }}</strong></div>
+            <div class="table-actions"><button class="ghost small" type="button" @click="editStaff(member)">Editar</button><button class="secondary small" type="button" @click="toggleStaff(member)">{{ member.active ? 'Desactivar' : 'Activar' }}</button></div>
+          </article>
+        </div>
+        <div v-else class="calm-empty"><strong>Sin personal registrado</strong><span>Agrega únicamente a quienes necesitan acceso al sistema.</span></div>
+      </section>
+      <section v-if="showStaffForm" class="glass-card staff-editor">
+        <div class="section-title"><div><span class="badge">{{ editingStaffId ? 'Editar' : 'Nuevo acceso' }}</span><h2>{{ editingStaffId ? 'Datos del trabajador' : 'Agregar trabajador' }}</h2></div><button class="ghost small" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cerrar</button></div>
+        <form class="stack" @submit.prevent="saveStaff">
+          <label>Nombre completo<input v-model="staffForm.fullName" required></label>
+          <label>Correo de acceso<input v-model="staffForm.email" type="email" required></label>
+          <label v-if="!editingStaffId">Contraseña temporal<input v-model="staffForm.password" type="password" minlength="6" required></label>
+          <label>Rol<select v-model="staffForm.role"><option value="RECEPTIONIST">Recepción</option><option value="VETERINARIAN">Veterinaria</option><option value="ADMIN">Administración</option></select></label>
+          <label>Horario<input v-model="staffForm.workSchedule" placeholder="Ej. 8:00 a. m. – 6:00 p. m."></label>
+          <label>Número de cuenta<input v-model="staffForm.bankAccount" autocomplete="off" placeholder="Se mostrará enmascarado"></label>
+          <label>Sueldo mensual<input v-model.number="staffForm.monthlySalary" type="number" min="0" step="0.01"></label>
+          <label>Día de pago<input v-model="staffForm.payDay" placeholder="Ej. Fin de mes"></label>
+          <label>Recordatorio<textarea v-model="staffForm.payrollReminder" rows="2" placeholder="Observación administrativa"></textarea></label>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar trabajador' }}</button>
+          <button class="secondary" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cancelar</button>
+        </form>
+      </section>
+    </div>
 
     <section v-else-if="active==='caja'" class="glass-card cash-panel">
       <div class="section-title">
@@ -1115,6 +1200,14 @@ onMounted(async () => {
 }
 
 .service-editor { align-self: start; }
+.staff-editor { align-self: start; }
+.staff-list { display: grid; gap: 10px; margin-top: 16px; }
+.staff-card { display: grid; grid-template-columns: minmax(210px,1.25fr) 1fr .8fr .65fr auto; align-items: center; gap: 15px; padding: 15px; border: 1px solid rgba(13,95,96,.13); border-radius: 19px; background: rgba(255,255,255,.78); }
+.staff-card.inactive { opacity: .62; }
+.staff-identity { display: flex; align-items: center; gap: 10px; }
+.staff-identity > div:last-child,.staff-detail { display: grid; gap: 2px; }
+.staff-identity span,.staff-identity small,.staff-detail span,.staff-detail small { color: #687a75; font-size: .78rem; }
+.staff-detail > span { font-weight: 800; text-transform: uppercase; }
 .service-price-note {
   margin: 0;
   padding: 12px 14px;
@@ -1418,6 +1511,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
+  .staff-card { grid-template-columns: 1fr; align-items: stretch; }
   .receivable-metrics,.receivable-form-grid,.receivable-card,.receivable-payment { grid-template-columns: 1fr; }
   .receivable-form-grid .wide { grid-column: auto; }
   .cash-subnav { width: 100%; }

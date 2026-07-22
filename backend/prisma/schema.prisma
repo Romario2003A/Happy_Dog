@@ -99,6 +99,11 @@ model User {
   passwordHash String
   role Role
   active Boolean @default(true)
+  workSchedule String?
+  bankAccount String?
+  monthlySalary Decimal? @db.Decimal(10,2)
+  payDay String?
+  payrollReminder String?
   appointments Appointment[] @relation("VetAppointments")
   medicalRecords MedicalRecord[]
   preventiveCareRecords PreventiveCareRecord[]
