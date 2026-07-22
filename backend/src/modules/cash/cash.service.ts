@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CashMovementType } from '@prisma/client';
+import {
+  AppointmentStatus,
+  CashMovementCategory,
+  CashMovementType,
+  PaymentMethod,
+  SaleStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateCashClosingDto } from './dto/create-cash-closing.dto';
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto';
@@ -12,7 +18,7 @@ export class CashService {
 
   findMovements(from?: string, to?: string) {
     const range = this.rangeFromQuery(from, to);
-    return (this.prisma as any).cashMovement.findMany({
+    return this.prisma.cashMovement.findMany({
       where: { occurredAt: { gte: range.start, lte: range.end } },
       orderBy: { occurredAt: 'desc' },
       include: {
@@ -25,11 +31,11 @@ export class CashService {
 
   async pendingAppointments(date?: string) {
     const { start, end } = this.dayRange(date);
-    const appointments = await (this.prisma as any).appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where: {
-        status: 'ATTENDED',
+        status: AppointmentStatus.ATTENDED,
         scheduledAt: { gte: start, lte: end },
-        cashMovements: { none: { type: { in: ['INCOME', 'DEBT_PAYMENT'] } } },
+        cashMovements: { none: { type: { in: [CashMovementType.INCOME, CashMovementType.DEBT_PAYMENT] } } },
       },
       orderBy: { scheduledAt: 'asc' },
       include: {
@@ -39,19 +45,24 @@ export class CashService {
       },
     });
 
-    return appointments.map((appointment: any) => ({
+    return appointments.map((appointment) => ({
       ...appointment,
-      suggestedAmount: appointment.quotedPrice !== null && appointment.quotedPrice !== undefined ? Number(appointment.quotedPrice) : appointment.service ? Number(appointment.service.price) : null,
+      suggestedAmount:
+        appointment.quotedPrice !== null && appointment.quotedPrice !== undefined
+          ? Number(appointment.quotedPrice)
+          : appointment.service
+          ? Number(appointment.service.price)
+          : null,
     }));
   }
 
   async summary(date?: string) {
     const { start, end } = this.dayRange(date);
-    const movements = await (this.prisma as any).cashMovement.findMany({
+    const movements = await this.prisma.cashMovement.findMany({
       where: { occurredAt: { gte: start, lte: end } },
       select: { type: true, category: true, paymentMethod: true, amount: true },
     });
-    const closing = await (this.prisma as any).cashClosing.findUnique({ where: { businessDate: start } });
+    const closing = await this.prisma.cashClosing.findUnique({ where: { businessDate: start } });
 
     const totals = {
       income: 0,
@@ -88,7 +99,7 @@ export class CashService {
     if (Number(dto.amount) <= 0) throw new BadRequestException('El monto debe ser mayor a cero.');
 
     if (dto.appointmentId && dto.type !== CashMovementType.EXPENSE) {
-      const existing = await (this.prisma as any).cashMovement.findFirst({
+      const existing = await this.prisma.cashMovement.findFirst({
         where: {
           appointmentId: dto.appointmentId,
           type: { in: [CashMovementType.INCOME, CashMovementType.DEBT_PAYMENT] },
@@ -97,41 +108,53 @@ export class CashService {
       if (existing) throw new BadRequestException('Esta atención ya fue cobrada.');
     }
 
-    return (this.prisma as any).cashMovement.create({
+    return this.prisma.cashMovement.create({
       data: {
         type: dto.type,
-        category: dto.category || 'OTHER',
+        category: dto.category ?? CashMovementCategory.OTHER,
         description: dto.description,
-        counterparty: dto.counterparty || null,
-        referenceCode: dto.referenceCode || null,
+        counterparty: dto.counterparty ?? null,
+        referenceCode: dto.referenceCode ?? null,
         amount: dto.amount,
-        paymentMethod: dto.paymentMethod || null,
+        paymentMethod: dto.paymentMethod ?? null,
         occurredAt: this.parseDateTime(dto.occurredAt),
-        clientName: dto.clientName || null,
-        petName: dto.petName || null,
-        clientId: dto.clientId || null,
-        petId: dto.petId || null,
-        saleId: dto.saleId || null,
-        appointmentId: dto.appointmentId || null,
-        notes: dto.notes || null,
-        registeredById: userId || null,
+        clientName: dto.clientName ?? null,
+        petName: dto.petName ?? null,
+        clientId: dto.clientId ?? null,
+        petId: dto.petId ?? null,
+        saleId: dto.saleId ?? null,
+        appointmentId: dto.appointmentId ?? null,
+        notes: dto.notes ?? null,
+        registeredById: userId ?? null,
       },
     });
   }
 
   updateMovement(id: string, dto: Partial<CreateCashMovementDto>) {
-    return (this.prisma as any).cashMovement.update({
+    return this.prisma.cashMovement.update({
       where: { id },
       data: {
-        ...dto,
-        amount: dto.amount === undefined ? undefined : Number(dto.amount),
-        occurredAt: dto.occurredAt ? this.parseDateTime(dto.occurredAt) : undefined,
+        ...(dto.type          !== undefined && { type:          dto.type }),
+        ...(dto.category      !== undefined && { category:      dto.category }),
+        ...(dto.description   !== undefined && { description:   dto.description }),
+        ...(dto.counterparty  !== undefined && { counterparty:  dto.counterparty }),
+        ...(dto.referenceCode !== undefined && { referenceCode: dto.referenceCode }),
+        ...(dto.amount        !== undefined && { amount:        dto.amount }),
+        ...(dto.paymentMethod !== undefined && { paymentMethod: dto.paymentMethod }),
+        ...(dto.occurredAt    !== undefined && { occurredAt:    this.parseDateTime(dto.occurredAt) }),
+        ...(dto.clientName    !== undefined && { clientName:    dto.clientName }),
+        ...(dto.petName       !== undefined && { petName:       dto.petName }),
+        ...(dto.clientId      !== undefined && { clientId:      dto.clientId }),
+        ...(dto.petId         !== undefined && { petId:         dto.petId }),
+        ...(dto.saleId        !== undefined && { saleId:        dto.saleId }),
+        ...(dto.appointmentId !== undefined && { appointmentId: dto.appointmentId }),
+        ...(dto.notes         !== undefined && { notes:         dto.notes }),
       },
     });
   }
 
   removeMovement(id: string) {
-    return (this.prisma as any).cashMovement.delete({ where: { id } });
+    return this.prisma.cashMovement.delete({ where: { id } });
   }
 
   async closeDay(dto: CreateCashClosingDto, userId?: string) {
@@ -142,35 +165,20 @@ export class CashService {
     const countedAmount = Number(dto.countedAmount || 0);
     const difference = countedAmount - expectedAmount;
 
-    return (this.prisma as any).cashClosing.upsert({
+    return this.prisma.cashClosing.upsert({
       where: { businessDate: start },
-      update: {
-        openingAmount,
-        expectedAmount,
-        countedAmount,
-        difference,
-        notes: dto.notes || null,
-        closedById: userId || null,
-      },
-      create: {
-        businessDate: start,
-        openingAmount,
-        expectedAmount,
-        countedAmount,
-        difference,
-        notes: dto.notes || null,
-        closedById: userId || null,
-      },
+      update: { openingAmount, expectedAmount, countedAmount, difference, notes: dto.notes ?? null, closedById: userId ?? null },
+      create: { businessDate: start, openingAmount, expectedAmount, countedAmount, difference, notes: dto.notes ?? null, closedById: userId ?? null },
     });
   }
 
   findClosings() {
-    return (this.prisma as any).cashClosing.findMany({ orderBy: { businessDate: 'desc' }, take: 60 });
+    return this.prisma.cashClosing.findMany({ orderBy: { businessDate: 'desc' }, take: 60 });
   }
 
   async findReceivables() {
-    const sales = await (this.prisma as any).sale.findMany({
-      where: { status: 'PENDING' },
+    const sales = await this.prisma.sale.findMany({
+      where: { status: SaleStatus.PENDING },
       orderBy: { createdAt: 'desc' },
       include: {
         client: { select: { id: true, fullName: true, phone: true, email: true } },
@@ -179,7 +187,7 @@ export class CashService {
         cashMovements: { orderBy: { occurredAt: 'asc' } },
       },
     });
-    return sales.map((sale: any) => this.receivableView(sale));
+    return sales.map((sale) => this.receivableView(sale));
   }
 
   async createReceivable(dto: CreateReceivableDto, userId?: string) {
@@ -188,20 +196,22 @@ export class CashService {
     if (initialPayment > total) throw new BadRequestException('El adelanto no puede superar el total.');
 
     const [client, pet] = await Promise.all([
-      (this.prisma as any).client.findUnique({ where: { id: dto.clientId } }),
-      dto.petId ? (this.prisma as any).pet.findUnique({ where: { id: dto.petId } }) : null,
+      this.prisma.client.findUnique({ where: { id: dto.clientId } }),
+      dto.petId ? this.prisma.pet.findUnique({ where: { id: dto.petId } }) : null,
     ]);
     if (!client) throw new BadRequestException('El cliente seleccionado no existe.');
-    if (dto.petId && (!pet || pet.clientId !== dto.clientId)) throw new BadRequestException('La mascota no pertenece al cliente seleccionado.');
+    if (dto.petId && (!pet || pet.clientId !== dto.clientId)) {
+      throw new BadRequestException('La mascota no pertenece al cliente seleccionado.');
+    }
 
-    return (this.prisma as any).$transaction(async (tx: any) => {
+    return this.prisma.$transaction(async (tx) => {
       const sale = await tx.sale.create({
         data: {
           clientId: dto.clientId,
-          appointmentId: dto.appointmentId || null,
-          cashierId: userId || null,
-          status: initialPayment >= total ? 'PAID' : 'PENDING',
-          paymentMethod: initialPayment ? dto.paymentMethod || 'CASH' : null,
+          appointmentId: dto.appointmentId ?? null,
+          cashierId: userId ?? null,
+          status: initialPayment >= total ? SaleStatus.PAID : SaleStatus.PENDING,
+          paymentMethod: initialPayment ? (dto.paymentMethod ?? PaymentMethod.CASH) : null,
           subtotal: total,
           total,
           items: { create: [{ description: dto.description.trim(), quantity: 1, unitPrice: total, total }] },
@@ -210,11 +220,19 @@ export class CashService {
       if (initialPayment > 0) {
         await tx.cashMovement.create({
           data: {
-            type: 'DEBT_PAYMENT', category: 'DEBT', description: `Adelanto: ${dto.description.trim()}`,
-            amount: initialPayment, paymentMethod: dto.paymentMethod || 'CASH', clientId: dto.clientId,
-            petId: dto.petId || null, clientName: client.fullName, petName: pet?.name || null,
-            saleId: sale.id, appointmentId: dto.appointmentId || null, notes: dto.notes?.trim() || null,
-            registeredById: userId || null,
+            type: CashMovementType.DEBT_PAYMENT,
+            category: CashMovementCategory.DEBT,
+            description: `Adelanto: ${dto.description.trim()}`,
+            amount: initialPayment,
+            paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH,
+            clientId: dto.clientId,
+            petId: dto.petId ?? null,
+            clientName: client.fullName,
+            petName: pet?.name ?? null,
+            saleId: sale.id,
+            appointmentId: dto.appointmentId ?? null,
+            notes: dto.notes?.trim() ?? null,
+            registeredById: userId ?? null,
           },
         });
       }
@@ -223,34 +241,42 @@ export class CashService {
   }
 
   async payReceivable(id: string, dto: PayReceivableDto, userId?: string) {
-    return (this.prisma as any).$transaction(async (tx: any) => {
+    return this.prisma.$transaction(async (tx) => {
       const sale = await tx.sale.findUnique({
         where: { id },
         include: { client: true, appointment: { include: { pet: true } }, items: true, cashMovements: true },
       });
-      if (!sale || sale.status !== 'PENDING') throw new BadRequestException('La cuenta ya no está pendiente.');
-      const paid = sale.cashMovements.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+      if (!sale || sale.status !== SaleStatus.PENDING) throw new BadRequestException('La cuenta ya no está pendiente.');
+      const paid = sale.cashMovements.reduce((sum, item) => sum + Number(item.amount || 0), 0);
       const balance = Number(sale.total) - paid;
       const amount = Number(dto.amount);
       if (amount > balance + 0.001) throw new BadRequestException(`El saldo pendiente es S/ ${balance.toFixed(2)}.`);
       const description = sale.items[0]?.description || 'Cuenta pendiente';
       const movement = await tx.cashMovement.create({
         data: {
-          type: 'DEBT_PAYMENT', category: 'DEBT', description: `Abono: ${description}`, amount,
-          paymentMethod: dto.paymentMethod, clientId: sale.clientId,
-          petId: sale.appointment?.pet?.id || null, clientName: sale.client.fullName,
-          petName: sale.appointment?.pet?.name || null, saleId: sale.id,
-          appointmentId: sale.appointmentId || null, notes: dto.notes?.trim() || null,
-          registeredById: userId || null,
+          type: CashMovementType.DEBT_PAYMENT,
+          category: CashMovementCategory.DEBT,
+          description: `Abono: ${description}`,
+          amount,
+          paymentMethod: dto.paymentMethod,
+          clientId: sale.clientId,
+          petId: sale.appointment?.pet?.id ?? null,
+          clientName: sale.client.fullName,
+          petName: sale.appointment?.pet?.name ?? null,
+          saleId: sale.id,
+          appointmentId: sale.appointmentId ?? null,
+          notes: dto.notes?.trim() ?? null,
+          registeredById: userId ?? null,
         },
       });
       if (amount >= balance - 0.001) {
-        await tx.sale.update({ where: { id }, data: { status: 'PAID', paymentMethod: dto.paymentMethod } });
+        await tx.sale.update({ where: { id }, data: { status: SaleStatus.PAID, paymentMethod: dto.paymentMethod } });
       }
       return movement;
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private receivableView(sale: any) {
     const paid = sale.cashMovements.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
     const total = Number(sale.total || 0);

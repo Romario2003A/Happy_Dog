@@ -1,12 +1,50 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
+
 @Injectable()
 export class InventoryService {
   constructor(private prisma: PrismaService) {}
-  findAll(){ return (this.prisma as any).product.findMany({ orderBy:{createdAt:'desc'}, include: undefined }); }
-  findOne(id:string){ return (this.prisma as any).product.findUnique({ where:{id}, include: undefined }); }
-  async create(dto:CreateProductDto){ return (this.prisma as any).product.create({ data: dto as any }); }
-  update(id:string, dto:Partial<CreateProductDto>){ return (this.prisma as any).product.update({ where:{id}, data:dto as any }); }
-  remove(id:string){ return (this.prisma as any).product.delete({ where:{id} }); }
+
+  findAll() {
+    return this.prisma.product.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+  findOne(id: string) {
+    return this.prisma.product.findUnique({ where: { id } });
+  }
+
+  async create(dto: CreateProductDto) {
+    return this.prisma.product.create({
+      data: {
+        name: dto.name,
+        sku: dto.sku,
+        category: dto.category,
+        unitPrice: dto.unitPrice,
+        stock: dto.stock,
+        minStock: dto.minStock,
+      },
+    });
+  }
+
+  async update(id: string, dto: Partial<CreateProductDto>) {
+    await this.prisma.product.findUniqueOrThrow({ where: { id } }).catch(() => {
+      throw new NotFoundException('Producto no encontrado.');
+    });
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        ...(dto.name      !== undefined && { name:      dto.name }),
+        ...(dto.sku       !== undefined && { sku:       dto.sku }),
+        ...(dto.category  !== undefined && { category:  dto.category }),
+        ...(dto.unitPrice !== undefined && { unitPrice: dto.unitPrice }),
+        ...(dto.stock     !== undefined && { stock:     dto.stock }),
+        ...(dto.minStock  !== undefined && { minStock:  dto.minStock }),
+      },
+    });
+  }
+
+  remove(id: string) {
+    return this.prisma.product.delete({ where: { id } });
+  }
 }
