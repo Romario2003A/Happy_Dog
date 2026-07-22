@@ -8,10 +8,11 @@ const route = useRoute();
 const router = useRouter();
 const summary = ref({});
 const inventory = ref([]);
+const services = ref([]);
 const clients = ref([]);
 const appointments = ref([]);
 const pets = ref([]);
-const adminTabs = ['resumen', 'inventario', 'clientes', 'caja'];
+const adminTabs = ['resumen', 'servicios', 'inventario', 'clientes', 'caja'];
 const active = ref(tabFromRoute());
 const error = ref('');
 const success = ref('');
@@ -20,6 +21,10 @@ const showProductForm = ref(false);
 const editingProductId = ref('');
 const inventorySearch = ref('');
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
+const serviceSearch = ref('');
+const showServiceForm = ref(false);
+const editingServiceId = ref('');
+const serviceForm = ref({ name: '', description: '', price: 0 });
 const cashDate = ref(todayInputDate());
 const cashMovements = ref([]);
 const pendingCharges = ref([]);
@@ -86,6 +91,16 @@ const filteredInventory = computed(() => {
     product.sku,
   ].some(value => String(value || '').toLowerCase().includes(query)));
 });
+const filteredServices = computed(() => {
+  const query = serviceSearch.value.trim().toLowerCase();
+  if (!query) return services.value;
+  return services.value.filter(service => [service.name, service.description]
+    .some(value => String(value || '').toLowerCase().includes(query)));
+});
+const serviceStats = computed(() => ({
+  active: services.value.filter(service => service.active !== false).length,
+  inactive: services.value.filter(service => service.active === false).length,
+}));
 const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
 const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.net || 0));
 const closingDifference = computed(() => Number(closingForm.value.countedAmount || 0) - expectedClosingAmount.value);
@@ -211,18 +226,20 @@ async function loadCash() {
 
 async function loadData() {
   error.value = '';
-  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes] = await Promise.allSettled([
+  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes] = await Promise.allSettled([
     api.get('/reports/summary'),
     api.get('/inventory'),
     api.get('/clients'),
     api.get('/appointments'),
     api.get('/pets'),
+    api.get('/services'),
   ]);
 
   if (inventoryRes.status === 'fulfilled') inventory.value = inventoryRes.value.data;
   if (clientsRes.status === 'fulfilled') clients.value = clientsRes.value.data;
   if (appointmentsRes.status === 'fulfilled') appointments.value = appointmentsRes.value.data;
   if (petsRes.status === 'fulfilled') pets.value = petsRes.value.data;
+  if (servicesRes.status === 'fulfilled') services.value = servicesRes.value.data;
 
   if (summaryRes.status === 'fulfilled') {
     summary.value = summaryRes.value.data;
@@ -419,6 +436,66 @@ function formatCashDateTime(value) {
   return new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
 
+function resetServiceForm() {
+  serviceForm.value = { name: '', description: '', price: 0 };
+}
+
+function openServiceCreator() {
+  setActive('servicios');
+  editingServiceId.value = '';
+  resetServiceForm();
+  showServiceForm.value = true;
+}
+
+function editService(service) {
+  editingServiceId.value = service.id;
+  serviceForm.value = {
+    name: service.name || '',
+    description: service.description || '',
+    price: Number(service.price || 0),
+  };
+  showServiceForm.value = true;
+}
+
+async function saveService() {
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    const payload = { ...serviceForm.value, price: Number(serviceForm.value.price) };
+    if (editingServiceId.value) {
+      await api.patch(`/services/${editingServiceId.value}`, payload);
+      success.value = 'Servicio actualizado.';
+    } else {
+      await api.post('/services', payload);
+      success.value = 'Servicio agregado al tarifario.';
+    }
+    showServiceForm.value = false;
+    editingServiceId.value = '';
+    resetServiceForm();
+    await loadData();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo guardar el servicio.';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function toggleService(service) {
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.patch(`/services/${service.id}`, { active: service.active === false });
+    success.value = service.active === false ? 'Servicio habilitado.' : 'Servicio retirado del tarifario.';
+    await loadData();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo actualizar el servicio.';
+  } finally {
+    saving.value = false;
+  }
+}
+
 function appointmentServiceLabel(appointment) {
   if (appointment.service?.name) return appointment.service.name;
   const type = String(appointment.notes || '').match(/SERVICE_TYPE:([A-Z_]+)/)?.[1];
@@ -516,6 +593,7 @@ onMounted(async () => {
   <AdminLayout title="Administración" subtitle="Control del negocio, inventario, caja y reportes" hide-user-pill>
     <template #nav>
       <button :class="{ active: active === 'resumen' }" @click="setActive('resumen')">Resumen</button>
+      <button :class="{ active: active === 'servicios' }" @click="setActive('servicios')">Servicios</button>
       <button :class="{ active: active === 'inventario' }" @click="openInventory">Inventario</button>
       <button :class="{ active: active === 'clientes' }" @click="setActive('clientes')">Clientes</button>
       <button :class="{ active: active === 'caja' }" @click="setActive('caja')">Caja</button>
@@ -563,6 +641,53 @@ onMounted(async () => {
             <span>{{ lowStockProducts.length ? 'Revisa las existencias antes de la siguiente atención.' : 'No hay productos con stock bajo.' }}</span>
           </div>
         </div>
+      </section>
+    </div>
+
+    <div v-else-if="active==='servicios'" class="panel-grid" :class="{ single: !showServiceForm }">
+      <section class="glass-card">
+        <div class="section-title">
+          <div>
+            <span class="badge">Tarifario</span>
+            <h2>Servicios y precios</h2>
+            <p class="muted-text">La lista central que usará Recepción al agendar y Caja al cobrar.</p>
+          </div>
+          <button class="secondary small" type="button" @click="openServiceCreator">Agregar servicio</button>
+        </div>
+        <div class="inventory-toolbar">
+          <input v-model="serviceSearch" placeholder="Buscar consulta, vacuna, cirugía o baño">
+          <div class="inventory-mini-stats">
+            <span><strong>{{ serviceStats.active }}</strong> disponibles</span>
+            <span><strong>{{ serviceStats.inactive }}</strong> retirados</span>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Servicio</th><th>Descripción</th><th>Precio sugerido</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>
+            <tr v-if="!filteredServices.length"><td colspan="5" class="empty">Agrega aquí los servicios del tarifario de Happy Dog.</td></tr>
+            <tr v-for="service in filteredServices" :key="service.id" :class="{ 'muted-row': service.active === false }">
+              <td><strong>{{ service.name }}</strong></td>
+              <td>{{ service.description || 'Sin descripción' }}</td>
+              <td><strong>S/ {{ formatPrice(service.price) }}</strong></td>
+              <td><span class="stock-pill" :class="service.active === false ? 'inactive' : 'ok'">{{ service.active === false ? 'Retirado' : 'Disponible' }}</span></td>
+              <td><div class="table-actions"><button class="ghost small" type="button" @click="editService(service)">Editar</button><button class="secondary small" type="button" @click="toggleService(service)">{{ service.active === false ? 'Habilitar' : 'Retirar' }}</button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section v-if="showServiceForm" class="glass-card service-editor">
+        <div class="section-title">
+          <div><span class="badge">{{ editingServiceId ? 'Edición' : 'Nuevo' }}</span><h2>{{ editingServiceId ? 'Editar servicio' : 'Nuevo servicio' }}</h2></div>
+          <button class="ghost small" type="button" @click="showServiceForm=false; editingServiceId=''; resetServiceForm()">Cerrar</button>
+        </div>
+        <form class="stack" @submit.prevent="saveService">
+          <label>Nombre<input v-model="serviceForm.name" required placeholder="Ej. Consulta general"></label>
+          <label>Descripción<textarea v-model="serviceForm.description" rows="3" placeholder="Qué incluye o cuándo se utiliza"></textarea></label>
+          <label>Precio sugerido<input v-model.number="serviceForm.price" type="number" min="0" step="0.01" required></label>
+          <p class="service-price-note">El importe podrá ajustarse al cobrar si la atención requiere algo adicional.</p>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : editingServiceId ? 'Guardar cambios' : 'Agregar al tarifario' }}</button>
+          <button class="secondary" type="button" @click="showServiceForm=false; editingServiceId=''; resetServiceForm()">Cancelar</button>
+        </form>
       </section>
     </div>
 
@@ -840,6 +965,17 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: nowrap;
+}
+
+.service-editor { align-self: start; }
+.service-price-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(225, 244, 239, 0.72);
+  color: #536b66;
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 .cash-actions button { white-space: nowrap; }
