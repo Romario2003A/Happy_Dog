@@ -39,6 +39,8 @@ const cashWorkspace = ref('day');
 const showCashForm = ref(false);
 const showClosingForm = ref(false);
 const cashForm = ref(defaultCashForm());
+const cashServiceCategory = ref('');
+const cashServiceId = ref('');
 const chargeForm = ref({ appointmentId: '', amount: 0, paymentMethod: 'CASH' });
 const showReceivableForm = ref(false);
 const receivableForm = ref({ clientId: '', petId: '', description: '', total: 0, initialPayment: 0, paymentMethod: 'CASH', notes: '' });
@@ -121,6 +123,10 @@ const serviceStats = computed(() => ({
   active: services.value.filter(service => service.active !== false).length,
   inactive: services.value.filter(service => service.active === false).length,
 }));
+const activeCashServices = computed(() => services.value.filter(service => service.active !== false));
+const cashServiceCategories = computed(() => [...new Set(activeCashServices.value.map(service => service.category || 'Otros'))].sort());
+const availableCashServices = computed(() => activeCashServices.value.filter(service => (service.category || 'Otros') === cashServiceCategory.value));
+const selectedCashService = computed(() => activeCashServices.value.find(service => service.id === cashServiceId.value));
 const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
 const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.net || 0));
 const closingDifference = computed(() => Number(closingForm.value.countedAmount || 0) - expectedClosingAmount.value);
@@ -435,6 +441,37 @@ async function deleteProduct(product) {
 
 function resetCashForm() {
   cashForm.value = defaultCashForm();
+  cashServiceCategory.value = '';
+  cashServiceId.value = '';
+}
+
+function normalizeServiceText(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+}
+
+function cashCategoryForService(service) {
+  const text = normalizeServiceText(`${service?.category || ''} ${service?.name || ''}`);
+  if (text.includes('DESPAR')) return 'DEWORMING';
+  if (text.includes('VACUN')) return 'VACCINE';
+  if (text.includes('CIRUG') || text.includes('ESTERIL') || text.includes('CASTR')) return 'SURGERY';
+  if (text.includes('PELUQU') || text.includes('BANO') || text.includes('CORTE')) return 'GROOMING';
+  if (text.includes('LABOR') || text.includes('ANALISIS') || text.includes('HEMOGRAMA')) return 'LABORATORY';
+  if (text.includes('ECOGRAF') || text.includes('RADIOGRAF') || text.includes('RAYOS')) return 'IMAGING';
+  if (text.includes('SEDACION')) return 'SEDATION';
+  if (text.includes('HOSPED')) return 'BOARDING';
+  if (text.includes('EUTANAS')) return 'EUTHANASIA';
+  if (text.includes('TRATAMIENTO') || text.includes('CURACION')) return 'TREATMENT';
+  if (text.includes('CONSULT') || text.includes('CERTIFICADO')) return 'CONSULTATION';
+  return 'OTHER';
+}
+
+function selectCashService() {
+  const service = selectedCashService.value;
+  if (!service) return;
+  cashForm.value.category = cashCategoryForService(service);
+  cashForm.value.description = [service.name, service.species, service.condition].filter(Boolean).join(' - ');
+  cashForm.value.amount = Number(service.price || 0);
+  cashForm.value.notes = service.priceLabel || '';
 }
 
 function cashPayload() {
@@ -1032,6 +1069,21 @@ onMounted(async () => {
       </section>
 
       <form v-if="showCashForm" class="cash-form" @submit.prevent="saveCashMovement">
+        <label v-if="cashForm.type === 'INCOME'" class="wide">Servicio del tarifario <small>Opcional para ventas registradas directamente en caja.</small>
+          <select v-model="cashServiceCategory" @change="cashServiceId = ''">
+            <option value="">Seleccionar categoría</option>
+            <option v-for="category in cashServiceCategories" :key="category" :value="category">{{ category }}</option>
+          </select>
+        </label>
+        <label v-if="cashForm.type === 'INCOME' && cashServiceCategory" class="wide">Servicio y condición
+          <select v-model="cashServiceId" @change="selectCashService">
+            <option value="">Seleccionar opción del tarifario</option>
+            <option v-for="service in availableCashServices" :key="service.id" :value="service.id">
+              {{ service.name }}{{ service.species ? ` · ${service.species}` : '' }}{{ service.condition ? ` · ${service.condition}` : '' }} — {{ service.priceLabel || `S/ ${formatPrice(service.price)}${service.maxPrice ? ` a S/ ${formatPrice(service.maxPrice)}` : ''}` }}
+            </option>
+          </select>
+          <small v-if="selectedCashService">{{ selectedCashService.requiresQuote || selectedCashService.maxPrice ? 'Confirma el monto acordado antes de guardar.' : 'Precio completado automáticamente.' }}</small>
+        </label>
         <label>Tipo
           <select v-model="cashForm.type">
             <option v-for="option in cashTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
