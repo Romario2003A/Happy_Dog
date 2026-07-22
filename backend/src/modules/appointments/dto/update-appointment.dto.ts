@@ -7,6 +7,10 @@ export class UpdateAppointmentDto {
   scheduledAt?: string;
 
   @IsOptional()
+  @IsDateString()
+  pickupAt?: string;
+
+  @IsOptional()
   @IsString()
   reason?: string;
 

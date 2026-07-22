@@ -21,6 +21,7 @@ enum AppointmentStatus {
   WAITING
   IN_CONSULTATION
   ATTENDED
+  NO_SHOW
   CANCELLED
 }
 
@@ -201,6 +202,10 @@ model Appointment {
   reason String
   status AppointmentStatus @default(PENDING)
   notes String?
+  pickupAt DateTime?
+  checkedInAt DateTime?
+  startedAt DateTime?
+  completedAt DateTime?
   clientId String
   petId String
   veterinarianId String?

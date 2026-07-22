@@ -19,13 +19,26 @@ export class AppointmentsService {
       data.scheduledAt = scheduledAt;
     }
 
+    if (dto.pickupAt !== undefined) {
+      const pickupAt = new Date(dto.pickupAt);
+      if (Number.isNaN(pickupAt.getTime())) {
+        throw new BadRequestException('Hora de recojo invalida.');
+      }
+      data.pickupAt = pickupAt;
+    }
+
     if (dto.reason !== undefined) data.reason = dto.reason.trim();
     if (dto.clientId !== undefined) data.clientId = dto.clientId;
     if (dto.petId !== undefined) data.petId = dto.petId;
     if (dto.veterinarianId?.trim()) data.veterinarianId = dto.veterinarianId.trim();
     if (dto.serviceId?.trim()) data.serviceId = dto.serviceId.trim();
     if (dto.notes?.trim()) data.notes = dto.notes.trim();
-    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.status !== undefined) {
+      data.status = dto.status;
+      if (dto.status === 'WAITING') data.checkedInAt = new Date();
+      if (dto.status === 'IN_CONSULTATION') data.startedAt = new Date();
+      if (dto.status === 'ATTENDED') data.completedAt = new Date();
+    }
 
     return data;
   }

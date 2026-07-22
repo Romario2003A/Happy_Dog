@@ -63,6 +63,7 @@ const quick = ref({
   age: '',
   weightKg: '',
   scheduledAt: '',
+  pickupAt: '',
   reason: '',
 });
 
@@ -103,7 +104,7 @@ const weekDays = computed(() => {
 const upcomingAppointments = computed(() => {
   const now = new Date();
   return searchedAppointments.value
-    .filter(item => new Date(item.scheduledAt) >= now && !['ATTENDED', 'CANCELLED'].includes(item.status))
+    .filter(item => new Date(item.scheduledAt) >= now && !['ATTENDED', 'NO_SHOW', 'CANCELLED'].includes(item.status))
     .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
     .slice(0, 12);
 });
@@ -194,7 +195,7 @@ const possibleDuplicateAppointments = computed(() => {
   const petName = normalizeText(quick.value.petName);
 
   return appointments.value.filter(item => {
-    if (['ATTENDED', 'CANCELLED'].includes(item.status)) return false;
+    if (['ATTENDED', 'NO_SHOW', 'CANCELLED'].includes(item.status)) return false;
     if (!sameDay(item.scheduledAt, quick.value.scheduledAt)) return false;
 
     if (quickMode.value === 'existing') {
@@ -233,8 +234,31 @@ function setToday() {
   agendaView.value = 'day';
 }
 
+function getAppointmentById(id) {
+  return appointments.value.find(item => item.id === id);
+}
+
+function normalizeAppointmentUpdate(payload, fallback, nextStatus) {
+  const source = payload?.appointment || payload?.data || payload || {};
+  return {
+    ...fallback,
+    ...source,
+    id: source.id || fallback.id,
+    status: source.status || nextStatus,
+    pet: source.pet || fallback.pet,
+    client: source.client || fallback.client,
+  };
+}
+
+function patchAppointmentInMemory(updated) {
+  appointments.value = appointments.value.map(item => (
+    item.id === updated.id ? { ...item, ...updated } : item
+  ));
+}
+
 function selectAppointment(appointment) {
-  selectedAppointment.value = appointments.value.find(item => item.id === appointment.id) || appointment;
+  const current = getAppointmentById(appointment.id);
+  selectedAppointment.value = current ? { ...current } : { ...appointment };
 }
 
 function hourAppointments(hour) {
@@ -248,6 +272,7 @@ function statusLabel(status) {
     WAITING: 'En espera',
     IN_CONSULTATION: 'En consulta',
     ATTENDED: 'Atendida',
+    NO_SHOW: 'No asistió',
     CANCELLED: 'Cancelada',
   };
   return labels[status] || status;
@@ -304,8 +329,7 @@ async function markNoShow(appointment) {
   error.value = '';
   success.value = '';
   try {
-    const notes = [appointment.notes, 'OUTCOME:NO_SHOW'].filter(Boolean).join('\n');
-    const { data } = await api.patch(`/appointments/${appointment.id}`, { status: 'CANCELLED', notes });
+    const { data } = await api.patch(`/appointments/${appointment.id}`, { status: 'NO_SHOW' });
     appointments.value = appointments.value.map(item => item.id === appointment.id ? data : item);
     selectedAppointment.value = data;
     success.value = 'La cita fue cerrada como no asistió.';
@@ -413,13 +437,31 @@ async function loadData() {
 async function setStatus(appointment, status) {
   error.value = '';
   success.value = '';
+
+  const optimistic = normalizeAppointmentUpdate(null, appointment, status);
+  patchAppointmentInMemory(optimistic);
+  if (selectedAppointment.value?.id === appointment.id) {
+    selectedAppointment.value = { ...optimistic };
+  }
+
   try {
     const { data } = await api.patch(`/appointments/${appointment.id}`, { status });
-    appointments.value = appointments.value.map(item => item.id === data.id ? data : item);
-    if (selectedAppointment.value?.id === data.id) selectedAppointment.value = null;
+    const updated = normalizeAppointmentUpdate(data, optimistic, status);
+    patchAppointmentInMemory(updated);
     await loadData();
-    success.value = 'Cita actualizada correctamente.';
+    const refreshed = getAppointmentById(appointment.id) || updated;
+    if (selectedAppointment.value?.id === appointment.id) {
+      selectedAppointment.value = { ...refreshed };
+    }
+    success.value = status === 'CONFIRMED'
+      ? 'Cita confirmada correctamente.'
+      : 'Cita actualizada correctamente.';
   } catch (e) {
+    await loadData();
+    const restored = getAppointmentById(appointment.id) || appointment;
+    if (selectedAppointment.value?.id === appointment.id) {
+      selectedAppointment.value = { ...restored };
+    }
     error.value = 'No se pudo actualizar la cita.';
   }
 }
@@ -552,7 +594,7 @@ async function uploadPetPhoto(petId, event) {
 }
 
 function resetQuick() {
-  quick.value = { serviceType: 'MEDICAL', clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', reason: '' };
+  quick.value = { serviceType: 'MEDICAL', clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
   duplicateOverride.value = false;
   reschedulingPastAppointment.value = false;
 }
@@ -607,6 +649,7 @@ async function saveQuickAppointment() {
       clientId,
       petId,
       scheduledAt: toIsoDateTime(quick.value.scheduledAt),
+      pickupAt: quick.value.serviceType === 'GROOMING' && quick.value.pickupAt ? toIsoDateTime(quick.value.pickupAt) : undefined,
       reason: quick.value.reason.trim(),
       notes: `SERVICE_TYPE:${quick.value.serviceType}`,
     });
@@ -809,6 +852,7 @@ onMounted(loadData);
           </template>
 
           <label>{{ reschedulingPastAppointment ? 'Nueva fecha y hora' : 'Fecha y hora' }}<input v-model="quick.scheduledAt" required type="datetime-local"></label>
+          <label v-if="quick.serviceType === 'GROOMING'">Hora estimada de recojo<input v-model="quick.pickupAt" type="datetime-local"><small>Opcional; se puede completar cuando se conozca.</small></label>
           <label>Motivo<textarea v-model="quick.reason" required placeholder="Motivo de consulta"></textarea></label>
           <div v-if="possibleDuplicateAppointments.length" class="duplicate-alert">
             <strong>Posible cita duplicada</strong>
@@ -831,13 +875,14 @@ onMounted(loadData);
         <div v-if="selectedAppointment" class="detail-box">
           <span class="badge">Detalle</span>
           <h3>{{ selectedAppointment.pet?.name || 'Mascota' }}</h3>
-          <div v-if="isPastAppointment(selectedAppointment)" class="past-appointment-notice" :class="{ warning: !['ATTENDED','CANCELLED'].includes(selectedAppointment.status) }">
-            <strong>{{ ['ATTENDED','CANCELLED'].includes(selectedAppointment.status) ? 'Cita pasada' : 'Cita pasada sin cierre' }}</strong>
-            <span>{{ ['ATTENDED','CANCELLED'].includes(selectedAppointment.status) ? 'Este registro es solo de consulta y ya no puede cambiar de estado.' : `Esta cita todavía figura como ${statusLabel(selectedAppointment.status).toLowerCase()}. No se debe crear otra hasta resolver su estado.` }}</span>
+          <div v-if="isPastAppointment(selectedAppointment)" class="past-appointment-notice" :class="{ warning: !['ATTENDED','NO_SHOW','CANCELLED'].includes(selectedAppointment.status) }">
+            <strong>{{ ['ATTENDED','NO_SHOW','CANCELLED'].includes(selectedAppointment.status) ? 'Cita pasada' : 'Cita pasada sin cierre' }}</strong>
+            <span>{{ ['ATTENDED','NO_SHOW','CANCELLED'].includes(selectedAppointment.status) ? 'Este registro es solo de consulta y ya no puede cambiar de estado.' : `Esta cita todavía figura como ${statusLabel(selectedAppointment.status).toLowerCase()}. No se debe crear otra hasta resolver su estado.` }}</span>
           </div>
           <p><b>Cliente:</b> {{ selectedAppointment.client?.fullName || '-' }}</p>
           <p><b>Contacto:</b> {{ selectedAppointment.client?.phone || selectedAppointment.client?.email || '-' }}</p>
           <p><b>Hora:</b> {{ formatTime(selectedAppointment.scheduledAt) }}</p>
+          <p v-if="selectedAppointment.pickupAt"><b>Recojo estimado:</b> {{ formatDate(selectedAppointment.pickupAt) }} · {{ formatTime(selectedAppointment.pickupAt) }}</p>
           <p><b>Motivo:</b> {{ selectedAppointment.reason }}</p>
           <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
           <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
@@ -855,8 +900,8 @@ onMounted(loadData);
             <button v-if="['PENDING','CONFIRMED','WAITING','IN_CONSULTATION'].includes(selectedAppointment.status)" class="small secondary" @click="setStatus(selectedAppointment,'CANCELLED')">Cancelar</button>
             <button v-if="selectedAppointment.status==='CANCELLED'" class="small" @click="setStatus(selectedAppointment,'PENDING')">Reactivar</button>
           </div>
-          <button v-else-if="!selectedAppointment.notes?.includes('OUTCOME:NO_SHOW') && !['ATTENDED','CANCELLED'].includes(selectedAppointment.status)" type="button" class="secondary full" @click="markNoShow(selectedAppointment)">Cerrar como no asistió</button>
-          <button v-else-if="['ATTENDED','CANCELLED'].includes(selectedAppointment.status)" type="button" class="secondary full" @click="createFollowUpFromPastAppointment">Agendar nueva cita</button>
+          <button v-else-if="!['ATTENDED','NO_SHOW','CANCELLED'].includes(selectedAppointment.status)" type="button" class="secondary full" @click="markNoShow(selectedAppointment)">Cerrar como no asistió</button>
+          <button v-else-if="['ATTENDED','NO_SHOW','CANCELLED'].includes(selectedAppointment.status)" type="button" class="secondary full" @click="createFollowUpFromPastAppointment">Agendar nueva cita</button>
         </div>
       </section>
     </div>
