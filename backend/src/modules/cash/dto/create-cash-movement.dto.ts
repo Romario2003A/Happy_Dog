@@ -12,6 +12,14 @@ export class CreateCashMovementDto {
   @IsString()
   description: string;
 
+  @IsOptional()
+  @IsString()
+  counterparty?: string;
+
+  @IsOptional()
+  @IsString()
+  referenceCode?: string;
+
   @IsNumber()
   @Min(0)
   amount: number;

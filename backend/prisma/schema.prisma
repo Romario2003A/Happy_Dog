@@ -310,6 +310,8 @@ model CashMovement {
   type CashMovementType
   category CashMovementCategory @default(OTHER)
   description String
+  counterparty String?
+  referenceCode String?
   amount Decimal @db.Decimal(10,2)
   paymentMethod PaymentMethod?
   occurredAt DateTime @default(now())

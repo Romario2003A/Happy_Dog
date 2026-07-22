@@ -102,6 +102,8 @@ export class CashService {
         type: dto.type,
         category: dto.category || 'OTHER',
         description: dto.description,
+        counterparty: dto.counterparty || null,
+        referenceCode: dto.referenceCode || null,
         amount: dto.amount,
         paymentMethod: dto.paymentMethod || null,
         occurredAt: this.parseDateTime(dto.occurredAt),

@@ -184,6 +184,8 @@ function defaultCashForm() {
     type: 'INCOME',
     category: 'CONSULTATION',
     description: '',
+    counterparty: '',
+    referenceCode: '',
     amount: 0,
     paymentMethod: 'CASH',
     occurredAt: toDateTimeInput(new Date()),
@@ -1038,6 +1040,12 @@ onMounted(async () => {
         <label class="wide">Detalle
           <input v-model="cashForm.description" required placeholder="Consulta, vacuna, compra, pago pendiente">
         </label>
+        <label>Empresa o proveedor
+          <input v-model="cashForm.counterparty" placeholder="Opcional">
+        </label>
+        <label>Código de operación
+          <input v-model="cashForm.referenceCode" placeholder="Voucher, factura o referencia">
+        </label>
         <label class="full">Notas
           <textarea v-model="cashForm.notes" rows="2" placeholder="Observacion opcional"></textarea>
         </label>
@@ -1046,6 +1054,11 @@ onMounted(async () => {
           <button class="secondary" type="button" @click="resetCashForm(); showCashForm = false">Cancelar</button>
         </div>
       </form>
+
+      <section v-if="cashSummary.byCategory?.length" class="cash-category-summary">
+        <div><span class="badge">Resumen automático</span><h3>Ingresos y movimientos por categoría</h3><p class="muted-text">Reemplaza los conteos manuales del Excel para el día seleccionado.</p></div>
+        <div class="cash-category-grid"><span v-for="item in cashSummary.byCategory" :key="item.key"><small>{{ cashCategoryLabels[item.key] || item.key }}</small><strong>S/ {{ formatMoney(item.total) }}</strong></span></div>
+      </section>
 
       <section v-if="showClosingForm" class="cash-box cash-close-box cash-close-focus">
           <div class="cash-close-header">
@@ -1100,6 +1113,7 @@ onMounted(async () => {
             <td>
               <strong>{{ movement.description }}</strong>
               <small v-if="movement.clientName || movement.petName">{{ movement.clientName || '-' }} · {{ movement.petName || '-' }}</small>
+              <small v-if="movement.counterparty || movement.referenceCode">{{ movement.counterparty || 'Sin proveedor' }}<template v-if="movement.referenceCode"> · Ref. {{ movement.referenceCode }}</template></small>
             </td>
             <td>{{ cashCategoryLabels[movement.category] || movement.category }}</td>
             <td>{{ paymentLabels[movement.paymentMethod] || '-' }}</td>
@@ -1287,6 +1301,13 @@ onMounted(async () => {
   font-weight: 800;
   white-space: nowrap;
 }
+
+.cash-category-summary { display: grid; grid-template-columns: minmax(220px,.7fr) 1.5fr; gap: 18px; align-items: center; padding: 17px; border: 1px solid rgba(13,95,96,.12); border-radius: 20px; background: rgba(255,255,255,.7); }
+.cash-category-summary h3,.cash-category-summary p { margin: 5px 0 0; }
+.cash-category-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 8px; }
+.cash-category-grid span { display: grid; gap: 3px; padding: 11px; border-radius: 14px; background: #e7f5f1; }
+.cash-category-grid small { color: #61736e; font-weight: 800; }
+.cash-category-grid strong { color: #145f61; }
 
 .cash-closed-summary > div {
   display: flex;
@@ -1511,6 +1532,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
+  .cash-category-summary { grid-template-columns: 1fr; }
   .staff-card { grid-template-columns: 1fr; align-items: stretch; }
   .receivable-metrics,.receivable-form-grid,.receivable-card,.receivable-payment { grid-template-columns: 1fr; }
   .receivable-form-grid .wide { grid-column: auto; }
