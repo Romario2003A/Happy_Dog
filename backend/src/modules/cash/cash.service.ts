@@ -61,11 +61,11 @@ export class CashService {
       net: 0,
       movementCount: movements.length,
       byPaymentMethod: [] as Array<{ key: string; total: number }>,
-      byCategory: [] as Array<{ key: string; total: number }>,
+      byCategory: [] as Array<{ key: string; income: number; expenses: number; net: number }>,
       closing,
     };
     const byPayment = new Map<string, number>();
-    const byCategory = new Map<string, number>();
+    const byCategory = new Map<string, { income: number; expenses: number }>();
 
     for (const movement of movements) {
       const amount = Number(movement.amount || 0);
@@ -75,12 +75,22 @@ export class CashService {
       else totals.income += amount;
 
       if (movement.paymentMethod) byPayment.set(movement.paymentMethod, (byPayment.get(movement.paymentMethod) || 0) + amount);
-      if (movement.category) byCategory.set(movement.category, (byCategory.get(movement.category) || 0) + amount);
+      if (movement.category) {
+        const category = byCategory.get(movement.category) || { income: 0, expenses: 0 };
+        if (movement.type === CashMovementType.EXPENSE) category.expenses += amount;
+        else category.income += amount;
+        byCategory.set(movement.category, category);
+      }
     }
 
     totals.net = totals.income + totals.debtPayments + totals.adjustments - totals.expenses;
     totals.byPaymentMethod = Array.from(byPayment.entries()).map(([key, total]) => ({ key, total }));
-    totals.byCategory = Array.from(byCategory.entries()).map(([key, total]) => ({ key, total }));
+    totals.byCategory = Array.from(byCategory.entries()).map(([key, values]) => ({
+      key,
+      income: values.income,
+      expenses: values.expenses,
+      net: values.income - values.expenses,
+    }));
     return totals;
   }
 

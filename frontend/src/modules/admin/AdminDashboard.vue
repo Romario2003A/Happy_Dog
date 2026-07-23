@@ -130,8 +130,12 @@ const availableCashServices = computed(() => activeCashServices.value.filter(ser
 const selectedCashService = computed(() => activeCashServices.value.find(service => service.id === cashServiceId.value));
 const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
 const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.net || 0));
-const closingDifference = computed(() => Number(closingForm.value.countedAmount || 0) - expectedClosingAmount.value);
+const hasClosingCount = computed(() => closingForm.value.countedAmount !== '' && closingForm.value.countedAmount !== null);
+const closingDifference = computed(() => hasClosingCount.value
+  ? Number(closingForm.value.countedAmount) - expectedClosingAmount.value
+  : null);
 const closingStatus = computed(() => {
+  if (!hasClosingCount.value) return { label: 'Pendiente de conteo', tone: 'neutral' };
   if (Math.abs(closingDifference.value) < 0.01) return { label: 'Caja cuadrada', tone: 'ok' };
   return closingDifference.value > 0
     ? { label: 'Sobra dinero', tone: 'warn' }
@@ -235,7 +239,7 @@ async function loadCash() {
         notes: closing.notes || '',
       };
     } else {
-      closingForm.value = { openingAmount: 0, countedAmount: 0, notes: '' };
+      closingForm.value = { openingAmount: 0, countedAmount: '', notes: '' };
     }
   }
 
@@ -1142,8 +1146,8 @@ onMounted(async () => {
       </form>
 
       <section v-if="cashSummary.byCategory?.length" class="cash-category-summary">
-        <div><span class="badge">Resumen automático</span><h3>Ingresos y movimientos por categoría</h3><p class="muted-text">Reemplaza los conteos manuales del Excel para el día seleccionado.</p></div>
-        <div class="cash-category-grid"><span v-for="item in cashSummary.byCategory" :key="item.key"><small>{{ cashCategoryLabels[item.key] || item.key }}</small><strong>S/ {{ formatMoney(item.total) }}</strong></span></div>
+        <div><span class="badge">Resumen automático</span><h3>Resultado por categoría</h3><p class="muted-text">Los ingresos y gastos aparecen separados para evitar totales engañosos.</p></div>
+        <div class="cash-category-grid"><span v-for="item in cashSummary.byCategory" :key="item.key"><small>{{ cashCategoryLabels[item.key] || item.key }}</small><strong>S/ {{ formatMoney(item.net) }}</strong><em>Ingresos S/ {{ formatMoney(item.income) }} · Gastos S/ {{ formatMoney(item.expenses) }}</em></span></div>
       </section>
 
       <section v-if="showClosingForm" class="cash-box cash-close-box cash-close-focus">
@@ -1177,7 +1181,7 @@ onMounted(async () => {
             <div :class="['cash-total', closingStatus.tone]">
               <span>Resultado automatico</span>
               <small>Debe quedar en S/ 0.00.</small>
-              <strong>S/ {{ formatMoney(closingDifference) }}</strong>
+              <strong>{{ hasClosingCount ? `S/ ${formatMoney(closingDifference)}` : 'Ingresa el conteo' }}</strong>
             </div>
             <label>Notas
               <small>Opcional, solo si hubo diferencia.</small>
@@ -1413,6 +1417,7 @@ onMounted(async () => {
 .cash-category-grid span { display: grid; gap: 3px; padding: 11px; border-radius: 14px; background: #e7f5f1; }
 .cash-category-grid small { color: #61736e; font-weight: 800; }
 .cash-category-grid strong { color: #145f61; }
+.cash-category-grid em { color: #61736e; font-size: 11px; font-style: normal; line-height: 1.35; }
 
 .cash-closed-summary > div {
   display: flex;
