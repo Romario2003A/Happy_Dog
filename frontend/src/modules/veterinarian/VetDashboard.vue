@@ -483,6 +483,14 @@ function generatePrescriptionPdf() {
     error.value = 'Selecciona un paciente antes de generar la receta.';
     return;
   }
+  if (!selectedProduct.value) {
+    error.value = 'Selecciona un medicamento antes de generar la receta.';
+    return;
+  }
+  if (!prescription.value.dosage.trim() || !prescription.value.instructions.trim()) {
+    error.value = 'Completa la dosis y las indicaciones antes de generar la receta.';
+    return;
+  }
 
   const prescriptionRows = selectedProduct.value
     ? `
@@ -620,7 +628,15 @@ function generateClinicalHistoryPdf() {
 
 function generateSurgeryConsentPdf() {
   if (!selectedPet.value) {
-    error.value = 'Selecciona un paciente antes de generar la autorizacion quirurgica.';
+    error.value = 'Selecciona un paciente antes de generar la autorización quirúrgica.';
+    return;
+  }
+  if (!surgeryConsent.ownerDni.trim() || !surgeryConsent.ownerAddress.trim() || !surgeryConsent.lastMeal.trim()) {
+    error.value = 'Completa el DNI, la dirección del dueño y la última comida antes de generar la autorización.';
+    return;
+  }
+  if (surgeryConsent.medicalCondition && !surgeryConsent.medicalConditionDetail.trim()) {
+    error.value = 'Describe el problema médico preexistente antes de generar la autorización.';
     return;
   }
 
@@ -1227,7 +1243,7 @@ onUnmounted(() => {
             <div class="prescription-head">
               <div>
                 <h3>Receta / inventario</h3>
-                <p class="muted-text">Selecciona medicamento, dosis e indicaciones para entregarlo como PDF.</p>
+                <p class="muted-text">Selecciona medicamento, dosis e indicaciones. Puedes imprimirla y guardarla en el historial.</p>
               </div>
               <button class="secondary small" type="button" @click="generatePrescriptionPdf">Generar receta en PDF</button>
             </div>
@@ -1253,11 +1269,11 @@ onUnmounted(() => {
               <button class="secondary small" type="button" @click="generateSurgeryConsentPdf">Generar autorización PDF</button>
             </div>
             <div class="form-grid surgery-grid">
-              <input v-model="surgeryConsent.ownerDni" placeholder="DNI del dueño">
-              <input v-model="surgeryConsent.ownerAddress" placeholder="Dirección del dueño">
+              <input v-model="surgeryConsent.ownerDni" required placeholder="DNI del dueño *">
+              <input v-model="surgeryConsent.ownerAddress" required placeholder="Dirección del dueño *">
               <input v-model="surgeryConsent.petAge" placeholder="Edad de la mascota">
               <input v-model="surgeryConsent.petColor" placeholder="Color de la mascota">
-              <input v-model="surgeryConsent.lastMeal" placeholder="Última comida">
+              <input v-model="surgeryConsent.lastMeal" required placeholder="Última comida *">
               <input v-model="surgeryConsent.medication" placeholder="Medicamento actual">
               <input v-model="surgeryConsent.alternativeName" placeholder="Persona alternativa para recojo">
               <input v-model="surgeryConsent.alternativePhone" placeholder="Teléfono alternativo">
@@ -1269,7 +1285,7 @@ onUnmounted(() => {
                 <input v-model="surgeryConsent.medicalCondition" type="checkbox">
                 Problema médico preexistente
               </label>
-              <textarea v-model="surgeryConsent.medicalConditionDetail" placeholder="Detalle del problema médico, si aplica"></textarea>
+              <textarea v-model="surgeryConsent.medicalConditionDetail" :required="surgeryConsent.medicalCondition" placeholder="Detalle del problema médico, si aplica"></textarea>
               <textarea v-model="surgeryConsent.staffNotes" placeholder="Anotaciones u observaciones del personal"></textarea>
             </div>
           </section>
