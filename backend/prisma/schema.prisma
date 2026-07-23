@@ -283,6 +283,7 @@ model Product {
   active            Boolean             @default(true)
   prescriptionItems PrescriptionItem[]
   saleItems         SaleItem[]
+  cashMovements     CashMovement[]
   movements         InventoryMovement[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -352,12 +353,15 @@ model CashMovement {
   petId          String?
   saleId         String?
   appointmentId  String?
+  productId      String?
+  productQuantity Int?
   notes          String?
   registeredById String?
   client         Client?              @relation(fields: [clientId], references: [id], onDelete: SetNull)
   pet            Pet?                 @relation(fields: [petId], references: [id], onDelete: SetNull)
   sale           Sale?                @relation(fields: [saleId], references: [id], onDelete: SetNull)
   appointment    Appointment?         @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  product        Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   registeredBy   User?                @relation(fields: [registeredById], references: [id], onDelete: SetNull)
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
@@ -368,6 +372,7 @@ model CashMovement {
   @@index([paymentMethod])
   @@index([clientId])
   @@index([petId])
+  @@index([productId])
 }
 
 model CashClosing {

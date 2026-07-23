@@ -137,6 +137,10 @@ const activeCashServices = computed(() => services.value.filter(service => servi
 const cashServiceCategories = computed(() => [...new Set(activeCashServices.value.map(service => service.category || 'Otros'))].sort());
 const availableCashServices = computed(() => activeCashServices.value.filter(service => (service.category || 'Otros') === cashServiceCategory.value));
 const selectedCashService = computed(() => activeCashServices.value.find(service => service.id === cashServiceId.value));
+const availableCashProducts = computed(() => inventory.value.filter(product => product.active !== false && Number(product.stock) > 0));
+const selectedCashProduct = computed(() => cashForm.value.type === 'INCOME' && cashForm.value.category === 'PRODUCT'
+  ? availableCashProducts.value.find(product => product.id === cashForm.value.productId)
+  : null);
 const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
 const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.net || 0));
 const hasClosingCount = computed(() => closingForm.value.countedAmount !== '' && closingForm.value.countedAmount !== null);
@@ -213,6 +217,8 @@ function defaultCashForm() {
     clientName: '',
     petName: '',
     notes: '',
+    productId: '',
+    productQuantity: 1,
   };
 }
 
@@ -540,11 +546,26 @@ function selectCashService() {
   cashForm.value.notes = service.priceLabel || '';
 }
 
+function selectCashProduct() {
+  const product = selectedCashProduct.value;
+  if (!product) return;
+  cashForm.value.type = 'INCOME';
+  cashForm.value.category = 'PRODUCT';
+  cashForm.value.description = `Venta · ${product.name}`;
+  cashForm.value.amount = Number(product.unitPrice || 0) * Number(cashForm.value.productQuantity || 1);
+}
+
+function updateCashProductTotal() {
+  if (selectedCashProduct.value) selectCashProduct();
+}
+
 function cashPayload() {
   return {
     ...cashForm.value,
     amount: Number(cashForm.value.amount),
     paymentMethod: cashForm.value.type === 'EXPENSE' ? null : cashForm.value.paymentMethod,
+    productId: cashForm.value.category === 'PRODUCT' && cashForm.value.type === 'INCOME' ? cashForm.value.productId || undefined : undefined,
+    productQuantity: cashForm.value.category === 'PRODUCT' && cashForm.value.type === 'INCOME' && cashForm.value.productId ? Number(cashForm.value.productQuantity || 1) : undefined,
   };
 }
 
@@ -1200,8 +1221,20 @@ onMounted(async () => {
             <option v-for="option in cashCategoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
+        <label v-if="cashForm.type === 'INCOME' && cashForm.category === 'PRODUCT'" class="wide">Producto del inventario
+          <select v-model="cashForm.productId" required @change="selectCashProduct">
+            <option value="">Seleccionar producto</option>
+            <option v-for="product in availableCashProducts" :key="product.id" :value="product.id">{{ product.name }}{{ product.presentation ? ` · ${product.presentation}` : '' }} — S/ {{ formatPrice(product.unitPrice) }} · Stock {{ product.stock }}</option>
+          </select>
+          <small v-if="selectedCashProduct">El stock se descontará automáticamente al guardar el cobro.</small>
+          <small v-else-if="!availableCashProducts.length">No hay productos con stock disponible.</small>
+        </label>
+        <label v-if="selectedCashProduct">Cantidad
+          <input v-model.number="cashForm.productQuantity" type="number" min="1" :max="selectedCashProduct.stock" required @input="updateCashProductTotal">
+          <small>Disponible: {{ selectedCashProduct.stock }}</small>
+        </label>
         <label>Monto
-          <input v-model.number="cashForm.amount" type="number" min="0" step="0.01" required placeholder="0.00">
+          <input v-model.number="cashForm.amount" type="number" min="0" step="0.01" required placeholder="0.00" :readonly="Boolean(selectedCashProduct)">
         </label>
         <label>Metodo
           <select v-model="cashForm.paymentMethod" :disabled="cashForm.type === 'EXPENSE'">
@@ -1292,6 +1325,7 @@ onMounted(async () => {
             <td>{{ formatCashDateTime(movement.occurredAt) }}</td>
             <td>
               <strong>{{ movement.description }}</strong>
+              <small v-if="movement.product">{{ movement.product.name }} · {{ movement.productQuantity }} unidad(es) descontada(s)</small>
               <small v-if="movement.clientName || movement.petName">{{ movement.clientName || '-' }} · {{ movement.petName || '-' }}</small>
               <small v-if="movement.counterparty || movement.referenceCode">{{ movement.counterparty || 'Sin proveedor' }}<template v-if="movement.referenceCode"> · Ref. {{ movement.referenceCode }}</template></small>
             </td>

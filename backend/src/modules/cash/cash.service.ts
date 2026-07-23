@@ -19,6 +19,7 @@ export class CashService {
         client: { select: { id: true, fullName: true, phone: true, email: true } },
         pet: { select: { id: true, name: true, species: true, breed: true } },
         registeredBy: { select: { id: true, fullName: true, role: true } },
+        product: { select: { id: true, name: true, sku: true, presentation: true } },
       },
     });
   }
@@ -107,14 +108,27 @@ export class CashService {
       if (existing) throw new BadRequestException('Esta atención ya fue cobrada.');
     }
 
-    return (this.prisma as any).cashMovement.create({
-      data: {
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      let product = null;
+      const productQuantity = Number(dto.productQuantity || 0);
+      if (dto.productId) {
+        if (dto.type !== CashMovementType.INCOME || dto.category !== 'PRODUCT') {
+          throw new BadRequestException('Los productos solo pueden registrarse como una venta de producto.');
+        }
+        product = await tx.product.findUnique({ where: { id: dto.productId } });
+        if (!product || product.active === false) throw new BadRequestException('El producto no está disponible.');
+        if (productQuantity < 1) throw new BadRequestException('Selecciona una cantidad válida.');
+        if (Number(product.stock) < productQuantity) throw new BadRequestException(`Stock insuficiente. Solo quedan ${product.stock} unidades.`);
+      }
+
+      const movement = await tx.cashMovement.create({
+        data: {
         type: dto.type,
         category: dto.category || 'OTHER',
         description: dto.description,
         counterparty: dto.counterparty || null,
         referenceCode: dto.referenceCode || null,
-        amount: dto.amount,
+        amount: product ? Number(product.unitPrice) * productQuantity : dto.amount,
         paymentMethod: dto.paymentMethod || null,
         occurredAt: this.parseDateTime(dto.occurredAt),
         clientName: dto.clientName || null,
@@ -125,7 +139,16 @@ export class CashService {
         appointmentId: dto.appointmentId || null,
         notes: dto.notes || null,
         registeredById: userId || null,
-      },
+        productId: product?.id || null,
+        productQuantity: product ? productQuantity : null,
+        },
+      });
+      if (product) {
+        const updated = await tx.product.updateMany({ where: { id: product.id, stock: { gte: productQuantity } }, data: { stock: { decrement: productQuantity } } });
+        if (updated.count !== 1) throw new BadRequestException('El stock cambió mientras registrabas la venta. Revisa la cantidad disponible.');
+        await tx.inventoryMovement.create({ data: { productId: product.id, type: 'SALE', quantity: productQuantity, reason: dto.description, referenceId: movement.id } });
+      }
+      return movement;
     });
   }
 
@@ -140,8 +163,16 @@ export class CashService {
     });
   }
 
-  removeMovement(id: string) {
-    return (this.prisma as any).cashMovement.delete({ where: { id } });
+  async removeMovement(id: string) {
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const movement = await tx.cashMovement.findUnique({ where: { id } });
+      if (!movement) throw new BadRequestException('Movimiento no encontrado.');
+      if (movement.productId && movement.productQuantity) {
+        await tx.product.update({ where: { id: movement.productId }, data: { stock: { increment: movement.productQuantity } } });
+        await tx.inventoryMovement.create({ data: { productId: movement.productId, type: 'IN', quantity: movement.productQuantity, reason: 'Venta anulada', referenceId: movement.id } });
+      }
+      return tx.cashMovement.delete({ where: { id } });
+    });
   }
 
   async closeDay(dto: CreateCashClosingDto, userId?: string) {
