@@ -1,16 +1,25 @@
 <script setup>
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import happyDogLogo from '../assets/images/happy-dog-logo.jpeg';
 
 defineProps({ title: String, subtitle: String, hideUserPill: Boolean, hideSidebar: Boolean, accountPath: String, shellClass: String });
 
 const auth = useAuthStore();
+const router = useRouter();
 const accountOpen = ref(false);
 const accountLoading = ref(false);
 const accountError = ref('');
 const accountSuccess = ref('');
 const accountForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' });
+
+function goHome() {
+  if (auth.role === 'CLIENT') return router.push('/cliente/dashboard');
+  if (auth.role === 'VETERINARIAN') return router.push('/veterinario');
+  if (auth.role === 'ADMIN') return router.push('/admin');
+  return router.push('/recepcion');
+}
 
 async function changeAccountPassword() {
   accountError.value = '';
@@ -38,17 +47,19 @@ async function changeAccountPassword() {
 <template>
   <div class="app-shell" :class="[shellClass, { 'sidebar-hidden': hideSidebar }]">
     <aside v-if="!hideSidebar" class="sidebar glass-panel">
-      <div class="brand brand-with-wordmark">
+      <button type="button" class="brand brand-with-wordmark brand-home-link" aria-label="Volver al inicio" @click="goHome">
         <img class="brand-wordmark" :src="happyDogLogo" alt="Happy Dog">
         <small>{{ title }}</small>
-      </div>
+      </button>
       <nav><slot name="nav" /></nav>
       <button class="ghost" @click="auth.logout(); $router.push('/personal/login')">Cerrar sesión</button>
     </aside>
     <main class="dashboard-main">
       <header class="topbar glass-panel">
         <div class="topbar-brand-block">
-          <img v-if="hideSidebar" :src="happyDogLogo" alt="Happy Dog">
+          <button v-if="hideSidebar" type="button" class="topbar-logo-home" aria-label="Volver al inicio" @click="goHome">
+            <img :src="happyDogLogo" alt="Happy Dog">
+          </button>
           <div>
             <h1>{{ title }}</h1>
             <p>{{ subtitle }}</p>

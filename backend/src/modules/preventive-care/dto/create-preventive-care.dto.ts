@@ -9,6 +9,9 @@ export class CreatePreventiveCareDto {
   @IsOptional() @IsNumber() amountCharged?: number;
   @IsOptional() @IsDateString() nextAppointmentAt?: string;
   @IsOptional() @IsBoolean() sterilizationRecommended?: boolean;
+  @IsOptional() @IsBoolean() dewormed?: boolean;
+  @IsOptional() @IsBoolean() followUpCalled?: boolean;
+  @IsOptional() @IsBoolean() sterilizationCallDone?: boolean;
   @IsOptional() @IsString() notes?: string;
   @IsString() petId: string;
   @IsString() veterinarianId: string;

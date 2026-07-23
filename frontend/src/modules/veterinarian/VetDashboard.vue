@@ -29,7 +29,7 @@ const consultationTabs = [
   { value: 'plan', label: 'Plan médico', help: 'Tratamiento y control' },
 ];
 const selectedDocuments = reactive({ prescription: false, clinicalHistory: false, surgeryConsent: false });
-const preventiveForm = reactive({ type:'DEWORMING', appliedAt:dateKey(), productName:'', nextProductName:'', weightKg:null, amountCharged:null, nextAppointmentAt:'', sterilizationRecommended:false, notes:'' });
+const preventiveForm = reactive({ type:'DEWORMING', appliedAt:dateKey(), productName:'', nextProductName:'', weightKg:null, amountCharged:null, nextAppointmentAt:'', dewormed:false, followUpCalled:false, sterilizationRecommended:false, sterilizationCallDone:false, notes:'' });
 const preventiveSaving = ref(false);
 const accountOpen = ref(false);
 const accountLoading = ref(false);
@@ -239,6 +239,45 @@ function formatPrice(value) {
   return Number(value || 0).toFixed(2);
 }
 
+function dateParts(value) {
+  const date = new Date(value);
+  const yearStart = new Date(date.getFullYear(), 0, 1);
+  return {
+    year: date.getFullYear(),
+    month: new Intl.DateTimeFormat('es-PE', { month: 'long' }).format(date),
+    week: Math.ceil((((date - yearStart) / 86400000) + yearStart.getDay() + 1) / 7),
+    day: new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: '2-digit' }).format(date),
+  };
+}
+
+function whatsappPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length === 9 ? `51${digits}` : digits;
+}
+
+function sendPrescriptionToWhatsApp() {
+  if (!selectedPet.value || !selectedProduct.value || !prescription.value.dosage.trim() || !prescription.value.instructions.trim()) {
+    error.value = 'Completa el medicamento, la dosis y las indicaciones antes de enviarla.';
+    return;
+  }
+  const phone = whatsappPhone(selectedClient.value?.phone);
+  if (phone.length < 10) {
+    error.value = 'El propietario no tiene un número telefónico válido registrado.';
+    return;
+  }
+  const message = [
+    'HAPPY DOG - RECETA VETERINARIA',
+    `Paciente: ${selectedPet.value.name || '-'}`,
+    `Propietario: ${selectedClient.value?.fullName || '-'}`,
+    `Medicamento: ${selectedProduct.value.name}`,
+    `Cantidad: ${prescription.value.quantity || 1}`,
+    `Dosis: ${prescription.value.dosage}`,
+    `Indicaciones: ${prescription.value.instructions}`,
+    `Médico: ${auth.user?.fullName || 'Doctor veterinario'}`,
+  ].join('\n');
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+}
+
 function greeting() {
   const hour = new Date().getHours();
   if (hour < 12) return 'Buenos días';
@@ -381,7 +420,7 @@ async function savePreventiveRecord() {
       nextAppointmentAt:preventiveForm.nextAppointmentAt || undefined,
     });
     preventiveRecords.value = [data, ...preventiveRecords.value];
-    preventiveForm.productName = ''; preventiveForm.nextProductName = ''; preventiveForm.weightKg = null; preventiveForm.amountCharged = null; preventiveForm.nextAppointmentAt = ''; preventiveForm.sterilizationRecommended = false; preventiveForm.notes = '';
+    preventiveForm.productName = ''; preventiveForm.nextProductName = ''; preventiveForm.weightKg = null; preventiveForm.amountCharged = null; preventiveForm.nextAppointmentAt = ''; preventiveForm.dewormed = false; preventiveForm.followUpCalled = false; preventiveForm.sterilizationRecommended = false; preventiveForm.sterilizationCallDone = false; preventiveForm.notes = '';
   } catch (e) { error.value = e.response?.data?.message || 'No se pudo guardar el registro preventivo.'; }
   finally { preventiveSaving.value = false; }
 }
@@ -517,7 +556,8 @@ function generatePrescriptionPdf() {
         <style>
           body{font-family:Arial,sans-serif;color:#172522;margin:36px}
           .header{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #155b66;padding-bottom:18px;margin-bottom:22px}
-          .brand{font-size:30px;font-weight:800;color:#155b66}
+          .brand{display:flex;align-items:center;gap:12px;font-size:30px;font-weight:800;color:#155b66}
+          .brand img{width:70px;height:56px;object-fit:cover;border-radius:12px}
           .muted{color:#66736f}
           .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin:18px 0}
           .box{border:1px solid #d9e8e3;border-radius:12px;padding:14px;margin:14px 0}
@@ -532,8 +572,8 @@ function generatePrescriptionPdf() {
       <body>
         <section class="header">
           <div>
-            <div class="brand">Happy Dog</div>
-            <div class="muted">Receta veterinaria</div>
+            <div class="brand"><img src="${happyDogLogo}" alt="Happy Dog"><span>Happy Dog</span></div>
+            <div class="muted">Receta veterinaria oficial</div>
           </div>
           <div>
             <strong>Fecha:</strong> ${escapeHtml(formatDate(new Date()))}<br>
@@ -1049,11 +1089,11 @@ onUnmounted(() => {
             <button type="button" @click="startClinicalTask('prescription')"><span>03</span><div><strong>Emitir receta</strong><small>Medicamento, dosis e indicaciones</small></div></button>
             <button type="button" @click="startClinicalTask('history')"><span>04</span><div><strong>Historia clínica</strong><small>Completar o generar el documento Happy Dog</small></div></button>
             <button type="button" @click="activeWorkspace = 'history'"><span>05</span><div><strong>Consultas anteriores</strong><small>Revisar antecedentes del paciente</small></div></button>
-            <button type="button" class="task-secondary" @click="startClinicalTask('surgery')"><span>06</span><div><strong>Cirugía</strong><small>Evaluación y autorización quirúrgica</small></div></button>
+            <button type="button" class="task-secondary" @click="startClinicalTask('surgery')"><span>06</span><div><strong>Esterilización / castración</strong><small>Evaluación y documento de autorización</small></div></button>
           </div>
         </section>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
-          <div class="current-task-bar"><span><strong>Paso 3 de 3</strong> · {{ activeTask === 'consultation' ? 'Consulta médica' : activeTask === 'preventive' ? 'Vacuna o desparasitación' : activeTask === 'prescription' ? 'Receta médica' : activeTask === 'history' ? 'Historia clínica' : 'Cirugía' }}</span></div>
+          <div class="current-task-bar"><span><strong>Paso 3 de 3</strong> · {{ activeTask === 'consultation' ? 'Consulta médica' : activeTask === 'preventive' ? 'Vacuna o desparasitación' : activeTask === 'prescription' ? 'Receta médica' : activeTask === 'history' ? 'Historia clínica' : 'Esterilización / castración' }}</span></div>
           <section v-if="activeTask === 'consultation'" class="attention-type-box">
             <label>Tipo de atención
               <select v-model="attentionType"><option v-for="type in attentionTypes" :key="type.value" :value="type.value">{{ type.label }} — {{ type.help }}</option></select>
@@ -1221,6 +1261,15 @@ onUnmounted(() => {
             </template>
             <div v-if="activeTask === 'preventive'" class="preventive-editor standalone-preventive">
               <div class="document-section-label"><strong>Vacunas y desparasitaciones</strong><small>Se guardan en la ficha de {{ selectedPet.name }}</small></div>
+              <div class="document-auto-grid preventive-auto-grid">
+                <div><span>Paciente</span><strong>{{ selectedPet.name }}</strong></div>
+                <div><span>Dueño</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
+                <div><span>Teléfono</span><strong>{{ selectedClient?.phone || '-' }}</strong></div>
+                <div><span>Raza</span><strong>{{ selectedPet.breed || '-' }}</strong></div>
+                <div><span>Sexo</span><strong>{{ sexLabel(selectedPet.sex) }}</strong></div>
+                <div><span>Edad</span><strong>{{ selectedPet.age || '-' }}</strong></div>
+                <div><span>Médico</span><strong>{{ auth.user?.fullName || 'Doctor veterinario' }}</strong></div>
+              </div>
               <form class="preventive-form" @submit.prevent="savePreventiveRecord">
                 <label>Registro<select v-model="preventiveForm.type"><option value="DEWORMING">Desparasitación</option><option value="VACCINE">Vacuna</option></select></label>
                 <label>Fecha<input v-model="preventiveForm.appliedAt" type="date" required></label>
@@ -1229,23 +1278,29 @@ onUnmounted(() => {
                 <label>Costo histórico<input v-model.number="preventiveForm.amountCharged" type="number" min="0" step="0.01" placeholder="S/ 0.00"></label>
                 <label v-if="preventiveForm.type === 'VACCINE'">Próxima vacuna<input v-model="preventiveForm.nextProductName" placeholder="Ej. Refuerzo quíntuple"></label>
                 <label>Próxima cita<input v-model="preventiveForm.nextAppointmentAt" type="date"></label>
+                <label v-if="preventiveForm.type === 'VACCINE'" class="preventive-check"><input v-model="preventiveForm.dewormed" type="checkbox"> Desparasitación realizada</label>
+                <label class="preventive-check"><input v-model="preventiveForm.followUpCalled" type="checkbox"> Llamada de seguimiento realizada</label>
                 <label class="preventive-check"><input v-model="preventiveForm.sterilizationRecommended" type="checkbox"> Recomendar llamada para esterilización</label>
+                <label v-if="preventiveForm.sterilizationRecommended" class="preventive-check"><input v-model="preventiveForm.sterilizationCallDone" type="checkbox"> Llamada para esterilizar realizada</label>
                 <button :disabled="preventiveSaving">{{ preventiveSaving ? 'Guardando...' : 'Agregar registro' }}</button>
               </form>
               <h4>3. Desparasitaciones</h4>
               <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Desparasitante</th><th>Peso</th><th>Costo</th><th>Firma y sello</th><th>Próxima cita</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'DEWORMING')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.weightKg ? record.weightKg + ' kg' : '-' }}</td><td>{{ record.amountCharged != null ? 'S/ ' + formatPrice(record.amountCharged) : '-' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'DEWORMING')"><td colspan="7" class="muted-text">Sin desparasitaciones registradas.</td></tr></tbody></table></div>
               <h4>4. Vacunas</h4>
-              <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Vacuna</th><th>Costo</th><th>Próxima vacuna</th><th>Próxima cita</th><th>Firma y sello</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'VACCINE')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.amountCharged != null ? 'S/ ' + formatPrice(record.amountCharged) : '-' }}</td><td>{{ record.nextProductName || '-' }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'VACCINE')"><td colspan="7" class="muted-text">Sin vacunas registradas.</td></tr></tbody></table></div>
+              <div class="preventive-table-wrap"><table class="preventive-table preventive-full-table"><thead><tr><th>Año</th><th>Mes</th><th>Semana</th><th>Día</th><th>Paciente</th><th>Dueño</th><th>Teléfono</th><th>Raza</th><th>Sexo</th><th>Edad</th><th>Vacuna aplicada</th><th>Costo</th><th>Próxima vacuna</th><th>Fecha próxima vacunación</th><th>Desparasitación</th><th>Médico</th><th>Llamada</th><th>Llamada esterilización</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'VACCINE')" :key="record.id"><td>{{ dateParts(record.appliedAt).year }}</td><td>{{ dateParts(record.appliedAt).month }}</td><td>{{ dateParts(record.appliedAt).week }}</td><td>{{ dateParts(record.appliedAt).day }}</td><td>{{ selectedPet.name }}</td><td>{{ selectedClient?.fullName || '-' }}</td><td>{{ selectedClient?.phone || '-' }}</td><td>{{ selectedPet.breed || '-' }}</td><td>{{ sexLabel(selectedPet.sex) }}</td><td>{{ selectedPet.age || '-' }}</td><td>{{ record.productName }}</td><td>{{ record.amountCharged != null ? 'S/ ' + formatPrice(record.amountCharged) : '-' }}</td><td>{{ record.nextProductName || '-' }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td>{{ record.dewormed ? 'Sí' : 'No' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.followUpCalled ? 'Realizada' : 'Pendiente' }}</td><td>{{ record.sterilizationRecommended ? (record.sterilizationCallDone ? 'Realizada' : 'Pendiente') : 'No aplica' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'VACCINE')"><td colspan="19" class="muted-text">Sin vacunas registradas.</td></tr></tbody></table></div>
             </div>
           </section>
 
           <section v-if="activeTask === 'prescription'" class="prescription-box">
             <div class="prescription-head">
               <div>
-                <h3>Receta / inventario</h3>
-                <p class="muted-text">Selecciona medicamento, dosis e indicaciones. Puedes imprimirla y guardarla en el historial.</p>
+                <h3>Receta veterinaria Happy Dog</h3>
+                <p class="muted-text">Completa el documento, guárdalo en el historial y compártelo con el propietario.</p>
               </div>
-              <button class="secondary small" type="button" @click="generatePrescriptionPdf">Generar receta en PDF</button>
+              <div class="document-head-actions">
+                <button class="secondary small" type="button" @click="generatePrescriptionPdf">Generar receta en PDF</button>
+                <button class="secondary small" type="button" @click="sendPrescriptionToWhatsApp">Enviar por WhatsApp</button>
+              </div>
             </div>
             <select v-model="prescription.productId">
               <option value="">Sin medicamento</option>
@@ -1263,8 +1318,8 @@ onUnmounted(() => {
           <section v-if="activeTask === 'surgery'" class="surgery-consent-box">
             <div class="prescription-head">
               <div>
-                <h3>Autorización de cirugía</h3>
-                <p class="muted-text">Para esterilización o castración. Completa los datos y genera el documento para firma.</p>
+                <h3>Documento de esterilización / castración</h3>
+                <p class="muted-text">Este es el formulario específico de autorización. Completa los datos y genera el documento para firma.</p>
               </div>
               <button class="secondary small" type="button" @click="generateSurgeryConsentPdf">Generar autorización PDF</button>
             </div>

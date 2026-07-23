@@ -175,6 +175,9 @@ model PreventiveCareRecord {
   amountCharged            Decimal?           @db.Decimal(10, 2)
   nextAppointmentAt        DateTime?
   sterilizationRecommended Boolean            @default(false)
+  dewormed                 Boolean            @default(false)
+  followUpCalled           Boolean            @default(false)
+  sterilizationCallDone    Boolean            @default(false)
   notes                    String?
   petId                    String
   veterinarianId           String
