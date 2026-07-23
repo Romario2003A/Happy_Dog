@@ -411,6 +411,15 @@ td small{display:block;color:var(--muted);margin-top:4px;font-weight:700}
 .inventory-mini-stats span{display:inline-flex;align-items:center;gap:6px;padding:9px 11px;border-radius:999px;background:rgba(15,143,125,.07);border:1px solid var(--line);color:var(--blue-dark);font-size:13px;font-weight:800}
 .inventory-mini-stats strong{font-size:16px;color:var(--ink)}
 .product-cell strong{display:block}
+.product-cell small{display:block;margin-top:3px;color:var(--muted)}
+.product-cell .expiry-alert{color:#a64b32;font-weight:800}
+.inventory-detail-card{align-self:start}
+.inventory-movement-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.inventory-movement-form{padding:14px;border:1px solid var(--line);border-radius:16px;background:rgba(232,247,243,.62)}
+.inventory-history{display:grid;gap:0;margin-top:18px}
+.inventory-history article{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:12px 2px;border-top:1px solid var(--line)}
+.inventory-history article div{display:grid;gap:3px}
+.inventory-history article small,.inventory-history time{color:var(--muted);font-size:12px}
 .stock-pill{display:inline-flex;align-items:center;justify-content:center;min-width:92px;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900;border:1px solid transparent}
 .stock-pill.ok{background:rgba(134,214,173,.22);border-color:rgba(15,143,125,.18);color:#0f6f60}
 .stock-pill.low{background:rgba(245,200,106,.24);border-color:rgba(184,135,70,.2);color:#7b5a16}

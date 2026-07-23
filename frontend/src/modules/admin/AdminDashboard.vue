@@ -22,7 +22,11 @@ const saving = ref(false);
 const showProductForm = ref(false);
 const editingProductId = ref('');
 const inventorySearch = ref('');
-const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
+const productForm = ref(defaultProductForm());
+const inventoryDetail = ref(null);
+const inventoryMovements = ref([]);
+const inventoryMovementForm = ref({ type: 'IN', quantity: 1, reason: '', referenceId: '' });
+const showInventoryMovement = ref(false);
 const serviceSearch = ref('');
 const showServiceCatalog = ref(false);
 const showServiceForm = ref(false);
@@ -100,6 +104,7 @@ const inventoryStats = computed(() => ({
   active: inventory.value.filter(p => p.active !== false).length,
   low: lowStockProducts.value.length,
   inactive: inventory.value.filter(p => p.active === false).length,
+  expiring: inventory.value.filter(isExpiringSoon).length,
 }));
 const upcomingAdminAppointments = computed(() => appointments.value
   .filter(item => new Date(item.scheduledAt) >= new Date() && item.status !== 'CANCELLED')
@@ -112,6 +117,10 @@ const filteredInventory = computed(() => {
     product.name,
     product.category,
     product.sku,
+    product.brand,
+    product.presentation,
+    product.supplier,
+    product.batchNumber,
   ].some(value => String(value || '').toLowerCase().includes(query)));
 });
 const filteredServices = computed(() => {
@@ -358,7 +367,11 @@ async function loadData() {
 }
 
 function resetProductForm() {
-  productForm.value = { name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 };
+  productForm.value = defaultProductForm();
+}
+
+function defaultProductForm() {
+  return { name: '', sku: '', category: '', description: '', brand: '', presentation: '', supplier: '', purchasePrice: null, unitPrice: 0, stock: 0, minStock: 0, batchNumber: '', expirationDate: '' };
 }
 
 function productPayload() {
@@ -367,6 +380,8 @@ function productPayload() {
     unitPrice: Number(productForm.value.unitPrice),
     stock: Number(productForm.value.stock),
     minStock: Number(productForm.value.minStock),
+    purchasePrice: productForm.value.purchasePrice === '' || productForm.value.purchasePrice === null ? null : Number(productForm.value.purchasePrice),
+    expirationDate: productForm.value.expirationDate || null,
   };
 }
 
@@ -376,9 +391,17 @@ function startEditProduct(product) {
   productForm.value = {
     name: product.name || '',
     category: product.category || '',
+    sku: product.sku || '',
+    description: product.description || '',
+    brand: product.brand || '',
+    presentation: product.presentation || '',
+    supplier: product.supplier || '',
+    purchasePrice: product.purchasePrice === null ? null : Number(product.purchasePrice || 0),
     unitPrice: Number(product.unitPrice || 0),
     stock: Number(product.stock || 0),
     minStock: Number(product.minStock || 0),
+    batchNumber: product.batchNumber || '',
+    expirationDate: product.expirationDate ? String(product.expirationDate).slice(0, 10) : '',
   };
   showProductForm.value = true;
 }
@@ -448,6 +471,44 @@ function resetCashForm() {
   cashForm.value = defaultCashForm();
   cashServiceCategory.value = '';
   cashServiceId.value = '';
+}
+
+function isExpiringSoon(product) {
+  if (!product.expirationDate || product.active === false) return false;
+  const days = (new Date(product.expirationDate) - new Date()) / 86400000;
+  return days >= 0 && days <= 60;
+}
+
+function productExpiryLabel(product) {
+  if (!product.expirationDate) return '';
+  const date = new Date(product.expirationDate);
+  if (date < new Date()) return `Vencido · ${date.toLocaleDateString('es-PE')}`;
+  return `${isExpiringSoon(product) ? 'Vence pronto · ' : 'Vence · '}${date.toLocaleDateString('es-PE')}`;
+}
+
+async function openInventoryHistory(product) {
+  inventoryDetail.value = product;
+  showInventoryMovement.value = false;
+  inventoryMovementForm.value = { type: 'IN', quantity: 1, reason: '', referenceId: '' };
+  try { inventoryMovements.value = (await api.get(`/inventory/${product.id}/movements`)).data; }
+  catch (e) { error.value = e.response?.data?.message || 'No se pudo cargar el historial.'; }
+}
+
+async function saveInventoryMovement() {
+  if (!inventoryDetail.value || Number(inventoryMovementForm.value.quantity) < 0) return;
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    await api.post(`/inventory/${inventoryDetail.value.id}/movements`, { ...inventoryMovementForm.value, quantity: Number(inventoryMovementForm.value.quantity) });
+    success.value = 'Stock actualizado y movimiento registrado.';
+    await loadData();
+    const updated = inventory.value.find(item => item.id === inventoryDetail.value.id);
+    if (updated) await openInventoryHistory(updated);
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo registrar el movimiento.'; }
+  finally { saving.value = false; }
+}
+
+function inventoryMovementLabel(type) {
+  return ({ IN: 'Entrada', OUT: 'Salida', ADJUSTMENT: 'Conteo físico', SALE: 'Venta', PRESCRIPTION: 'Uso médico' })[type] || type;
 }
 
 function normalizeServiceText(value) {
@@ -890,7 +951,7 @@ onMounted(async () => {
       </section>
     </div>
 
-    <div v-else-if="active==='inventario'" class="panel-grid" :class="{ single: !showProductForm }">
+    <div v-else-if="active==='inventario'" class="panel-grid" :class="{ single: !showProductForm && !inventoryDetail }">
       <section class="glass-card">
         <div class="section-title">
           <div>
@@ -905,6 +966,7 @@ onMounted(async () => {
             <span><strong>{{ inventoryStats.active }}</strong> activos</span>
             <span><strong>{{ inventoryStats.low }}</strong> stock bajo</span>
             <span><strong>{{ inventoryStats.inactive }}</strong> retirados</span>
+            <span><strong>{{ inventoryStats.expiring }}</strong> por vencer</span>
           </div>
         </div>
         <table>
@@ -914,7 +976,9 @@ onMounted(async () => {
             <tr v-for="p in filteredInventory" :key="p.id" :class="{ 'muted-row': p.active === false }">
               <td class="product-cell">
                 <strong>{{ p.name }}</strong>
-                <small v-if="p.sku">SKU: {{ p.sku }}</small>
+                <small>{{ [p.brand, p.presentation].filter(Boolean).join(' · ') || 'Sin marca o presentación' }}</small>
+                <small v-if="p.sku">Código: {{ p.sku }}</small>
+                <small v-if="productExpiryLabel(p)" :class="{ 'expiry-alert': isExpiringSoon(p) || new Date(p.expirationDate) < new Date() }">{{ productExpiryLabel(p) }}</small>
               </td>
               <td>{{ p.category || '-' }}</td>
               <td>S/ {{ formatPrice(p.unitPrice) }}</td>
@@ -923,6 +987,7 @@ onMounted(async () => {
               <td>
                 <div class="table-actions">
                   <button class="ghost small" type="button" @click="startEditProduct(p)">Editar</button>
+                  <button class="ghost small" type="button" @click="openInventoryHistory(p)">Stock</button>
                   <button class="secondary small" type="button" @click="toggleProductActive(p)">{{ p.active === false ? 'Activar' : 'Retirar' }}</button>
                   <button class="danger small" type="button" @click="deleteProduct(p)">Eliminar</button>
                 </div>
@@ -941,10 +1006,18 @@ onMounted(async () => {
         </div>
         <form class="stack" @submit.prevent="saveProduct">
           <label>Producto<input v-model="productForm.name" required placeholder="Vacuna, medicamento, alimento"></label>
+          <label>Código o SKU<input v-model="productForm.sku" placeholder="Código de barras o código interno"></label>
           <label>Categoria<input v-model="productForm.category" placeholder="Medicamento"></label>
-          <label>Precio<input v-model.number="productForm.unitPrice" type="number" min="0" step="0.01" required></label>
-          <label>Stock<input v-model.number="productForm.stock" type="number" min="0" required></label>
+          <label>Marca<input v-model="productForm.brand" placeholder="Laboratorio o fabricante"></label>
+          <label>Presentación<input v-model="productForm.presentation" placeholder="Frasco 100 ml, bolsa 1 kg"></label>
+          <label>Proveedor<input v-model="productForm.supplier" placeholder="Empresa proveedora"></label>
+          <label>Precio de compra<input v-model.number="productForm.purchasePrice" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+          <label>Precio de venta<input v-model.number="productForm.unitPrice" type="number" min="0" step="0.01" required></label>
+          <label>{{ editingProductId ? 'Stock actual (usa Control de stock para cambiarlo)' : 'Stock inicial' }}<input v-model.number="productForm.stock" type="number" min="0" required :disabled="Boolean(editingProductId)"></label>
           <label>Stock minimo<input v-model.number="productForm.minStock" type="number" min="0"></label>
+          <label>Lote<input v-model="productForm.batchNumber" placeholder="Número de lote"></label>
+          <label>Vencimiento<input v-model="productForm.expirationDate" type="date"></label>
+          <label>Descripción<textarea v-model="productForm.description" rows="2" placeholder="Uso, concentración u observaciones"></textarea></label>
           <button :disabled="saving">{{ saving ? 'Guardando...' : (editingProductId ? 'Guardar cambios' : 'Agregar producto') }}</button>
           <button class="secondary" type="button" @click="showProductForm = false; editingProductId = ''; resetProductForm()">Cancelar</button>
         </form>
@@ -994,6 +1067,23 @@ onMounted(async () => {
           <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar trabajador' }}</button>
           <button class="secondary" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cancelar</button>
         </form>
+      </section>
+      <section v-if="inventoryDetail" class="glass-card inventory-detail-card">
+        <div class="section-title"><div><span class="badge">Control de stock</span><h2>{{ inventoryDetail.name }}</h2><p class="muted-text">Stock actual: <strong>{{ inventoryDetail.stock }}</strong> · Cada cambio queda registrado.</p></div><button class="ghost small" type="button" @click="inventoryDetail=null; inventoryMovements=[]">Cerrar</button></div>
+        <div class="inventory-movement-actions">
+          <button type="button" @click="showInventoryMovement=true; inventoryMovementForm.type='IN'">+ Entrada</button>
+          <button class="secondary" type="button" @click="showInventoryMovement=true; inventoryMovementForm.type='OUT'">− Salida</button>
+          <button class="ghost" type="button" @click="showInventoryMovement=true; inventoryMovementForm.type='ADJUSTMENT'">Conteo físico</button>
+        </div>
+        <form v-if="showInventoryMovement" class="stack inventory-movement-form" @submit.prevent="saveInventoryMovement">
+          <label>Movimiento<select v-model="inventoryMovementForm.type"><option value="IN">Entrada</option><option value="OUT">Salida</option><option value="ADJUSTMENT">Ajustar al conteo físico</option></select></label>
+          <label>{{ inventoryMovementForm.type === 'ADJUSTMENT' ? 'Stock contado' : 'Cantidad' }}<input v-model.number="inventoryMovementForm.quantity" type="number" min="0" required></label>
+          <label>Motivo<input v-model="inventoryMovementForm.reason" required placeholder="Compra, merma, uso interno, corrección"></label>
+          <label>Referencia<input v-model="inventoryMovementForm.referenceId" placeholder="Factura, guía o comprobante"></label>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Registrar movimiento' }}</button>
+          <button class="secondary" type="button" @click="showInventoryMovement=false">Cancelar</button>
+        </form>
+        <div class="inventory-history"><h3>Historial</h3><p v-if="!inventoryMovements.length" class="empty">Todavía no hay movimientos registrados.</p><article v-for="movement in inventoryMovements" :key="movement.id"><div><strong>{{ inventoryMovementLabel(movement.type) }} · {{ movement.quantity }}</strong><small>{{ movement.reason || 'Sin motivo' }}<template v-if="movement.referenceId"> · {{ movement.referenceId }}</template></small></div><time>{{ new Date(movement.createdAt).toLocaleString('es-PE') }}</time></article></div>
       </section>
     </div>
 
