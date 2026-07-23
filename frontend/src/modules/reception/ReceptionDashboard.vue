@@ -297,7 +297,7 @@ function statusLabel(status) {
 }
 
 function appointmentType(appointment) {
-  const text = `${appointment?.notes || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
+  const text = `${appointment?.notes || ''} ${appointment?.service?.category || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
   if (text.includes('service_type:grooming') || ['baño', 'bano', 'corte', 'grooming', 'peluquer'].some(word => text.includes(word))) return 'GROOMING';
   if (text.includes('service_type:vaccine') || text.includes('vacun') || text.includes('desparasit')) return 'VACCINE';
   if (text.includes('service_type:surgery') || ['cirug', 'esteriliz', 'castr'].some(word => text.includes(word))) return 'SURGERY';
