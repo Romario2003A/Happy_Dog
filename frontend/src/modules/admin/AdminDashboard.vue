@@ -124,14 +124,6 @@ const serviceStats = computed(() => ({
   active: services.value.filter(service => service.active !== false).length,
   inactive: services.value.filter(service => service.active === false).length,
 }));
-const serviceCategorySummary = computed(() => Object.entries(services.value
-  .filter(service => service.active !== false)
-  .reduce((summary, service) => {
-    const category = service.category || 'Otros';
-    summary[category] = (summary[category] || 0) + 1;
-    return summary;
-  }, {}))
-  .sort((a, b) => a[0].localeCompare(b[0])));
 const activeCashServices = computed(() => services.value.filter(service => service.active !== false));
 const cashServiceCategories = computed(() => [...new Set(activeCashServices.value.map(service => service.category || 'Otros'))].sort());
 const availableCashServices = computed(() => activeCashServices.value.filter(service => (service.category || 'Otros') === cashServiceCategory.value));
@@ -842,9 +834,8 @@ onMounted(async () => {
           </div>
         </div>
         <div v-if="!showServiceCatalog" class="service-calm-summary">
-          <div><strong>{{ serviceStats.active }}</strong><span>servicios disponibles para Citas y Caja</span></div>
-          <div class="service-category-chips"><span v-for="([category, count]) in serviceCategorySummary" :key="category">{{ category }} <strong>{{ count }}</strong></span></div>
-          <p>No necesitas administrar esta lista durante el trabajo diario.</p>
+          <div><strong>Tarifario configurado</strong><span>Citas y Caja completan servicios y precios automáticamente.</span></div>
+          <p>La lista permanece protegida y solo se muestra cuando presionas “Ver tarifario”.</p>
         </div>
         <div v-if="showServiceCatalog" class="service-catalog-actions">
           <button class="ghost small" type="button" :disabled="saving" @click="importTariff">Sincronizar hoja</button>
@@ -1317,13 +1308,10 @@ onMounted(async () => {
 }
 
 .service-calm-summary { display: grid; gap: 18px; padding: 26px; border: 1px solid rgba(13,95,96,.13); border-radius: 22px; background: linear-gradient(145deg,rgba(255,255,255,.92),rgba(229,246,241,.68)); }
-.service-calm-summary > div:first-child { display: flex; align-items: baseline; gap: 10px; }
-.service-calm-summary > div:first-child strong { color: #155f66; font-size: 2rem; }
+.service-calm-summary > div:first-child { display: grid; gap: 5px; }
+.service-calm-summary > div:first-child strong { color: #155f66; font-size: 1.15rem; }
 .service-calm-summary > div:first-child span,.service-calm-summary p { color: #667873; }
 .service-calm-summary p { margin: 0; font-size: .88rem; }
-.service-category-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.service-category-chips span { padding: 8px 11px; border: 1px solid rgba(13,95,96,.12); border-radius: 999px; background: rgba(255,255,255,.82); color: #315f5e; font-size: .8rem; }
-.service-category-chips strong { margin-left: 4px; }
 .service-catalog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
 .service-editor { align-self: start; }
 .staff-editor { align-self: start; }
