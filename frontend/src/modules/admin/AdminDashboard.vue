@@ -24,6 +24,7 @@ const editingProductId = ref('');
 const inventorySearch = ref('');
 const productForm = ref({ name: '', category: '', unitPrice: 0, stock: 0, minStock: 0 });
 const serviceSearch = ref('');
+const showServiceCatalog = ref(false);
 const showServiceForm = ref(false);
 const editingServiceId = ref('');
 const serviceForm = ref({ name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false, durationMinutes: 30 });
@@ -123,6 +124,14 @@ const serviceStats = computed(() => ({
   active: services.value.filter(service => service.active !== false).length,
   inactive: services.value.filter(service => service.active === false).length,
 }));
+const serviceCategorySummary = computed(() => Object.entries(services.value
+  .filter(service => service.active !== false)
+  .reduce((summary, service) => {
+    const category = service.category || 'Otros';
+    summary[category] = (summary[category] || 0) + 1;
+    return summary;
+  }, {}))
+  .sort((a, b) => a[0].localeCompare(b[0])));
 const activeCashServices = computed(() => services.value.filter(service => service.active !== false));
 const cashServiceCategories = computed(() => [...new Set(activeCashServices.value.map(service => service.category || 'Otros'))].sort());
 const availableCashServices = computed(() => activeCashServices.value.filter(service => (service.category || 'Otros') === cashServiceCategory.value));
@@ -828,16 +837,27 @@ onMounted(async () => {
             <h2>Servicios y precios</h2>
             <p class="muted-text">La lista central que usará Recepción al agendar y Caja al cobrar.</p>
           </div>
-          <div class="table-actions"><button class="ghost small" type="button" :disabled="saving" @click="importTariff">Sincronizar hoja</button><button class="secondary small" type="button" @click="openServiceCreator">Agregar servicio</button></div>
+          <div class="table-actions">
+            <button class="secondary small" type="button" @click="showServiceCatalog = !showServiceCatalog">{{ showServiceCatalog ? 'Ocultar tarifario' : 'Ver tarifario' }}</button>
+          </div>
         </div>
-        <div class="inventory-toolbar">
+        <div v-if="!showServiceCatalog" class="service-calm-summary">
+          <div><strong>{{ serviceStats.active }}</strong><span>servicios disponibles para Citas y Caja</span></div>
+          <div class="service-category-chips"><span v-for="([category, count]) in serviceCategorySummary" :key="category">{{ category }} <strong>{{ count }}</strong></span></div>
+          <p>No necesitas administrar esta lista durante el trabajo diario.</p>
+        </div>
+        <div v-if="showServiceCatalog" class="service-catalog-actions">
+          <button class="ghost small" type="button" :disabled="saving" @click="importTariff">Sincronizar hoja</button>
+          <button class="secondary small" type="button" @click="openServiceCreator">Agregar servicio</button>
+        </div>
+        <div v-if="showServiceCatalog" class="inventory-toolbar">
           <input v-model="serviceSearch" placeholder="Buscar consulta, vacuna, cirugía o baño">
           <div class="inventory-mini-stats">
             <span><strong>{{ serviceStats.active }}</strong> disponibles</span>
             <span><strong>{{ serviceStats.inactive }}</strong> retirados</span>
           </div>
         </div>
-        <table>
+        <table v-if="showServiceCatalog">
           <thead><tr><th>Servicio</th><th>Condición</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>
             <tr v-if="!filteredServices.length"><td colspan="5" class="empty">Agrega aquí los servicios del tarifario de Happy Dog.</td></tr>
@@ -1296,6 +1316,15 @@ onMounted(async () => {
   flex-wrap: nowrap;
 }
 
+.service-calm-summary { display: grid; gap: 18px; padding: 26px; border: 1px solid rgba(13,95,96,.13); border-radius: 22px; background: linear-gradient(145deg,rgba(255,255,255,.92),rgba(229,246,241,.68)); }
+.service-calm-summary > div:first-child { display: flex; align-items: baseline; gap: 10px; }
+.service-calm-summary > div:first-child strong { color: #155f66; font-size: 2rem; }
+.service-calm-summary > div:first-child span,.service-calm-summary p { color: #667873; }
+.service-calm-summary p { margin: 0; font-size: .88rem; }
+.service-category-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.service-category-chips span { padding: 8px 11px; border: 1px solid rgba(13,95,96,.12); border-radius: 999px; background: rgba(255,255,255,.82); color: #315f5e; font-size: .8rem; }
+.service-category-chips strong { margin-left: 4px; }
+.service-catalog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
 .service-editor { align-self: start; }
 .staff-editor { align-self: start; }
 .staff-list { display: grid; gap: 10px; margin-top: 16px; }
