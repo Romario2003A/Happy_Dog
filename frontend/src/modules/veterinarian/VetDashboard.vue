@@ -104,7 +104,11 @@ function isGroomingAppointment(appointment) {
   const text = `${appointment?.notes || ''} ${appointment?.service?.category || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
   return ['baño', 'bano', 'corte', 'grooming', 'peluquer'].some(word => text.includes(word));
 }
-const visibleAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status) && !isGroomingAppointment(a)));
+const visibleAppointments = computed(() => appointments.value.filter((appointment) => {
+  if (!readyStatuses.includes(appointment.status) || isGroomingAppointment(appointment)) return false;
+  const patientAlreadyArrived = ['WAITING', 'IN_CONSULTATION'].includes(appointment.status);
+  return patientAlreadyArrived || dateKey(appointment.scheduledAt) === dateKey();
+}));
 const groomingAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status) && isGroomingAppointment(a)));
 const pendingAppointments = computed(() => appointments.value
   .filter(a => a.status === 'PENDING')
@@ -237,7 +241,7 @@ function formatPrice(value) {
 
 function greeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Buenos dias';
+  if (hour < 12) return 'Buenos días';
   if (hour < 19) return 'Buenas tardes';
   return 'Buenas noches';
 }
@@ -774,6 +778,10 @@ function generateSurgeryConsentPdf() {
 
 async function saveRecord() {
   if (!selectedPet.value) return;
+  if (!form.value.reason.trim()) {
+    error.value = 'Escribe el motivo de la atención antes de guardarla.';
+    return;
+  }
   const diagnosis = buildDiagnosisText() || (attentionType.value === 'VACCINE' ? 'Vacunación preventiva' : '');
   if (!diagnosis) {
     error.value = 'Completa al menos un diagnóstico presuntivo o definitivo.';
@@ -785,7 +793,7 @@ async function saveRecord() {
   try {
     await api.post('/medical-records', {
       appointmentId: selected.value?.id,
-      petId: selected.value.petId,
+      petId: selectedPet.value.id,
       veterinarianId: auth.user.id,
       reason: form.value.reason,
       weightKg: form.value.weightKg === null || form.value.weightKg === '' ? undefined : Number(form.value.weightKg),
@@ -804,6 +812,59 @@ async function saveRecord() {
     error.value = e.response?.status === 403
       ? 'Tu sesión no tiene permiso para guardar historias clínicas. Cierra sesión y entra nuevamente con la cuenta del doctor.'
       : e.response?.data?.message || 'No se pudo guardar la atención.';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function savePrescriptionRecord() {
+  if (!selectedPet.value) return;
+  if (!selectedProduct.value) {
+    error.value = 'Selecciona un medicamento antes de guardar la receta.';
+    return;
+  }
+  const quantity = Number(prescription.value.quantity || 0);
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    error.value = 'La cantidad del medicamento debe ser un número entero mayor que cero.';
+    return;
+  }
+  if (quantity > Number(selectedProduct.value.stock || 0)) {
+    error.value = `Stock insuficiente. Solo quedan ${selectedProduct.value.stock} unidades de ${selectedProduct.value.name}.`;
+    return;
+  }
+  if (!prescription.value.dosage.trim() || !prescription.value.instructions.trim()) {
+    error.value = 'Completa la dosis y las indicaciones antes de guardar la receta.';
+    return;
+  }
+
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.post('/medical-records', {
+      appointmentId: selected.value?.id,
+      petId: selectedPet.value.id,
+      veterinarianId: auth.user.id,
+      reason: form.value.reason || 'Emisión de receta médica',
+      weightKg: form.value.weightKg === null || form.value.weightKg === '' ? undefined : Number(form.value.weightKg),
+      diagnosis: 'Receta médica',
+      treatment: `${selectedProduct.value.name}: ${prescription.value.dosage}. ${prescription.value.instructions}`,
+      observations: 'Receta emitida desde el módulo médico.',
+      prescriptions: [{
+        productId: selectedProduct.value.id,
+        quantity,
+        dosage: prescription.value.dosage.trim(),
+        instructions: prescription.value.instructions.trim(),
+      }],
+    });
+    success.value = 'Receta guardada en el historial y stock actualizado.';
+    products.value = products.value.map(product => product.id === selectedProduct.value.id
+      ? { ...product, stock: Number(product.stock) - quantity }
+      : product);
+    history.value = (await api.get(`/medical-records/pet/${selectedPet.value.id}`)).data;
+    activeWorkspace.value = 'history';
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo guardar la receta.';
   } finally {
     saving.value = false;
   }
@@ -1101,7 +1162,10 @@ onUnmounted(() => {
             <template v-if="activeTask === 'history'">
             <div class="document-editor-head">
               <div><span class="badge">Documento editable</span><h3>Historia clínica Happy Dog</h3><p>Los datos del paciente se completan automáticamente. El doctor registra únicamente la información médica.</p></div>
-              <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar PDF</button>
+              <div class="document-head-actions">
+                <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar PDF</button>
+                <button type="button" :disabled="saving" @click="saveRecord">{{ saving ? 'Guardando...' : 'Guardar en historial' }}</button>
+              </div>
             </div>
             <div class="document-auto-section">
               <div class="document-section-label"><strong>Datos automáticos</strong><small>Tomados de la ficha del paciente</small></div>
@@ -1118,6 +1182,7 @@ onUnmounted(() => {
             </div>
             <div class="document-manual-section">
               <div class="document-section-label"><strong>Consulta actual</strong><small>Información que completa el doctor</small></div>
+              <label>Motivo de la atención<input v-model="form.reason" placeholder="Ej. control, dolor, falta de apetito"></label>
               <div class="document-vitals-grid">
                 <label>Fecha<input :value="formatShortDate()" readonly></label>
                 <label>Peso<input v-model.number="form.weightKg" type="number" step="0.01" placeholder="kg"></label>
@@ -1164,7 +1229,7 @@ onUnmounted(() => {
                 <h3>Receta / inventario</h3>
                 <p class="muted-text">Selecciona medicamento, dosis e indicaciones para entregarlo como PDF.</p>
               </div>
-              <button class="secondary small" type="button" @click="generatePrescriptionPdf">Generar Receta en PDF</button>
+              <button class="secondary small" type="button" @click="generatePrescriptionPdf">Generar receta en PDF</button>
             </div>
             <select v-model="prescription.productId">
               <option value="">Sin medicamento</option>
@@ -1172,37 +1237,39 @@ onUnmounted(() => {
                 {{ product.name }} - stock {{ product.stock }}
               </option>
             </select>
-            <input v-model.number="prescription.quantity" type="number" min="1" placeholder="Cantidad">
+            <input v-model.number="prescription.quantity" type="number" min="1" :max="selectedProduct?.stock || undefined" step="1" placeholder="Cantidad">
             <input v-model="prescription.dosage" placeholder="Dosis">
             <input v-model="prescription.instructions" placeholder="Indicaciones">
+            <p v-if="selectedProduct" class="prescription-stock-note">Disponible: <strong>{{ selectedProduct.stock }}</strong> unidades. Al guardar, el inventario se actualiza automáticamente.</p>
+            <button type="button" :disabled="saving || !selectedProduct" @click="savePrescriptionRecord">{{ saving ? 'Guardando...' : 'Guardar receta en historial' }}</button>
           </section>
 
           <section v-if="activeTask === 'surgery'" class="surgery-consent-box">
             <div class="prescription-head">
               <div>
-                <h3>Autorizacion de cirugia</h3>
-                <p class="muted-text">Para esterilizacion o castracion. Completa los datos y genera el documento para firma.</p>
+                <h3>Autorización de cirugía</h3>
+                <p class="muted-text">Para esterilización o castración. Completa los datos y genera el documento para firma.</p>
               </div>
-              <button class="secondary small" type="button" @click="generateSurgeryConsentPdf">Generar autorizacion PDF</button>
+              <button class="secondary small" type="button" @click="generateSurgeryConsentPdf">Generar autorización PDF</button>
             </div>
             <div class="form-grid surgery-grid">
-              <input v-model="surgeryConsent.ownerDni" placeholder="DNI del dueno">
-              <input v-model="surgeryConsent.ownerAddress" placeholder="Direccion del dueno">
+              <input v-model="surgeryConsent.ownerDni" placeholder="DNI del dueño">
+              <input v-model="surgeryConsent.ownerAddress" placeholder="Dirección del dueño">
               <input v-model="surgeryConsent.petAge" placeholder="Edad de la mascota">
               <input v-model="surgeryConsent.petColor" placeholder="Color de la mascota">
-              <input v-model="surgeryConsent.lastMeal" placeholder="Ultima comida">
+              <input v-model="surgeryConsent.lastMeal" placeholder="Última comida">
               <input v-model="surgeryConsent.medication" placeholder="Medicamento actual">
               <input v-model="surgeryConsent.alternativeName" placeholder="Persona alternativa para recojo">
-              <input v-model="surgeryConsent.alternativePhone" placeholder="Telefono alternativo">
+              <input v-model="surgeryConsent.alternativePhone" placeholder="Teléfono alternativo">
               <label class="checkbox-row">
                 <input v-model="surgeryConsent.digestiveIssue" type="checkbox">
-                Vomito o diarrea en las ultimas 24 horas
+                Vómito o diarrea en las últimas 24 horas
               </label>
               <label class="checkbox-row">
                 <input v-model="surgeryConsent.medicalCondition" type="checkbox">
-                Problema medico preexistente
+                Problema médico preexistente
               </label>
-              <textarea v-model="surgeryConsent.medicalConditionDetail" placeholder="Detalle del problema medico, si aplica"></textarea>
+              <textarea v-model="surgeryConsent.medicalConditionDetail" placeholder="Detalle del problema médico, si aplica"></textarea>
               <textarea v-model="surgeryConsent.staffNotes" placeholder="Anotaciones u observaciones del personal"></textarea>
             </div>
           </section>
@@ -1211,9 +1278,9 @@ onUnmounted(() => {
           <div class="consultation-actions">
             <button v-if="activeTask === 'consultation' && consultationTab !== 'evaluation'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.max(0, consultationTabs.findIndex(tab => tab.value === consultationTab) - 1)].value">Anterior</button>
             <button v-if="activeTask === 'consultation' && consultationTab !== 'plan'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.min(consultationTabs.length - 1, consultationTabs.findIndex(tab => tab.value === consultationTab) + 1)].value">Continuar</button>
-            <button v-if="activeTask === 'consultation'" :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Guardar atención directa' }}</button>
+            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Guardar atención directa' }}</button>
           </div>
-          <p v-if="activeTask === 'consultation' && !selected" class="direct-care-note">Esta atención se guardará directamente en el historial del paciente.</p>
+          <p v-if="activeTask === 'consultation' && consultationTab === 'plan' && !selected" class="direct-care-note">Esta atención se guardará directamente en el historial del paciente.</p>
         </form>
       </section>
 

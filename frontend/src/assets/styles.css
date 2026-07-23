@@ -201,6 +201,7 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .prescription-box h3{grid-column:1/-1;margin:0}
 .prescription-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
 .prescription-head p{margin:6px 0 0}
+.prescription-stock-note{grid-column:1/-1;margin:0;padding:10px 12px;border-radius:12px;background:rgba(21,91,102,.07);color:var(--muted);font-size:12px}.prescription-box>button{grid-column:1/-1}.document-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .surgery-consent-box{grid-column:1/-1;display:grid;gap:14px;padding:18px;border-radius:20px;background:linear-gradient(145deg,rgba(255,250,238,.86),rgba(235,250,244,.74));border:1px solid rgba(15,143,125,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
 .surgery-grid{margin-top:2px}
 .surgery-grid textarea{min-height:96px}
@@ -552,7 +553,7 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 @media(max-width:700px){.reception-calm-theme .panel-grid.single>.glass-card{min-height:520px}.reception-calm-theme .panel-grid.single table{table-layout:auto}}
 @media(max-width:560px){.account-session-row{align-items:stretch;flex-direction:column}.account-session-row button{width:100%}}
 @media(max-width:560px){.account-overlay{padding:10px 14px 10px 10px}.account-drawer{padding:22px}}
-@media(max-width:900px){.document-auto-grid{grid-template-columns:1fr 1fr}.document-vitals-grid{grid-template-columns:1fr 1fr}.document-editor-head{flex-direction:column}}@media(max-width:560px){.document-auto-grid,.document-vitals-grid,.document-diagnosis-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.document-auto-grid{grid-template-columns:1fr 1fr}.document-vitals-grid{grid-template-columns:1fr 1fr}.document-editor-head{flex-direction:column}.document-head-actions{width:100%;justify-content:stretch}.document-head-actions button{flex:1}}@media(max-width:560px){.document-auto-grid,.document-vitals-grid,.document-diagnosis-grid{grid-template-columns:1fr}}
 @media(max-width:900px){.preventive-form{grid-template-columns:1fr 1fr}.preventive-form button{grid-column:1/-1}}
 @media(max-width:900px){.cash-cards,.cash-flow,.cash-form,.cash-split,.cash-closing-form.improved,.cash-guide{grid-template-columns:1fr}.cash-actions{justify-content:flex-start}.cash-date{max-width:none;width:100%}.cash-close-header{flex-direction:column}}
 @media(max-width:900px){.client-dashboard-hero,.client-dashboard-grid{grid-template-columns:1fr}.client-summary-strip{grid-template-columns:repeat(3,1fr)}}
