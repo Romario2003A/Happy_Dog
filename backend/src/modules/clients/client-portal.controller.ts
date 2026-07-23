@@ -98,6 +98,7 @@ export class ClientPortalController {
       quotedPrice: body.quotedPrice === undefined ? Number(service.price) : Number(body.quotedPrice),
       priceNote: String(body.priceNote || service.priceLabel || '').trim() || undefined,
       durationMinutes: Number(service.durationMinutes || 30),
+      notes: 'CLIENT_REQUESTED_DATE_ONLY',
     });
   }
 

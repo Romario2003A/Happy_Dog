@@ -35,7 +35,7 @@ async function submit() {
   }
 
   if (!form.value.scheduledAt) {
-    error.value = 'Selecciona fecha y hora para la cita.';
+    error.value = 'Selecciona el día que prefieres para la cita.';
     return;
   }
 
@@ -43,6 +43,7 @@ async function submit() {
   try {
     await api.post('/public/appointment-request', {
       ...form.value,
+      scheduledAt: new Date(`${form.value.scheduledAt}T12:00:00-05:00`).toISOString(),
       fullName: form.value.fullName.trim(),
       phone,
       petName: form.value.petName.trim(),
@@ -94,7 +95,10 @@ async function submit() {
           <input v-model="form.fullName" required placeholder="Nombre del due&ntilde;o">
           <input v-model="form.phone" required inputmode="tel" autocomplete="tel" placeholder="WhatsApp" @input="form.phone = form.phone.replace(/\s+/g, '')">
           <input v-model="form.petName" required placeholder="Nombre de la mascota">
-          <input v-model="form.scheduledAt" type="datetime-local" step="1" required>
+          <label>Día preferido
+            <input v-model="form.scheduledAt" type="date" required>
+            <small>Recepción te confirmará la hora disponible por WhatsApp.</small>
+          </label>
           <textarea v-model="form.reason" required placeholder="Motivo de la visita"></textarea>
           <button :disabled="loading">{{ loading ? 'Enviando...' : 'Enviar y esperar confirmaci&oacute;n' }}</button>
         </form>

@@ -1,9 +1,10 @@
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import ClientLayout from '../../layouts/ClientLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
+import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 
 const router=useRouter();
 const auth=useAuthStore();
@@ -19,6 +20,7 @@ const newPetPhotoInput=ref(null);
 const showPetForm=ref(false);
 const savingPet=ref(false);
 const showAppointmentForm=ref(false);
+const appointmentSection=ref(null);
 const savingAppointment=ref(false);
 const appointmentForm=ref({
   petId:'',
@@ -87,11 +89,28 @@ function selectAppointmentService(){
   appointmentForm.value.reason=[service.name,service.condition].filter(Boolean).join(' - ');
 }
 
-function peruLocalToIso(value){
+function requestedDateToIso(value){
   if(!value) return '';
-  const normalized=value.length===16 ? `${value}:00` : value;
-  const date=new Date(`${normalized}-05:00`);
+  const date=new Date(`${value}T12:00:00-05:00`);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function isDateOnlyRequest(appointment){
+  return String(appointment?.notes || '').includes('CLIENT_REQUESTED_DATE_ONLY');
+}
+
+function formatAppointmentDate(appointment){
+  if(!appointment?.scheduledAt) return '-';
+  if(isDateOnlyRequest(appointment)){
+    return `Día solicitado: ${new Date(appointment.scheduledAt).toLocaleDateString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'short',year:'numeric'})} · horario por confirmar`;
+  }
+  return formatDate(appointment.scheduledAt);
+}
+
+async function openAppointmentForm(){
+  showAppointmentForm.value=true;
+  await nextTick();
+  appointmentSection.value?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 async function uploadPetPhoto(petId,event){
@@ -207,7 +226,7 @@ async function createAppointment(){
       serviceId:appointmentForm.value.serviceId,
       quotedPrice:Number(appointmentForm.value.quotedPrice || 0),
       priceNote:appointmentForm.value.priceNote || undefined,
-      scheduledAt:peruLocalToIso(appointmentForm.value.scheduledAt),
+      scheduledAt:requestedDateToIso(appointmentForm.value.scheduledAt),
       reason:appointmentForm.value.reason.trim(),
     });
     success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
@@ -265,13 +284,14 @@ onUnmounted(()=>clearInterval(refreshTimer));
 <template>
   <ClientLayout title="Portal cliente" subtitle="Mascotas, citas y carnet en un solo lugar">
     <template #nav>
-      <button class="secondary" type="button" @click="showAppointmentForm=true">Nueva cita</button>
+      <button class="secondary" type="button" @click="openAppointmentForm">Nueva cita</button>
     </template>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
     <section class="client-dashboard-hero glass-card">
-      <div>
+      <div class="client-hero-copy">
+        <img class="client-hero-logo" :src="happyDogLogo" alt="Happy Dog">
         <span class="badge">Happy Dog</span>
         <h2>{{ clientName }}, aqui esta todo listo para tu mascota</h2>
         <p class="muted-text">Revisa tus citas, actualiza fotos para el carnet y ten la informacion de tus mascotas ordenada.</p>
@@ -293,13 +313,13 @@ onUnmounted(()=>clearInterval(refreshTimer));
     </section>
 
     <div class="client-dashboard-grid">
-      <section class="glass-card next-appointment-card">
+      <section ref="appointmentSection" class="glass-card next-appointment-card">
         <div class="section-title compact">
           <div>
             <span class="badge">Proxima cita</span>
             <h2>Agenda</h2>
           </div>
-          <button class="small secondary" type="button" @click="showAppointmentForm=!showAppointmentForm">
+          <button class="small secondary" type="button" @click="showAppointmentForm ? showAppointmentForm=false : openAppointmentForm()">
             {{ showAppointmentForm ? 'Cerrar' : 'Agendar' }}
           </button>
         </div>
@@ -320,7 +340,10 @@ onUnmounted(()=>clearInterval(refreshTimer));
             <strong>{{ selectedService.priceLabel || `S/ ${Number(selectedService.price).toFixed(2)}` }}</strong>
             <span>{{ selectedService.requiresQuote || selectedService.maxPrice ? 'Recepción confirmará el precio final.' : 'Precio referencial del tarifario.' }}</span>
           </div>
-          <input v-model="appointmentForm.scheduledAt" type="datetime-local" step="60" required>
+          <label class="appointment-day-field">¿Qué día prefieres?
+            <input v-model="appointmentForm.scheduledAt" type="date" required>
+            <small>Recepción revisará la agenda, asignará la hora y te confirmará.</small>
+          </label>
           <textarea v-model="appointmentForm.reason" required placeholder="Detalle adicional"></textarea>
           <button :disabled="savingAppointment || !pets.length">
             {{ savingAppointment ? 'Enviando...' : 'Enviar solicitud' }}
@@ -328,7 +351,7 @@ onUnmounted(()=>clearInterval(refreshTimer));
         </form>
         <div v-if="nextAppointment" class="next-appointment">
           <strong>{{ nextAppointment.pet?.name || 'Mascota' }}</strong>
-          <span>{{ formatDate(nextAppointment.scheduledAt) }}</span>
+          <span>{{ formatAppointmentDate(nextAppointment) }}</span>
           <p>{{ nextAppointment.reason || 'Consulta veterinaria' }}</p>
           <span class="status">{{ statusLabel(nextAppointment.status) }}</span>
         </div>
@@ -415,7 +438,7 @@ onUnmounted(()=>clearInterval(refreshTimer));
           <article v-for="a in recentAppointments" :key="a.id">
             <div>
               <strong>{{ a.pet?.name || 'Mascota' }}</strong>
-              <span>{{ formatDate(a.scheduledAt) }}</span>
+              <span>{{ formatAppointmentDate(a) }}</span>
             </div>
             <span class="status">{{ statusLabel(a.status) }}</span>
           </article>

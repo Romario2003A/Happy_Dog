@@ -63,6 +63,7 @@ export class PublicController {
         reason,
         scheduledAt,
         status: AppointmentStatus.PENDING,
+        notes: 'CLIENT_REQUESTED_DATE_ONLY',
       },
     });
   }

@@ -32,6 +32,7 @@ const cardSearch = ref('');
 const cardVisibleLimit = ref(25);
 const selectedCardPetIds = ref([]);
 const selectedAppointment = ref(null);
+const confirmationDateTime = ref('');
 const duplicateOverride = ref(false);
 const reschedulingPastAppointment = ref(false);
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
@@ -134,6 +135,10 @@ const acceptedAppointments = computed(() => {
     .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
     .slice(0, 8);
 });
+const pendingDateRequests = computed(() => searchedAppointments.value
+  .filter(item => item.status === 'PENDING' && requiresTimeAssignment(item))
+  .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+  .slice(0, 8));
 
 const filteredClients = computed(() => {
   const query = search.value.trim().toLowerCase();
@@ -277,6 +282,9 @@ function patchAppointmentInMemory(updated) {
 function selectAppointment(appointment) {
   const current = getAppointmentById(appointment.id);
   selectedAppointment.value = current ? { ...current } : { ...appointment };
+  confirmationDateTime.value = requiresTimeAssignment(selectedAppointment.value)
+    ? `${dateKey(selectedAppointment.value.scheduledAt)}T09:00`
+    : '';
 }
 
 function hourAppointments(hour) {
@@ -313,6 +321,40 @@ function appointmentStatusLabel(appointment) {
   if (isGroomingAppointment(appointment) && appointment?.status === 'IN_CONSULTATION') return 'En servicio';
   if (isGroomingAppointment(appointment) && appointment?.status === 'ATTENDED') return 'Completada';
   return statusLabel(appointment?.status);
+}
+
+function requiresTimeAssignment(appointment) {
+  return String(appointment?.notes || '').includes('CLIENT_REQUESTED_DATE_ONLY');
+}
+
+async function confirmAppointment(appointment) {
+  if (!requiresTimeAssignment(appointment)) {
+    await setStatus(appointment, 'CONFIRMED');
+    return;
+  }
+  if (!confirmationDateTime.value) {
+    error.value = 'Asigna una hora antes de confirmar la solicitud.';
+    return;
+  }
+  error.value = '';
+  success.value = '';
+  saving.value = true;
+  try {
+    const { data } = await api.patch(`/appointments/${appointment.id}`, {
+      scheduledAt: toIsoDateTime(confirmationDateTime.value),
+      status: 'CONFIRMED',
+      notes: String(appointment.notes || '').replace('CLIENT_REQUESTED_DATE_ONLY', 'SCHEDULED_BY_RECEPTION'),
+    });
+    patchAppointmentInMemory(data);
+    selectedAppointment.value = { ...data };
+    confirmationDateTime.value = '';
+    success.value = 'Hora asignada y cita confirmada correctamente.';
+    await loadData();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo asignar el horario de la cita.';
+  } finally {
+    saving.value = false;
+  }
 }
 
 function isPastAppointment(appointment) {
@@ -807,6 +849,22 @@ onMounted(loadData);
         </div>
         <button class="full" @click="reschedulingPastAppointment = false; showQuick=!showQuick">{{ showQuick ? 'Ocultar formulario' : '+ Nueva cita por llamada o WhatsApp' }}</button>
 
+        <div v-if="!showQuick && pendingDateRequests.length" class="detail-box pending-schedule-summary">
+          <span class="badge">Por programar</span>
+          <h3>{{ pendingDateRequests.length }} {{ pendingDateRequests.length === 1 ? 'solicitud espera' : 'solicitudes esperan' }} horario</h3>
+          <p class="muted-text">El cliente eligió el día. Asigna la hora antes de confirmar.</p>
+          <button
+            v-for="item in pendingDateRequests"
+            :key="item.id"
+            class="summary-appointment"
+            type="button"
+            @click="selectAppointment(item)"
+          >
+            <strong>{{ formatDate(item.scheduledAt) }} · hora pendiente</strong>
+            <span>{{ item.pet?.name || 'Mascota' }} - {{ item.client?.fullName || 'Cliente' }}</span>
+          </button>
+        </div>
+
         <div v-if="!showQuick" class="detail-box upcoming-summary">
           <span class="badge">Aceptadas</span>
           <h3>{{ acceptedAppointments.length }} {{ acceptedAppointments.length === 1 ? 'cita aceptada' : 'citas aceptadas' }}</h3>
@@ -917,17 +975,23 @@ onMounted(loadData);
           </div>
           <p><b>Cliente:</b> {{ selectedAppointment.client?.fullName || '-' }}</p>
           <p><b>Contacto:</b> {{ selectedAppointment.client?.phone || selectedAppointment.client?.email || '-' }}</p>
-          <p><b>Hora:</b> {{ formatTime(selectedAppointment.scheduledAt) }}</p>
+          <p v-if="requiresTimeAssignment(selectedAppointment)"><b>Día solicitado:</b> {{ formatDate(selectedAppointment.scheduledAt) }} · horario pendiente</p>
+          <p v-else><b>Hora:</b> {{ formatTime(selectedAppointment.scheduledAt) }}</p>
           <p v-if="selectedAppointment.pickupAt"><b>Recojo estimado:</b> {{ formatDate(selectedAppointment.pickupAt) }} · {{ formatTime(selectedAppointment.pickupAt) }}</p>
           <p><b>Motivo:</b> {{ selectedAppointment.reason }}</p>
           <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
           <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
+          <label v-if="selectedAppointment.status==='PENDING' && requiresTimeAssignment(selectedAppointment)" class="confirmation-time-field">
+            Hora que asignará recepción
+            <input v-model="confirmationDateTime" type="datetime-local" required>
+            <small>La fecha inicia con el día solicitado; puedes cambiarla si lo acuerdas con el cliente.</small>
+          </label>
           <div v-if="isFutureAppointment(selectedAppointment) && selectedAppointment.status === 'CONFIRMED'" class="future-appointment-notice">
             <strong>Cita confirmada para una fecha futura</strong>
             <span>No requiere ninguna acción hasta que el cliente llegue el día de la cita.</span>
           </div>
           <div v-if="!isPastAppointment(selectedAppointment)" class="detail-actions">
-            <button v-if="selectedAppointment.status==='PENDING'" class="small" @click="setStatus(selectedAppointment,'CONFIRMED')">Confirmar</button>
+            <button v-if="selectedAppointment.status==='PENDING'" class="small" :disabled="saving" @click="confirmAppointment(selectedAppointment)">{{ requiresTimeAssignment(selectedAppointment) ? 'Asignar hora y confirmar' : 'Confirmar' }}</button>
             <button v-if="!isFutureAppointment(selectedAppointment) && !isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">Registrar llegada</button>
             <button v-if="!isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='WAITING'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Enviar al doctor</button>
             <button v-if="!isFutureAppointment(selectedAppointment) && isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Iniciar servicio</button>
