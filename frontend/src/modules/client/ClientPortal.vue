@@ -47,7 +47,7 @@ async function submit() {
       fullName: form.value.fullName.trim(),
       phone,
       petName: form.value.petName.trim(),
-      reason: form.value.reason.trim(),
+      reason: `CLIENT_DATE_REQUEST::${form.value.reason.trim()}`,
       species: form.value.species || 'No especificada',
       sex: form.value.sex || 'UNKNOWN',
     });

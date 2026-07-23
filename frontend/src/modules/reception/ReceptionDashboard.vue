@@ -324,7 +324,12 @@ function appointmentStatusLabel(appointment) {
 }
 
 function requiresTimeAssignment(appointment) {
-  return String(appointment?.notes || '').includes('CLIENT_REQUESTED_DATE_ONLY');
+  return String(appointment?.notes || '').includes('CLIENT_REQUESTED_DATE_ONLY')
+    || String(appointment?.reason || '').startsWith('CLIENT_DATE_REQUEST::');
+}
+
+function cleanAppointmentReason(reason) {
+  return String(reason || '').replace(/^CLIENT_DATE_REQUEST::/, '');
 }
 
 async function confirmAppointment(appointment) {
@@ -343,6 +348,7 @@ async function confirmAppointment(appointment) {
     const { data } = await api.patch(`/appointments/${appointment.id}`, {
       scheduledAt: toIsoDateTime(confirmationDateTime.value),
       status: 'CONFIRMED',
+      reason: cleanAppointmentReason(appointment.reason),
       notes: String(appointment.notes || '').replace('CLIENT_REQUESTED_DATE_ONLY', 'SCHEDULED_BY_RECEPTION'),
     });
     patchAppointmentInMemory(data);
@@ -789,7 +795,7 @@ onMounted(loadData);
               <article v-for="item in hourAppointments(hour)" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectAppointment(item)">
                 <div>
                   <strong>{{ formatTime(item.scheduledAt) }} - {{ item.pet?.name || 'Mascota' }}</strong>
-                  <span>{{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
+                  <span>{{ item.client?.fullName || 'Cliente' }} · {{ cleanAppointmentReason(item.reason) }}</span>
                 </div>
                 <div class="event-actions">
                   <span class="status">{{ appointmentStatusLabel(item) }}</span>
@@ -823,7 +829,7 @@ onMounted(loadData);
           <article v-for="item in upcomingAppointments" :key="item.id" class="calendar-event" :data-status="item.status" @click="selectAppointment(item)">
             <div>
               <strong>{{ formatDate(item.scheduledAt) }} - {{ formatTime(item.scheduledAt) }}</strong>
-              <span>{{ item.pet?.name || 'Mascota' }} · {{ item.client?.fullName || 'Cliente' }} · {{ item.reason }}</span>
+              <span>{{ item.pet?.name || 'Mascota' }} · {{ item.client?.fullName || 'Cliente' }} · {{ cleanAppointmentReason(item.reason) }}</span>
             </div>
             <div class="event-actions">
               <span class="status">{{ appointmentStatusLabel(item) }}</span>
@@ -978,7 +984,7 @@ onMounted(loadData);
           <p v-if="requiresTimeAssignment(selectedAppointment)"><b>Día solicitado:</b> {{ formatDate(selectedAppointment.scheduledAt) }} · horario pendiente</p>
           <p v-else><b>Hora:</b> {{ formatTime(selectedAppointment.scheduledAt) }}</p>
           <p v-if="selectedAppointment.pickupAt"><b>Recojo estimado:</b> {{ formatDate(selectedAppointment.pickupAt) }} · {{ formatTime(selectedAppointment.pickupAt) }}</p>
-          <p><b>Motivo:</b> {{ selectedAppointment.reason }}</p>
+          <p><b>Motivo:</b> {{ cleanAppointmentReason(selectedAppointment.reason) }}</p>
           <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
           <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
           <label v-if="selectedAppointment.status==='PENDING' && requiresTimeAssignment(selectedAppointment)" class="confirmation-time-field">

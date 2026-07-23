@@ -96,7 +96,12 @@ function requestedDateToIso(value){
 }
 
 function isDateOnlyRequest(appointment){
-  return String(appointment?.notes || '').includes('CLIENT_REQUESTED_DATE_ONLY');
+  return String(appointment?.notes || '').includes('CLIENT_REQUESTED_DATE_ONLY')
+    || String(appointment?.reason || '').startsWith('CLIENT_DATE_REQUEST::');
+}
+
+function cleanAppointmentReason(reason){
+  return String(reason || '').replace(/^CLIENT_DATE_REQUEST::/, '') || 'Consulta veterinaria';
 }
 
 function formatAppointmentDate(appointment){
@@ -227,7 +232,7 @@ async function createAppointment(){
       quotedPrice:Number(appointmentForm.value.quotedPrice || 0),
       priceNote:appointmentForm.value.priceNote || undefined,
       scheduledAt:requestedDateToIso(appointmentForm.value.scheduledAt),
-      reason:appointmentForm.value.reason.trim(),
+      reason:`CLIENT_DATE_REQUEST::${appointmentForm.value.reason.trim()}`,
     });
     success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
     appointmentForm.value={petId:'',serviceCategory:'',serviceId:'',quotedPrice:'',priceNote:'',scheduledAt:'',reason:''};
@@ -352,7 +357,7 @@ onUnmounted(()=>clearInterval(refreshTimer));
         <div v-if="nextAppointment" class="next-appointment">
           <strong>{{ nextAppointment.pet?.name || 'Mascota' }}</strong>
           <span>{{ formatAppointmentDate(nextAppointment) }}</span>
-          <p>{{ nextAppointment.reason || 'Consulta veterinaria' }}</p>
+          <p>{{ cleanAppointmentReason(nextAppointment.reason) }}</p>
           <span class="status">{{ statusLabel(nextAppointment.status) }}</span>
         </div>
         <div v-else class="friendly-empty">
