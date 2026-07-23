@@ -333,6 +333,8 @@ label{display:grid;gap:8px;margin:14px 0;font-weight:700}
 .client-appointment-form{display:grid;gap:12px;margin:0 0 16px;padding:16px;border-radius:20px;background:linear-gradient(145deg,rgba(255,255,255,.86),rgba(240,252,249,.72));border:1px solid var(--line)}
 .client-appointment-form textarea{min-height:96px;resize:vertical}
 .client-appointment-form button{justify-self:start;min-width:220px}
+.appointment-price-note{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-radius:15px;background:rgba(226,245,239,.82);color:var(--blue-dark)}
+.appointment-price-note span{color:var(--muted);font-size:12px;font-weight:700}
 .client-pet-form{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:0 0 16px;padding:16px;border-radius:20px;background:linear-gradient(145deg,rgba(255,255,255,.84),rgba(239,252,246,.72));border:1px solid var(--line)}
 .client-pet-form button{grid-column:1/-1;justify-self:start;min-width:220px}
 .check-row{display:flex;align-items:center;gap:10px;margin:0;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72);color:var(--ink)}

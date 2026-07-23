@@ -1,18 +1,19 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { AppointmentStatus, PetSex, Role } from '@prisma/client';
+import { PetSex, Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { petPhotoUploadOptions, uploadedFileDataUrl } from '../../common/upload/pet-photo-upload';
 import { PrismaService } from '../../database/prisma.service';
+import { AppointmentsService } from '../appointments/appointments.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.CLIENT)
 @Controller('client-portal')
 export class ClientPortalController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private appointmentsService: AppointmentsService) {}
 
   @Get('me')
   me(@CurrentUser('id') clientId: string) {
@@ -64,28 +65,39 @@ export class ClientPortalController {
     });
   }
 
+  @Get('services')
+  services() {
+    return this.prisma.service.findMany({
+      where: { active: true },
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    });
+  }
+
   @Post('appointments')
   async createAppointment(@CurrentUser('id') clientId: string, @Body() body: any) {
     const petId = String(body.petId || '').trim();
     const reason = String(body.reason || '').trim();
     const scheduledAt = new Date(body.scheduledAt);
+    const serviceId = String(body.serviceId || '').trim();
 
-    if (!petId || !reason || Number.isNaN(scheduledAt.getTime())) {
-      throw new BadRequestException('Selecciona mascota, fecha y motivo de la cita.');
+    if (!petId || !serviceId || !reason || Number.isNaN(scheduledAt.getTime())) {
+      throw new BadRequestException('Selecciona mascota, servicio, fecha y motivo de la cita.');
     }
 
     const pet = await this.prisma.pet.findFirst({ where: { id: petId, clientId } });
     if (!pet) throw new NotFoundException('Mascota no encontrada.');
+    const service = await this.prisma.service.findFirst({ where: { id: serviceId, active: true } });
+    if (!service) throw new NotFoundException('Servicio no disponible.');
 
-    return this.prisma.appointment.create({
-      data: {
-        clientId,
-        petId,
-        reason,
-        scheduledAt,
-        status: AppointmentStatus.PENDING,
-      },
-      include: { pet: true, veterinarian: true, service: true },
+    return this.appointmentsService.create({
+      clientId,
+      petId,
+      serviceId,
+      reason,
+      scheduledAt: scheduledAt.toISOString(),
+      quotedPrice: body.quotedPrice === undefined ? Number(service.price) : Number(body.quotedPrice),
+      priceNote: String(body.priceNote || service.priceLabel || '').trim() || undefined,
+      durationMinutes: Number(service.durationMinutes || 30),
     });
   }
 

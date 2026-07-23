@@ -45,7 +45,9 @@ function dateKey(value = new Date()) {
 }
 
 function toIsoDateTime(value) {
-  const date = new Date(value);
+  if (!value) return '';
+  const normalized = value.length === 16 ? `${value}:00` : value;
+  const date = new Date(`${normalized}-05:00`);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 }
 
@@ -231,12 +233,12 @@ const possibleDuplicateAppointments = computed(() => {
 
 function formatTime(value) {
   if (!value) return '';
-  return new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
 function formatDate(value) {
   if (!value) return '';
-  return new Intl.DateTimeFormat('es-PE', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value));
+  return new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value));
 }
 
 function moveDay(days) {
@@ -372,7 +374,7 @@ function cardActivityLabel(pet) {
 
 function formatDateTime(value) {
   if (!value) return '-';
-  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
 function toggleCardPet(petId, checked) {
@@ -807,7 +809,7 @@ onMounted(loadData);
 
         <div v-if="!showQuick" class="detail-box upcoming-summary">
           <span class="badge">Aceptadas</span>
-          <h3>{{ acceptedAppointments.length }} citas aceptadas</h3>
+          <h3>{{ acceptedAppointments.length }} {{ acceptedAppointments.length === 1 ? 'cita aceptada' : 'citas aceptadas' }}</h3>
           <button
             v-for="item in acceptedAppointments.slice(0, 4)"
             :key="item.id"

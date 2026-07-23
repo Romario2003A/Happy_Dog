@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref,onMounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import ClientLayout from '../../layouts/ClientLayout.vue';
 import { api } from '../../services/api';
@@ -10,6 +10,7 @@ const auth=useAuthStore();
 const profile=ref(null);
 const appointments=ref([]);
 const pets=ref([]);
+const services=ref([]);
 const error=ref('');
 const success=ref('');
 const photoInputs=ref({});
@@ -21,9 +22,14 @@ const showAppointmentForm=ref(false);
 const savingAppointment=ref(false);
 const appointmentForm=ref({
   petId:'',
+  serviceCategory:'',
+  serviceId:'',
+  quotedPrice:'',
+  priceNote:'',
   scheduledAt:'',
   reason:'',
 });
+let refreshTimer;
 const newPet=ref({
   name:'',
   species:'Perro',
@@ -46,18 +52,23 @@ const recentAppointments=computed(()=>[...appointments.value]
 const petsPendingPhoto=computed(()=>pets.value.filter(p=>!displayPetPhoto(p)).length);
 const petsWithPrintableCard=computed(()=>pets.value.filter(p=>displayPetPhoto(p) && p.cardStatus!=='PRINTED').length);
 const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
+const serviceCategories=computed(()=>[...new Set(services.value.map(service=>service.category || 'Otros'))].sort());
+const availableServices=computed(()=>services.value.filter(service=>(service.category || 'Otros')===appointmentForm.value.serviceCategory));
+const selectedService=computed(()=>services.value.find(service=>service.id===appointmentForm.value.serviceId));
 
 async function loadData(){
   try{
-    const [profileResponse,petsResponse,appointmentsResponse]=await Promise.all([
+    const [profileResponse,petsResponse,appointmentsResponse,servicesResponse]=await Promise.all([
       api.get('/client-portal/me'),
       api.get('/client-portal/pets'),
       api.get('/client-portal/appointments'),
+      api.get('/client-portal/services'),
     ]);
     if(!profileResponse.data) throw new Error('CLIENT_PROFILE_NOT_FOUND');
     profile.value=profileResponse.data;
     pets.value=petsResponse.data;
     appointments.value=appointmentsResponse.data;
+    services.value=servicesResponse.data;
   }catch(e){
     if(e.response?.status===401){
       auth.logout();
@@ -66,6 +77,21 @@ async function loadData(){
     }
     error.value='No se pudo cargar tu panel. Actualiza nuevamente o intenta en unos segundos.';
   }
+}
+
+function selectAppointmentService(){
+  const service=selectedService.value;
+  if(!service) return;
+  appointmentForm.value.quotedPrice=Number(service.price || 0);
+  appointmentForm.value.priceNote=service.priceLabel || '';
+  appointmentForm.value.reason=[service.name,service.condition].filter(Boolean).join(' - ');
+}
+
+function peruLocalToIso(value){
+  if(!value) return '';
+  const normalized=value.length===16 ? `${value}:00` : value;
+  const date=new Date(`${normalized}-05:00`);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 }
 
 async function uploadPetPhoto(petId,event){
@@ -170,19 +196,22 @@ async function createAppointment(){
     error.value='Primero registra una mascota para pedir una cita.';
     return;
   }
-  if(!appointmentForm.value.petId || !appointmentForm.value.scheduledAt || !appointmentForm.value.reason.trim()){
-    error.value='Selecciona mascota, fecha y motivo de la cita.';
+  if(!appointmentForm.value.petId || !appointmentForm.value.serviceId || !appointmentForm.value.scheduledAt || !appointmentForm.value.reason.trim()){
+    error.value='Selecciona mascota, servicio, fecha y motivo de la cita.';
     return;
   }
   savingAppointment.value=true;
   try{
     await api.post('/client-portal/appointments',{
       petId:appointmentForm.value.petId,
-      scheduledAt:appointmentForm.value.scheduledAt,
+      serviceId:appointmentForm.value.serviceId,
+      quotedPrice:Number(appointmentForm.value.quotedPrice || 0),
+      priceNote:appointmentForm.value.priceNote || undefined,
+      scheduledAt:peruLocalToIso(appointmentForm.value.scheduledAt),
       reason:appointmentForm.value.reason.trim(),
     });
     success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
-    appointmentForm.value={petId:'',scheduledAt:'',reason:''};
+    appointmentForm.value={petId:'',serviceCategory:'',serviceId:'',quotedPrice:'',priceNote:'',scheduledAt:'',reason:''};
     showAppointmentForm.value=false;
     await loadData();
   }catch(e){
@@ -194,7 +223,7 @@ async function createAppointment(){
 
 function formatDate(value){
   if(!value) return '-';
-  return new Date(value).toLocaleString('es-PE',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  return new Date(value).toLocaleString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
 function statusLabel(status){
@@ -227,7 +256,11 @@ function triggerPhotoInput(petId){
   photoInputs.value[petId]?.click();
 }
 
-onMounted(loadData);
+onMounted(()=>{
+  loadData();
+  refreshTimer=setInterval(loadData,15000);
+});
+onUnmounted(()=>clearInterval(refreshTimer));
 </script>
 <template>
   <ClientLayout title="Portal cliente" subtitle="Mascotas, citas y carnet en un solo lugar">
@@ -275,8 +308,20 @@ onMounted(loadData);
             <option value="" disabled>Selecciona tu mascota</option>
             <option v-for="pet in pets" :key="pet.id" :value="pet.id">{{ pet.name }}</option>
           </select>
+          <select v-model="appointmentForm.serviceCategory" required @change="appointmentForm.serviceId=''; appointmentForm.quotedPrice=''; appointmentForm.reason=''">
+            <option value="" disabled>¿Qué atención necesita?</option>
+            <option v-for="category in serviceCategories" :key="category" :value="category">{{ category }}</option>
+          </select>
+          <select v-if="appointmentForm.serviceCategory" v-model="appointmentForm.serviceId" required @change="selectAppointmentService">
+            <option value="" disabled>Selecciona servicio y condición</option>
+            <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ service.name }}{{ service.condition ? ` · ${service.condition}` : '' }} — {{ service.priceLabel || `S/ ${Number(service.price).toFixed(2)}` }}</option>
+          </select>
+          <div v-if="selectedService" class="appointment-price-note">
+            <strong>{{ selectedService.priceLabel || `S/ ${Number(selectedService.price).toFixed(2)}` }}</strong>
+            <span>{{ selectedService.requiresQuote || selectedService.maxPrice ? 'Recepción confirmará el precio final.' : 'Precio referencial del tarifario.' }}</span>
+          </div>
           <input v-model="appointmentForm.scheduledAt" type="datetime-local" step="60" required>
-          <textarea v-model="appointmentForm.reason" required placeholder="Motivo de la visita"></textarea>
+          <textarea v-model="appointmentForm.reason" required placeholder="Detalle adicional"></textarea>
           <button :disabled="savingAppointment || !pets.length">
             {{ savingAppointment ? 'Enviando...' : 'Enviar solicitud' }}
           </button>
