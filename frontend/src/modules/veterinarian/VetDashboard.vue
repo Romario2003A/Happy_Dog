@@ -413,6 +413,7 @@ async function savePreventiveRecord() {
   try {
     const { data } = await api.post('/preventive-care', {
       ...preventiveForm,
+      sterilizationCallDone: preventiveForm.sterilizationRecommended && preventiveForm.sterilizationCallDone,
       petId:selectedPet.value.id,
       veterinarianId:auth.user.id,
       weightKg:preventiveForm.weightKg === null || preventiveForm.weightKg === '' ? undefined : Number(preventiveForm.weightKg),
@@ -1270,7 +1271,7 @@ onUnmounted(() => {
                 <div><span>Edad</span><strong>{{ selectedPet.age || '-' }}</strong></div>
                 <div><span>Médico</span><strong>{{ auth.user?.fullName || 'Doctor veterinario' }}</strong></div>
               </div>
-              <form class="preventive-form" @submit.prevent="savePreventiveRecord">
+              <div class="preventive-form">
                 <label>Registro<select v-model="preventiveForm.type"><option value="DEWORMING">Desparasitación</option><option value="VACCINE">Vacuna</option></select></label>
                 <label>Fecha<input v-model="preventiveForm.appliedAt" type="date" required></label>
                 <label>{{ preventiveForm.type === 'VACCINE' ? 'Vacuna' : 'Desparasitante' }}<input v-model="preventiveForm.productName" required placeholder="Nombre del producto"></label>
@@ -1282,8 +1283,8 @@ onUnmounted(() => {
                 <label class="preventive-check"><input v-model="preventiveForm.followUpCalled" type="checkbox"> Llamada de seguimiento realizada</label>
                 <label class="preventive-check"><input v-model="preventiveForm.sterilizationRecommended" type="checkbox"> Recomendar llamada para esterilización</label>
                 <label v-if="preventiveForm.sterilizationRecommended" class="preventive-check"><input v-model="preventiveForm.sterilizationCallDone" type="checkbox"> Llamada para esterilizar realizada</label>
-                <button :disabled="preventiveSaving">{{ preventiveSaving ? 'Guardando...' : 'Agregar registro' }}</button>
-              </form>
+                <button type="button" :disabled="preventiveSaving" @click="savePreventiveRecord">{{ preventiveSaving ? 'Guardando...' : 'Agregar registro' }}</button>
+              </div>
               <h4>3. Desparasitaciones</h4>
               <div class="preventive-table-wrap"><table class="preventive-table"><thead><tr><th>Fecha</th><th>Desparasitante</th><th>Peso</th><th>Costo</th><th>Firma y sello</th><th>Próxima cita</th><th></th></tr></thead><tbody><tr v-for="record in preventiveRecords.filter(item => item.type === 'DEWORMING')" :key="record.id"><td>{{ formatShortDate(record.appliedAt) }}</td><td>{{ record.productName }}</td><td>{{ record.weightKg ? record.weightKg + ' kg' : '-' }}</td><td>{{ record.amountCharged != null ? 'S/ ' + formatPrice(record.amountCharged) : '-' }}</td><td>{{ record.veterinarian?.fullName || auth.user?.fullName }}</td><td>{{ record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '-' }}</td><td><button type="button" class="danger small" @click="removePreventiveRecord(record)">Eliminar</button></td></tr><tr v-if="!preventiveRecords.some(item => item.type === 'DEWORMING')"><td colspan="7" class="muted-text">Sin desparasitaciones registradas.</td></tr></tbody></table></div>
               <h4>4. Vacunas</h4>
