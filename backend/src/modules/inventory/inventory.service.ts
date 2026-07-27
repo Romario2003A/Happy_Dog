@@ -44,7 +44,39 @@ export class InventoryService {
     });
   }
 
-  remove(id: string) {
-    return this.prisma.product.delete({ where: { id } });
+  async remove(id: string) {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) throw new NotFoundException('Producto no encontrado.');
+
+    // Verificar si el producto tiene historial en la clínica
+    // (recetas médicas, ventas o movimientos de inventario)
+    const [recetas, ventas, movimientos] = await Promise.all([
+      this.prisma.prescriptionItem.count({ where: { productId: id } }),
+      this.prisma.saleItem.count({ where: { productId: id } }),
+      this.prisma.inventoryMovement.count({ where: { productId: id } }),
+    ]);
+
+    const tieneHistorial = recetas > 0 || ventas > 0 || movimientos > 0;
+
+    if (tieneHistorial) {
+      // El producto tiene registros médicos o de ventas vinculados.
+      // No se puede borrar porque rompería el historial clínico de las mascotas
+      // y los registros financieros pasados. Se desactiva en su lugar.
+      await this.prisma.product.update({
+        where: { id },
+        data: { active: false },
+      });
+      return {
+        accion: 'desactivado',
+        mensaje: `El producto "${product.name}" tiene historial en la clínica (${recetas} receta(s), ${ventas} venta(s), ${movimientos} movimiento(s)). Fue desactivado y ya no aparecerá en ventas ni recetas, pero los registros pasados se mantienen intactos.`,
+      };
+    }
+
+    // El producto nunca fue usado: se elimina permanentemente
+    await this.prisma.product.delete({ where: { id } });
+    return {
+      accion: 'eliminado',
+      mensaje: `El producto "${product.name}" fue eliminado permanentemente.`,
+    };
   }
 }
