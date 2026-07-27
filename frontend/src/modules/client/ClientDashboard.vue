@@ -198,7 +198,15 @@ function formatDate(value){
 }
 
 function statusLabel(status){
-  const labels={PENDING:'Pendiente',CONFIRMED:'Confirmada',IN_PROGRESS:'En consulta',ATTENDED:'Atendida',CANCELLED:'Cancelada'};
+  const labels={
+    PENDING:         'Pendiente',
+    CONFIRMED:       'Confirmada',
+    WAITING:         'En sala de espera',
+    IN_CONSULTATION: 'En consulta',
+    ATTENDED:        'Atendida',
+    NO_SHOW:         'No asistió',
+    CANCELLED:       'Cancelada',
+  };
   return labels[status] || status || '-';
 }
 
