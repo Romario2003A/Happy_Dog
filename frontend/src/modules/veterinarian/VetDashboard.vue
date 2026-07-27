@@ -109,7 +109,6 @@ const visibleAppointments = computed(() => appointments.value.filter((appointmen
   const patientAlreadyArrived = ['WAITING', 'IN_CONSULTATION'].includes(appointment.status);
   return patientAlreadyArrived || dateKey(appointment.scheduledAt) === dateKey();
 }));
-const groomingAppointments = computed(() => appointments.value.filter(a => readyStatuses.includes(a.status) && isGroomingAppointment(a)));
 const pendingAppointments = computed(() => appointments.value
   .filter(a => a.status === 'PENDING')
   .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
@@ -122,6 +121,12 @@ const filteredPets = computed(() => pets.value.filter(pet => {
 }).slice(0, 8));
 const selectedPet = computed(() => selected.value?.pet || selectedStandalonePet.value);
 const selectedClient = computed(() => selected.value?.client || selectedStandalonePet.value?.client);
+const scheduledServiceLabel = computed(() => {
+  if (!selected.value) return '';
+  return selected.value.service?.name
+    || String(selected.value.reason || '').replace(/^CLIENT_DATE_REQUEST::/, '')
+    || 'Atención veterinaria';
+});
 const selectedProduct = computed(() => products.value.find(product => product.id === prescription.value.productId));
 const filteredHistory = computed(() => {
   const query = historySearch.value.trim().toLowerCase();
@@ -189,6 +194,13 @@ function startClinicalTask(task) {
   taskChosen.value = true;
 }
 
+function taskForAppointment(appointment) {
+  const text = `${appointment?.service?.category || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
+  if (text.includes('vacun') || text.includes('desparasit')) return 'preventive';
+  if (text.includes('cirug') || text.includes('esteriliz') || text.includes('castr')) return 'surgery';
+  return 'consultation';
+}
+
 function returnToPatients() {
   activeWorkspace.value = 'agenda';
   taskChosen.value = false;
@@ -202,6 +214,10 @@ function returnToPatientActions() {
 }
 
 function goBackOneStep() {
+  if (taskChosen.value && selected.value) {
+    returnToPatients();
+    return;
+  }
   if (taskChosen.value || activeWorkspace.value === 'history') {
     returnToPatientActions();
     return;
@@ -378,7 +394,7 @@ async function selectAppointment(appointment) {
   expandedRecordId.value = null;
   if (!appointment?.petId) return;
   activeWorkspace.value = 'consultation';
-  consultationTab.value = 'evaluation';
+  startClinicalTask(taskForAppointment(appointment));
   try {
     const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${appointment.petId}`),api.get(`/preventive-care/pet/${appointment.petId}`).catch(() => ({data:[]}))]);
     history.value = historyRes.data;
@@ -1013,10 +1029,6 @@ onUnmounted(() => {
           <h2>¿A qué paciente atenderás?</h2>
         </div>
         <p class="muted-text">Elige una cita de hoy o busca directamente a la mascota.</p>
-        <div v-if="groomingAppointments.length" class="grooming-note">
-          <strong>{{ groomingAppointments.length }} servicio{{ groomingAppointments.length === 1 ? '' : 's' }} de baño y corte</strong>
-          <span>No requieren historia médica y continúan en el flujo de recepción/peluquería.</span>
-        </div>
         <p v-if="loading" class="muted-text">Cargando citas...</p>
         <div v-else-if="!visibleAppointments.length" class="empty-state">
           <strong>Sin citas por atender ahora</strong>
@@ -1094,7 +1106,10 @@ onUnmounted(() => {
           </div>
         </section>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
-          <div class="current-task-bar"><span><strong>Paso 3 de 3</strong> · {{ activeTask === 'consultation' ? 'Consulta médica' : activeTask === 'preventive' ? 'Vacuna o desparasitación' : activeTask === 'prescription' ? 'Receta médica' : activeTask === 'history' ? 'Historia clínica' : 'Esterilización / castración' }}</span></div>
+          <div class="current-task-bar">
+            <span><strong>Paso 3 de 3</strong> · {{ activeTask === 'consultation' ? 'Consulta médica' : activeTask === 'preventive' ? 'Vacuna o desparasitación' : activeTask === 'prescription' ? 'Receta médica' : activeTask === 'history' ? 'Historia clínica' : 'Esterilización / castración' }}</span>
+            <small v-if="scheduledServiceLabel">Motivo confirmado: {{ scheduledServiceLabel }}</small>
+          </div>
           <section v-if="activeTask === 'consultation'" class="attention-type-box">
             <label>Tipo de atención
               <select v-model="attentionType"><option v-for="type in attentionTypes" :key="type.value" :value="type.value">{{ type.label }} — {{ type.help }}</option></select>
