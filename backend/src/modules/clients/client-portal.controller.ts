@@ -1,16 +1,14 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { PetSex, Role } from '@prisma/client';
+import { PetSex } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { ClientAccountGuard } from '../../common/guards/client-account.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { petPhotoUploadOptions, uploadedFileDataUrl } from '../../common/upload/pet-photo-upload';
 import { PrismaService } from '../../database/prisma.service';
 import { AppointmentsService } from '../appointments/appointments.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.CLIENT)
+@UseGuards(JwtAuthGuard, ClientAccountGuard)
 @Controller('client-portal')
 export class ClientPortalController {
   constructor(private prisma: PrismaService, private appointmentsService: AppointmentsService) {}

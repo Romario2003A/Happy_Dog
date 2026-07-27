@@ -6,7 +6,7 @@ api.interceptors.response.use(r=>r, e=>{
   const path = window.location.pathname;
   const isClientArea = path.startsWith('/cliente');
   const isStaffArea = path.startsWith('/admin') || path.startsWith('/recepcion') || path.startsWith('/veterinario');
-  if(status===401 || (status===403 && isStaffArea)){
+  if(status===401 || (status===403 && (isStaffArea || isClientArea))){
     localStorage.removeItem('vet_token');
     localStorage.removeItem('vet_user');
     const loginPath=isClientArea ? '/cliente/login' : '/personal/login';
