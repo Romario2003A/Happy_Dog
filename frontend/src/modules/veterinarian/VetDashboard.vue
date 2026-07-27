@@ -42,6 +42,7 @@ const expandedRecordId = ref(null);
 const patientSearch = ref(null);
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
 const attentionType = ref('CONSULTATION');
+const changingAttentionType = ref(false);
 const attentionTypes = [
   { value: 'CONSULTATION', label: 'Consulta', help: 'Evaluación, diagnóstico y tratamiento' },
   { value: 'VACCINE', label: 'Vacunación', help: 'Aplicación y próximo control' },
@@ -127,6 +128,14 @@ const scheduledServiceLabel = computed(() => {
     || String(selected.value.reason || '').replace(/^CLIENT_DATE_REQUEST::/, '')
     || 'Atención veterinaria';
 });
+const attentionTypeLabel = computed(() => attentionTypes.find(type => type.value === attentionType.value)?.label || 'Consulta');
+const activeTaskLabel = computed(() => {
+  if (activeTask.value === 'consultation') return attentionType.value === 'FOLLOW_UP' ? 'Control médico' : 'Consulta médica';
+  if (activeTask.value === 'preventive') return 'Vacuna o desparasitación';
+  if (activeTask.value === 'prescription') return 'Receta médica';
+  if (activeTask.value === 'history') return 'Historia clínica';
+  return 'Esterilización / castración';
+});
 const selectedProduct = computed(() => products.value.find(product => product.id === prescription.value.productId));
 const filteredHistory = computed(() => {
   const query = historySearch.value.trim().toLowerCase();
@@ -199,6 +208,21 @@ function taskForAppointment(appointment) {
   if (text.includes('vacun') || text.includes('desparasit')) return 'preventive';
   if (text.includes('cirug') || text.includes('esteriliz') || text.includes('castr')) return 'surgery';
   return 'consultation';
+}
+
+function applyAttentionType() {
+  changingAttentionType.value = false;
+  if (attentionType.value === 'VACCINE') {
+    startClinicalTask('preventive');
+    return;
+  }
+  if (attentionType.value === 'SURGERY') {
+    startClinicalTask('surgery');
+    return;
+  }
+  activeTask.value = 'consultation';
+  consultationTab.value = 'evaluation';
+  taskChosen.value = true;
 }
 
 function returnToPatients() {
@@ -349,6 +373,7 @@ function resetForm(appointment) {
   selectedDocuments.surgeryConsent = false;
   taskChosen.value = false;
   activeTask.value = '';
+  changingAttentionType.value = false;
   success.value = '';
   error.value = '';
 }
@@ -1107,13 +1132,18 @@ onUnmounted(() => {
         </section>
         <form v-else class="medical-form" @submit.prevent="saveRecord">
           <div class="current-task-bar">
-            <span><strong>Paso 3 de 3</strong> · {{ activeTask === 'consultation' ? 'Consulta médica' : activeTask === 'preventive' ? 'Vacuna o desparasitación' : activeTask === 'prescription' ? 'Receta médica' : activeTask === 'history' ? 'Historia clínica' : 'Esterilización / castración' }}</span>
+            <span><strong>Paso 3 de 3</strong> · {{ activeTaskLabel }}</span>
             <small v-if="scheduledServiceLabel">Motivo confirmado: {{ scheduledServiceLabel }}</small>
           </div>
           <section v-if="activeTask === 'consultation'" class="attention-type-box">
-            <label>Tipo de atención
-              <select v-model="attentionType"><option v-for="type in attentionTypes" :key="type.value" :value="type.value">{{ type.label }} — {{ type.help }}</option></select>
+            <div v-if="selected && !changingAttentionType" class="confirmed-attention-type">
+              <div><span>Tipo confirmado</span><strong>{{ attentionTypeLabel }}</strong></div>
+              <button type="button" class="secondary small" @click="changingAttentionType = true">Cambiar tipo de atención</button>
+            </div>
+            <label v-else>Tipo de atención
+              <select v-model="attentionType" @change="applyAttentionType"><option v-for="type in attentionTypes" :key="type.value" :value="type.value">{{ type.label }} — {{ type.help }}</option></select>
             </label>
+            <button v-if="selected && changingAttentionType" type="button" class="ghost small" @click="changingAttentionType = false">Cancelar cambio</button>
           </section>
           <label v-if="activeTask === 'consultation'" class="consultation-section-select">Sección
             <select v-model="consultationTab"><option v-for="tab in consultationTabs" :key="tab.value" :value="tab.value">{{ tab.label }} — {{ tab.help }}</option></select>
