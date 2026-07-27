@@ -1133,7 +1133,7 @@ onUnmounted(() => {
         <form v-else class="medical-form" @submit.prevent="saveRecord">
           <div class="current-task-bar">
             <span><strong>Paso 3 de 3</strong> · {{ activeTaskLabel }}</span>
-            <small v-if="scheduledServiceLabel">Motivo confirmado: {{ scheduledServiceLabel }}</small>
+            <small v-if="scheduledServiceLabel">Motivo de la cita: {{ scheduledServiceLabel }}</small>
           </div>
           <section v-if="activeTask === 'consultation'" class="attention-type-box">
             <div v-if="selected && !changingAttentionType" class="confirmed-attention-type">
