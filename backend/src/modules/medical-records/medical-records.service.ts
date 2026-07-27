@@ -25,9 +25,35 @@ export class MedicalRecordsService {
   async create(dto: CreateMedicalRecordDto) {
     return this.prisma.$transaction(async (tx) => {
       let appointmentId = dto.appointmentId;
-      if (!appointmentId) {
+
+      if (appointmentId) {
+        // --- Validate appointment exists and belongs to the correct pet ---
+        const appointment = await tx.appointment.findUnique({
+          where: { id: appointmentId },
+          include: { medicalRecord: true },
+        });
+
+        if (!appointment) {
+          throw new BadRequestException(
+            'La cita seleccionada no existe. Es posible que haya sido cancelada o eliminada. Recarga la página e intenta nuevamente.',
+          );
+        }
+
+        if (appointment.petId !== dto.petId) {
+          throw new BadRequestException(
+            'La cita no corresponde al paciente indicado. No se puede registrar una historia clínica con datos de otro paciente.',
+          );
+        }
+
+        if (appointment.medicalRecord) {
+          throw new BadRequestException(
+            'Esta cita ya tiene una historia clínica registrada. No se puede duplicar el registro.',
+          );
+        }
+      } else {
+        // --- No appointmentId: create a direct appointment on the fly ---
         const pet = await tx.pet.findUnique({ where: { id: dto.petId }, select: { clientId: true } });
-        if (!pet) throw new BadRequestException('Paciente no encontrado');
+        if (!pet) throw new BadRequestException('Paciente no encontrado.');
         const directAppointment = await tx.appointment.create({
           data: {
             scheduledAt: new Date(),
@@ -109,7 +135,7 @@ export class MedicalRecordsService {
         });
       }
 
-      // --- Mark appointment as attended if explicit appointmentId was provided ---
+      // --- Mark appointment as attended ---
       if (dto.appointmentId) {
         await tx.appointment.update({
           where: { id: dto.appointmentId },
