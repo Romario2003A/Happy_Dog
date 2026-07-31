@@ -45,7 +45,7 @@ const newPet=ref({
 });
 
 const activeAppointments=computed(()=>appointments.value
-  .filter(a=>!['CANCELLED','ATTENDED'].includes(a.status))
+  .filter(a=>!['CANCELLED','ATTENDED','NO_SHOW'].includes(a.status))
   .sort((a,b)=>new Date(a.scheduledAt)-new Date(b.scheduledAt)));
 const nextAppointment=computed(()=>activeAppointments.value.find(a=>new Date(a.scheduledAt)>=new Date()) || activeAppointments.value[0]);
 const recentAppointments=computed(()=>[...appointments.value]
@@ -251,7 +251,15 @@ function formatDate(value){
 }
 
 function statusLabel(status){
-  const labels={PENDING:'Pendiente',CONFIRMED:'Confirmada',IN_PROGRESS:'En consulta',ATTENDED:'Atendida',CANCELLED:'Cancelada'};
+  const labels={
+    PENDING:'Pendiente de confirmación',
+    CONFIRMED:'Confirmada',
+    WAITING:'Ya llegó al local',
+    IN_CONSULTATION:'En atención',
+    ATTENDED:'Atendida',
+    NO_SHOW:'No asistió',
+    CANCELLED:'Cancelada',
+  };
   return labels[status] || status || '-';
 }
 

@@ -70,4 +70,9 @@ export class CashController {
   closeDay(@Body() dto: CreateCashClosingDto, @CurrentUser('sub') userId?: string) {
     return this.service.closeDay(dto, userId);
   }
+
+  @Delete('closing/:date')
+  reopenDay(@Param('date') date: string) {
+    return this.service.reopenDay(date);
+  }
 }

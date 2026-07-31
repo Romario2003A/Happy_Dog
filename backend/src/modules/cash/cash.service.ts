@@ -10,6 +10,14 @@ import { PayReceivableDto } from './dto/pay-receivable.dto';
 export class CashService {
   constructor(private prisma: PrismaService) {}
 
+  private async assertDayOpen(value:Date|string, db:any=this.prisma){
+    const date=value instanceof Date ? value : this.parseDateTime(value);
+    const day=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima'}).format(date);
+    const {start}=this.dayRange(day);
+    const closing=await db.cashClosing.findUnique({where:{businessDate:start},select:{id:true}});
+    if(closing) throw new BadRequestException('La caja de ese día está cerrada. Reábrela antes de registrar o modificar movimientos.');
+  }
+
   findMovements(from?: string, to?: string) {
     const range = this.rangeFromQuery(from, to);
     return (this.prisma as any).cashMovement.findMany({
@@ -60,6 +68,7 @@ export class CashService {
       debtPayments: 0,
       adjustments: 0,
       net: 0,
+      cashNet: 0,
       movementCount: movements.length,
       byPaymentMethod: [] as Array<{ key: string; total: number }>,
       byCategory: [] as Array<{ key: string; income: number; expenses: number; net: number }>,
@@ -75,7 +84,9 @@ export class CashService {
       else if (movement.type === CashMovementType.ADJUSTMENT) totals.adjustments += amount;
       else totals.income += amount;
 
-      if (movement.paymentMethod) byPayment.set(movement.paymentMethod, (byPayment.get(movement.paymentMethod) || 0) + amount);
+      const signedAmount = movement.type === CashMovementType.EXPENSE ? -amount : amount;
+      if (movement.paymentMethod) byPayment.set(movement.paymentMethod, (byPayment.get(movement.paymentMethod) || 0) + signedAmount);
+      if (movement.paymentMethod === 'CASH') totals.cashNet += signedAmount;
       if (movement.category) {
         const category = byCategory.get(movement.category) || { income: 0, expenses: 0 };
         if (movement.type === CashMovementType.EXPENSE) category.expenses += amount;
@@ -97,6 +108,7 @@ export class CashService {
 
   async createMovement(dto: CreateCashMovementDto, userId?: string) {
     if (Number(dto.amount) <= 0) throw new BadRequestException('El monto debe ser mayor a cero.');
+    await this.assertDayOpen(dto.occurredAt || new Date());
 
     if (dto.appointmentId && dto.type !== CashMovementType.EXPENSE) {
       const existing = await (this.prisma as any).cashMovement.findFirst({
@@ -152,7 +164,11 @@ export class CashService {
     });
   }
 
-  updateMovement(id: string, dto: Partial<CreateCashMovementDto>) {
+  async updateMovement(id: string, dto: Partial<CreateCashMovementDto>) {
+    const current=await (this.prisma as any).cashMovement.findUnique({where:{id}});
+    if(!current) throw new BadRequestException('Movimiento no encontrado.');
+    await this.assertDayOpen(current.occurredAt);
+    if(dto.occurredAt) await this.assertDayOpen(dto.occurredAt);
     return (this.prisma as any).cashMovement.update({
       where: { id },
       data: {
@@ -167,6 +183,7 @@ export class CashService {
     return (this.prisma as any).$transaction(async (tx: any) => {
       const movement = await tx.cashMovement.findUnique({ where: { id } });
       if (!movement) throw new BadRequestException('Movimiento no encontrado.');
+      await this.assertDayOpen(movement.occurredAt,tx);
       if (movement.productId && movement.productQuantity) {
         await tx.product.update({ where: { id: movement.productId }, data: { stock: { increment: movement.productQuantity } } });
         await tx.inventoryMovement.create({ data: { productId: movement.productId, type: 'IN', quantity: movement.productQuantity, reason: 'Venta anulada', referenceId: movement.id } });
@@ -179,7 +196,7 @@ export class CashService {
     const { start } = this.dayRange(dto.businessDate);
     const summary = await this.summary(dto.businessDate);
     const openingAmount = Number(dto.openingAmount || 0);
-    const expectedAmount = openingAmount + summary.net;
+    const expectedAmount = openingAmount + summary.cashNet;
     const countedAmount = Number(dto.countedAmount || 0);
     const difference = countedAmount - expectedAmount;
 
@@ -209,6 +226,13 @@ export class CashService {
     return (this.prisma as any).cashClosing.findMany({ orderBy: { businessDate: 'desc' }, take: 60 });
   }
 
+  async reopenDay(date:string){
+    const {start}=this.dayRange(date);
+    const closing=await (this.prisma as any).cashClosing.findUnique({where:{businessDate:start}});
+    if(!closing) throw new BadRequestException('La caja de ese día ya está abierta.');
+    return (this.prisma as any).cashClosing.delete({where:{businessDate:start}});
+  }
+
   async findReceivables() {
     const sales = await (this.prisma as any).sale.findMany({
       where: { status: 'PENDING' },
@@ -227,6 +251,7 @@ export class CashService {
     const total = Number(dto.total);
     const initialPayment = Number(dto.initialPayment || 0);
     if (initialPayment > total) throw new BadRequestException('El adelanto no puede superar el total.');
+    if(initialPayment>0) await this.assertDayOpen(new Date());
 
     const [client, pet] = await Promise.all([
       (this.prisma as any).client.findUnique({ where: { id: dto.clientId } }),
@@ -264,6 +289,7 @@ export class CashService {
   }
 
   async payReceivable(id: string, dto: PayReceivableDto, userId?: string) {
+    await this.assertDayOpen(new Date());
     return (this.prisma as any).$transaction(async (tx: any) => {
       const sale = await tx.sale.findUnique({
         where: { id },

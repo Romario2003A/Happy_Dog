@@ -67,6 +67,22 @@ export class AppointmentsService {
     if(conflict) throw new BadRequestException('Ese horario se cruza con otra cita de la mascota o del profesional. Elige una hora disponible.');
   }
 
+  private assertValidStatusTransition(currentStatus:string, nextStatus?:string){
+    if(!nextStatus || nextStatus===currentStatus) return;
+    const allowed:Record<string,string[]>={
+      PENDING:['CONFIRMED','CANCELLED','NO_SHOW'],
+      CONFIRMED:['WAITING','IN_CONSULTATION','CANCELLED','NO_SHOW'],
+      WAITING:['IN_CONSULTATION','CANCELLED','NO_SHOW'],
+      IN_CONSULTATION:['ATTENDED','CANCELLED','NO_SHOW'],
+      CANCELLED:['PENDING'],
+      ATTENDED:[],
+      NO_SHOW:[],
+    };
+    if(!(allowed[currentStatus] || []).includes(nextStatus)){
+      throw new BadRequestException(`No se puede cambiar una cita de ${currentStatus} a ${nextStatus}.`);
+    }
+  }
+
   async create(dto:CreateAppointmentDto){
     const data=this.toAppointmentData(dto as any);
     if(data.serviceId && dto.durationMinutes === undefined){
@@ -78,7 +94,14 @@ export class AppointmentsService {
   }
   async update(id:string, dto:UpdateAppointmentDto){
     const current=await (this.prisma as any).appointment.findUnique({where:{id}});
+    if(!current) throw new BadRequestException('Cita no encontrada.');
+    this.assertValidStatusTransition(current.status,dto.status);
     const changes=this.toAppointmentData(dto);
+    if(dto.status==='PENDING' || dto.status==='CONFIRMED'){
+      changes.checkedInAt=null;
+      changes.startedAt=null;
+      changes.completedAt=null;
+    }
     const data={...current,...changes};
     if(changes.serviceId && dto.durationMinutes === undefined){
       const service=await (this.prisma as any).service.findUnique({where:{id:changes.serviceId},select:{durationMinutes:true}});

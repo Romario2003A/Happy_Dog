@@ -145,11 +145,12 @@ const selectedCashProduct = computed(() => cashForm.value.type === 'INCOME' && c
   ? availableCashProducts.value.find(product => product.id === cashForm.value.productId)
   : null);
 const sortedCashMovements = computed(() => cashMovements.value.slice().sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)));
-const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.net || 0));
+const expectedClosingAmount = computed(() => Number(closingForm.value.openingAmount || 0) + Number(cashSummary.value.cashNet || 0));
 const hasClosingCount = computed(() => closingForm.value.countedAmount !== '' && closingForm.value.countedAmount !== null);
 const closingDifference = computed(() => hasClosingCount.value
   ? Number(closingForm.value.countedAmount) - expectedClosingAmount.value
   : null);
+const isCashDayClosed = computed(() => Boolean(cashSummary.value.closing));
 const closingStatus = computed(() => {
   if (!hasClosingCount.value) return { label: 'Pendiente de conteo', tone: 'neutral' };
   if (Math.abs(closingDifference.value) < 0.01) return { label: 'Caja cuadrada', tone: 'ok' };
@@ -204,6 +205,7 @@ function defaultCashSummary() {
     debtPayments: 0,
     adjustments: 0,
     net: 0,
+    cashNet: 0,
     movementCount: 0,
     byPaymentMethod: [],
     byCategory: [],
@@ -524,7 +526,12 @@ async function openInventoryHistory(product) {
 }
 
 async function saveInventoryMovement() {
-  if (!inventoryDetail.value || Number(inventoryMovementForm.value.quantity) < 0) return;
+  const quantity = Number(inventoryMovementForm.value.quantity);
+  if (!inventoryDetail.value || quantity < 0) return;
+  if (inventoryMovementForm.value.type !== 'ADJUSTMENT' && quantity === 0) {
+    error.value = 'La cantidad debe ser mayor a cero.';
+    return;
+  }
   saving.value = true; error.value = ''; success.value = '';
   try {
     await api.post(`/inventory/${inventoryDetail.value.id}/movements`, { ...inventoryMovementForm.value, quantity: Number(inventoryMovementForm.value.quantity) });
@@ -586,7 +593,7 @@ function cashPayload() {
   return {
     ...cashForm.value,
     amount: Number(cashForm.value.amount),
-    paymentMethod: cashForm.value.type === 'EXPENSE' ? null : cashForm.value.paymentMethod,
+    paymentMethod: cashForm.value.paymentMethod,
     productId: cashForm.value.category === 'PRODUCT' && cashForm.value.type === 'INCOME' ? cashForm.value.productId || undefined : undefined,
     productQuantity: cashForm.value.category === 'PRODUCT' && cashForm.value.type === 'INCOME' && cashForm.value.productId ? Number(cashForm.value.productQuantity || 1) : undefined,
   };
@@ -807,6 +814,24 @@ function stockClass(product) {
   if (Number(product.stock) <= 0) return 'out';
   if (Number(product.stock) <= Number(product.minStock)) return 'low';
   return 'ok';
+}
+
+async function reopenCashDay() {
+  const ok = window.confirm(`¿Reabrir la caja del ${cashDate.value}? Hazlo solo para corregir o agregar movimientos pendientes.`);
+  if (!ok) return;
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    await api.delete(`/cash/closing/${cashDate.value}`);
+    success.value = 'Caja reabierta. Ya puedes corregir los movimientos y volver a cerrarla.';
+    showClosingForm.value = false;
+    await loadCash();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo reabrir la caja.';
+  } finally {
+    saving.value = false;
+  }
 }
 
 async function importTariff() {
@@ -1037,7 +1062,6 @@ onMounted(async () => {
                   <button class="ghost small" type="button" @click="startEditProduct(p)">Editar</button>
                   <button class="ghost small" type="button" @click="openInventoryHistory(p)">Stock</button>
                   <button class="secondary small" type="button" @click="toggleProductActive(p)">{{ p.active === false ? 'Activar' : 'Retirar' }}</button>
-                  <button class="danger small" type="button" @click="deleteProduct(p)">Eliminar</button>
                 </div>
               </td>
             </tr>
@@ -1144,7 +1168,7 @@ onMounted(async () => {
         </div>
         <div v-if="cashWorkspace === 'day'" class="cash-actions">
           <input v-model="cashDate" class="cash-date" type="date">
-          <button class="secondary small" type="button" @click="showCashForm = !showCashForm">
+          <button class="secondary small" type="button" :disabled="isCashDayClosed" @click="showCashForm = !showCashForm">
             {{ showCashForm ? 'Cancelar registro' : '+ Registrar movimiento' }}
           </button>
           <button class="small" type="button" @click="showClosingForm = !showClosingForm">
@@ -1187,6 +1211,7 @@ onMounted(async () => {
           <small>Contado: S/ {{ formatMoney(cashSummary.closing.countedAmount) }}</small>
         </div>
         <button class="secondary small" type="button" @click="showClosingForm = true">Revisar cierre</button>
+        <button class="danger small" type="button" :disabled="saving" @click="reopenCashDay">Reabrir caja</button>
       </div>
 
       <section class="pending-charges">
@@ -1211,7 +1236,7 @@ onMounted(async () => {
             </div>
             <div v-if="chargeForm.appointmentId !== appointment.id" class="pending-charge-action">
               <strong>{{ appointment.suggestedAmount ? `S/ ${formatMoney(appointment.suggestedAmount)}` : 'Importe pendiente' }}</strong>
-              <button class="small" type="button" @click="selectPendingCharge(appointment)">Cobrar</button>
+              <button class="small" type="button" :disabled="isCashDayClosed" @click="selectPendingCharge(appointment)">Cobrar</button>
             </div>
             <form v-else class="quick-charge-form" @submit.prevent="collectAppointment(appointment)">
               <label>Importe<input v-model.number="chargeForm.amount" type="number" min="0.01" step="0.01" required></label>
@@ -1227,7 +1252,7 @@ onMounted(async () => {
         </div>
       </section>
 
-      <form v-if="showCashForm" class="cash-form" @submit.prevent="saveCashMovement">
+      <form v-if="showCashForm && !isCashDayClosed" class="cash-form" @submit.prevent="saveCashMovement">
         <label v-if="cashForm.type === 'INCOME'" class="wide">Servicio del tarifario <small>Opcional para ventas registradas directamente en caja.</small>
           <select v-model="cashServiceCategory" @change="cashServiceId = ''">
             <option value="">Seleccionar categoría</option>
@@ -1269,7 +1294,7 @@ onMounted(async () => {
           <input v-model.number="cashForm.amount" type="number" min="0" step="0.01" required placeholder="0.00" :readonly="Boolean(selectedCashProduct)">
         </label>
         <label>Metodo
-          <select v-model="cashForm.paymentMethod" :disabled="cashForm.type === 'EXPENSE'">
+          <select v-model="cashForm.paymentMethod">
             <option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
@@ -1325,8 +1350,8 @@ onMounted(async () => {
               <strong>S/ {{ formatMoney(cashSummary.net) }}</strong>
             </div>
             <div class="cash-total strong">
-              <span>Caja esperada</span>
-              <small>Inicial + resultado del dia.</small>
+              <span>Efectivo esperado</span>
+              <small>Dinero inicial + cobros en efectivo - gastos en efectivo.</small>
               <strong>S/ {{ formatMoney(expectedClosingAmount) }}</strong>
             </div>
             <label>Dinero contado fisicamente
@@ -1364,7 +1389,7 @@ onMounted(async () => {
             <td>{{ cashCategoryLabels[movement.category] || movement.category }}</td>
             <td>{{ paymentLabels[movement.paymentMethod] || '-' }}</td>
             <td :class="movementAmountClass(movement)">{{ movementSignedAmount(movement) }}</td>
-            <td><button class="danger small" type="button" @click="deleteCashMovement(movement)">Eliminar</button></td>
+            <td><button class="danger small" type="button" :disabled="isCashDayClosed" @click="deleteCashMovement(movement)">Eliminar</button></td>
           </tr>
         </tbody>
       </table>
