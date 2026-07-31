@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
@@ -83,6 +84,22 @@ export class AppointmentsService {
     }
   }
 
+  private businessDate(value:Date|string = new Date()){
+    return new Intl.DateTimeFormat('en-CA',{
+      timeZone:'America/Lima',
+      year:'numeric',
+      month:'2-digit',
+      day:'2-digit',
+    }).format(new Date(value));
+  }
+
+  private assertNotFutureArrival(scheduledAt:Date|string,status?:string){
+    if(!['WAITING','IN_CONSULTATION'].includes(String(status || ''))) return;
+    if(this.businessDate(scheduledAt)>this.businessDate()){
+      throw new BadRequestException('La mascota todavía no puede registrarse: la cita corresponde a una fecha futura.');
+    }
+  }
+
   async create(dto:CreateAppointmentDto){
     const data=this.toAppointmentData(dto as any);
     if(data.serviceId && dto.durationMinutes === undefined){
@@ -92,7 +109,13 @@ export class AppointmentsService {
     await this.assertNoConflict(data);
     return (this.prisma as any).appointment.create({ data, include: { client:true, pet:true, veterinarian:true, service:true } });
   }
-  async update(id:string, dto:UpdateAppointmentDto){
+  async update(id:string, dto:UpdateAppointmentDto, actorRole:Role = Role.ADMIN){
+    if(actorRole===Role.VETERINARIAN){
+      const fields=Object.keys(dto).filter(key=>(dto as any)[key]!==undefined);
+      if(fields.length!==1 || fields[0]!=='status' || dto.status!=='IN_CONSULTATION'){
+        throw new ForbiddenException('El personal veterinario solo puede iniciar una atención asignada.');
+      }
+    }
     const current=await (this.prisma as any).appointment.findUnique({where:{id}});
     if(!current) throw new BadRequestException('Cita no encontrada.');
     this.assertValidStatusTransition(current.status,dto.status);
@@ -103,6 +126,7 @@ export class AppointmentsService {
       changes.completedAt=null;
     }
     const data={...current,...changes};
+    this.assertNotFutureArrival(data.scheduledAt,dto.status);
     if(changes.serviceId && dto.durationMinutes === undefined){
       const service=await (this.prisma as any).service.findUnique({where:{id:changes.serviceId},select:{durationMinutes:true}});
       changes.durationMinutes=service?.durationMinutes || 30;
