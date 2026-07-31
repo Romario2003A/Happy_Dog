@@ -872,8 +872,8 @@ onMounted(loadData);
         </div>
 
         <div v-if="!showQuick" class="detail-box upcoming-summary">
-          <span class="badge">Aceptadas</span>
-          <h3>{{ acceptedAppointments.length }} {{ acceptedAppointments.length === 1 ? 'cita aceptada' : 'citas aceptadas' }}</h3>
+          <span class="badge">Próximamente</span>
+          <h3>{{ acceptedAppointments.length }} {{ acceptedAppointments.length === 1 ? 'cita confirmada próxima' : 'citas confirmadas próximas' }}</h3>
           <button
             v-for="item in acceptedAppointments.slice(0, 4)"
             :key="item.id"
@@ -885,7 +885,7 @@ onMounted(loadData);
             <span>{{ item.pet?.name || 'Mascota' }} - {{ appointmentStatusLabel(item) }}</span>
           </button>
           <button v-if="acceptedAppointments.length > 4" class="secondary small full" type="button" @click="agendaView='upcoming'">Ver todas</button>
-          <p v-if="!acceptedAppointments.length" class="muted-text">Cuando confirmes una cita, aparecerá aquí como aceptada.</p>
+          <p v-if="!acceptedAppointments.length" class="muted-text">No hay citas confirmadas pendientes para las próximas horas.</p>
         </div>
 
         <form v-if="showQuick" class="stack quick-form" @submit.prevent="saveQuickAppointment">
