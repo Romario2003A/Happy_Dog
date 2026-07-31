@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import { api } from '../../services/api';
+import { daysUntilDateOnly, formatDateOnly } from '../../utils/dateOnly';
 
 const route = useRoute();
 const router = useRouter();
@@ -19,6 +20,8 @@ const active = ref(tabFromRoute());
 const error = ref('');
 const success = ref('');
 const saving = ref(false);
+const adminLoading = ref(true);
+const cashLoading = ref(false);
 const showProductForm = ref(false);
 const editingProductId = ref('');
 const inventorySearch = ref('');
@@ -158,6 +161,10 @@ const cashActivityLabel = computed(() => {
   if (cashMovements.value.length === 1) return '1 movimiento registrado';
   return `${cashMovements.value.length} movimientos registrados`;
 });
+const cashInitialLoading = computed(() => cashLoading.value
+  && cashMovements.value.length === 0
+  && Number(cashSummary.value.movementCount || 0) === 0
+  && pendingCharges.value.length === 0);
 const receivableTotal = computed(() => receivables.value.reduce((sum, item) => sum + Number(item.balance || 0), 0));
 const receivablePets = computed(() => clients.value.find(client => client.id === receivableForm.value.clientId)?.pets || []);
 
@@ -236,43 +243,48 @@ function rejectedStatus(result) {
 }
 
 async function loadCash() {
+  cashLoading.value = true;
   error.value = '';
-  const [summaryRes, movementsRes, pendingRes, receivablesRes] = await Promise.allSettled([
-    api.get(`/cash/summary?date=${cashDate.value}`),
-    api.get(`/cash?from=${cashDate.value}&to=${cashDate.value}`),
-    api.get(`/cash/pending?date=${cashDate.value}`),
-    api.get('/cash/receivables'),
-  ]);
+  try {
+    const [summaryRes, movementsRes, pendingRes, receivablesRes] = await Promise.allSettled([
+      api.get(`/cash/summary?date=${cashDate.value}`),
+      api.get(`/cash?from=${cashDate.value}&to=${cashDate.value}`),
+      api.get(`/cash/pending?date=${cashDate.value}`),
+      api.get('/cash/receivables'),
+    ]);
 
-  if (summaryRes.status === 'fulfilled') {
-    cashSummary.value = { ...defaultCashSummary(), ...summaryRes.value.data };
-    const closing = summaryRes.value.data?.closing;
-    if (closing) {
-      closingForm.value = {
-        openingAmount: Number(closing.openingAmount || 0),
-        countedAmount: Number(closing.countedAmount || 0),
-        notes: closing.notes || '',
-      };
-    } else {
-      closingForm.value = { openingAmount: 0, countedAmount: '', notes: '' };
+    if (summaryRes.status === 'fulfilled') {
+      cashSummary.value = { ...defaultCashSummary(), ...summaryRes.value.data };
+      const closing = summaryRes.value.data?.closing;
+      if (closing) {
+        closingForm.value = {
+          openingAmount: Number(closing.openingAmount || 0),
+          countedAmount: Number(closing.countedAmount || 0),
+          notes: closing.notes || '',
+        };
+      } else {
+        closingForm.value = { openingAmount: 0, countedAmount: '', notes: '' };
+      }
     }
-  }
 
-  if (movementsRes.status === 'fulfilled') {
-    cashMovements.value = movementsRes.value.data;
-  }
+    if (movementsRes.status === 'fulfilled') {
+      cashMovements.value = movementsRes.value.data;
+    }
 
-  if (pendingRes.status === 'fulfilled') pendingCharges.value = pendingRes.value.data;
-  else pendingCharges.value = [];
-  if (receivablesRes.status === 'fulfilled') receivables.value = receivablesRes.value.data;
+    if (pendingRes.status === 'fulfilled') pendingCharges.value = pendingRes.value.data;
+    else pendingCharges.value = [];
+    if (receivablesRes.status === 'fulfilled') receivables.value = receivablesRes.value.data;
 
-  // La bandeja de cobros es complementaria. Si el backend nuevo todavía está
-  // desplegándose, el saldo y los movimientos deben continuar disponibles.
-  if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected') {
-    const status = rejectedStatus(summaryRes) || rejectedStatus(movementsRes);
-    error.value = status === 401 || status === 403
-      ? 'Tu sesion no tiene permisos para Caja. Ingresa otra vez con la cuenta de recepcion o administracion.'
-      : 'No se pudo cargar caja. Intenta actualizar la pagina en unos segundos.';
+    // La bandeja de cobros es complementaria. Si el backend nuevo todavía está
+    // desplegándose, el saldo y los movimientos deben continuar disponibles.
+    if (summaryRes.status === 'rejected' || movementsRes.status === 'rejected') {
+      const status = rejectedStatus(summaryRes) || rejectedStatus(movementsRes);
+      error.value = status === 401 || status === 403
+        ? 'Tu sesion no tiene permisos para Caja. Ingresa otra vez con la cuenta de recepcion o administracion.'
+        : 'No se pudo cargar caja. Intenta actualizar la pagina en unos segundos.';
+    }
+  } finally {
+    cashLoading.value = false;
   }
 }
 
@@ -330,17 +342,19 @@ async function payReceivable(receivable) {
 }
 
 async function loadData() {
+  adminLoading.value = true;
   error.value = '';
-  const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes, followUpsRes] = await Promise.allSettled([
-    api.get('/reports/summary'),
-    api.get('/inventory'),
-    api.get('/clients'),
-    api.get('/appointments'),
-    api.get('/pets'),
-    api.get('/services'),
-    api.get('/users'),
-    api.get('/preventive-care/follow-ups'),
-  ]);
+  try {
+    const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes, followUpsRes] = await Promise.allSettled([
+      api.get('/reports/summary'),
+      api.get('/inventory'),
+      api.get('/clients'),
+      api.get('/appointments'),
+      api.get('/pets'),
+      api.get('/services'),
+      api.get('/users'),
+      api.get('/preventive-care/follow-ups'),
+    ]);
   preventiveFollowUps.value = followUpsRes.status === 'fulfilled' ? followUpsRes.value.data : [];
 
   if (inventoryRes.status === 'fulfilled') inventory.value = inventoryRes.value.data;
@@ -363,12 +377,15 @@ async function loadData() {
     };
   }
 
-  const failed = [summaryRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
-  if (failed) {
-    const status = rejectedStatus(summaryRes) || rejectedStatus(inventoryRes) || rejectedStatus(clientsRes);
-    error.value = status === 401 || status === 403
-      ? 'Tu sesion no tiene permisos de administracion. Ingresa otra vez con la cuenta de recepcion o administracion.'
-      : 'Algunos datos administrativos no se pudieron cargar. Actualiza la pagina o vuelve a iniciar sesion si falta informacion.';
+    const failed = [summaryRes, inventoryRes, clientsRes].some(result => result.status === 'rejected');
+    if (failed) {
+      const status = rejectedStatus(summaryRes) || rejectedStatus(inventoryRes) || rejectedStatus(clientsRes);
+      error.value = status === 401 || status === 403
+        ? 'Tu sesion no tiene permisos de administracion. Ingresa otra vez con la cuenta de recepcion o administracion.'
+        : 'Algunos datos administrativos no se pudieron cargar. Actualiza la pagina o vuelve a iniciar sesion si falta informacion.';
+    }
+  } finally {
+    adminLoading.value = false;
   }
 }
 
@@ -481,15 +498,21 @@ function resetCashForm() {
 
 function isExpiringSoon(product) {
   if (!product.expirationDate || product.active === false) return false;
-  const days = (new Date(product.expirationDate) - new Date()) / 86400000;
+  const days = daysUntilDateOnly(product.expirationDate);
   return days >= 0 && days <= 60;
+}
+
+function isProductExpired(product) {
+  const days = daysUntilDateOnly(product?.expirationDate);
+  return days !== null && days < 0;
 }
 
 function productExpiryLabel(product) {
   if (!product.expirationDate) return '';
-  const date = new Date(product.expirationDate);
-  if (date < new Date()) return `Vencido · ${date.toLocaleDateString('es-PE')}`;
-  return `${isExpiringSoon(product) ? 'Vence pronto · ' : 'Vence · '}${date.toLocaleDateString('es-PE')}`;
+  const days = daysUntilDateOnly(product.expirationDate);
+  const formatted = formatDateOnly(product.expirationDate);
+  if (days < 0) return `Vencido · ${formatted}`;
+  return `${isExpiringSoon(product) ? 'Vence pronto · ' : 'Vence · '}${formatted}`;
 }
 
 async function openInventoryHistory(product) {
@@ -981,7 +1004,11 @@ onMounted(async () => {
           </div>
           <button class="secondary small" @click="openProductCreator">Agregar producto</button>
         </div>
-        <div class="inventory-toolbar">
+        <div v-if="adminLoading && !inventory.length" class="calm-loading" role="status">
+          <span class="loading-dot"></span>
+          <div><strong>Cargando inventario</strong><small>Consultando productos, stock y vencimientos.</small></div>
+        </div>
+        <div v-else class="inventory-toolbar">
           <input v-model="inventorySearch" placeholder="Buscar producto, categoria o SKU">
           <div class="inventory-mini-stats">
             <span><strong>{{ inventoryStats.active }}</strong> activos</span>
@@ -990,7 +1017,7 @@ onMounted(async () => {
             <span><strong>{{ inventoryStats.expiring }}</strong> por vencer</span>
           </div>
         </div>
-        <table>
+        <table v-if="!adminLoading || inventory.length">
           <thead><tr><th>Producto</th><th>Categoria</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>
             <tr v-if="!filteredInventory.length"><td colspan="6" class="empty">No hay productos con ese criterio.</td></tr>
@@ -999,7 +1026,7 @@ onMounted(async () => {
                 <strong>{{ p.name }}</strong>
                 <small>{{ [p.brand, p.presentation].filter(Boolean).join(' · ') || 'Sin marca o presentación' }}</small>
                 <small v-if="p.sku">Código: {{ p.sku }}</small>
-                <small v-if="productExpiryLabel(p)" :class="{ 'expiry-alert': isExpiringSoon(p) || new Date(p.expirationDate) < new Date() }">{{ productExpiryLabel(p) }}</small>
+                <small v-if="productExpiryLabel(p)" :class="{ 'expiry-alert': isExpiringSoon(p) || isProductExpired(p) }">{{ productExpiryLabel(p) }}</small>
               </td>
               <td>{{ p.category || '-' }}</td>
               <td>S/ {{ formatPrice(p.unitPrice) }}</td>
@@ -1132,7 +1159,12 @@ onMounted(async () => {
         <button type="button" :class="{ active: cashWorkspace === 'receivables' }" @click="cashWorkspace = 'receivables'">Por cobrar <span v-if="receivables.length">{{ receivables.length }}</span></button>
       </nav>
 
-      <div v-if="cashWorkspace === 'day'" class="cash-day-view">
+      <div v-if="cashInitialLoading" class="calm-loading cash-loading" role="status">
+        <span class="loading-dot"></span>
+        <div><strong>Cargando caja</strong><small>Recuperando cobros, movimientos y saldos del día.</small></div>
+      </div>
+
+      <div v-else-if="cashWorkspace === 'day'" class="cash-day-view">
       <div class="cash-cards">
         <div class="cash-metric income"><span>Ingresos</span><strong>S/ {{ formatMoney(cashSummary.income + cashSummary.debtPayments) }}</strong><small>Ventas y cobros</small></div>
         <div class="cash-metric expense"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
@@ -1397,6 +1429,12 @@ onMounted(async () => {
   display: grid;
   gap: 18px;
 }
+
+.calm-loading { display: flex; align-items: center; gap: 12px; min-height: 96px; padding: 18px; border: 1px solid rgba(13,95,96,.12); border-radius: 18px; background: linear-gradient(145deg,rgba(255,255,255,.92),rgba(231,248,243,.68)); color: #315d59; }
+.calm-loading div { display: grid; gap: 3px; }
+.calm-loading small { color: #71837f; }
+.loading-dot { width: 13px; height: 13px; border: 3px solid rgba(21,111,110,.2); border-top-color: #157b78; border-radius: 50%; animation: calm-spin .8s linear infinite; }
+@keyframes calm-spin { to { transform: rotate(360deg); } }
 
 .cash-day-view { display: grid; gap: 18px; }
 .cash-subnav { display: flex; gap: 6px; width: fit-content; padding: 5px; border: 1px solid rgba(13,95,96,.12); border-radius: 16px; background: rgba(229,242,239,.72); }

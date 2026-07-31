@@ -110,6 +110,11 @@ const visibleAppointments = computed(() => appointments.value.filter((appointmen
   const patientAlreadyArrived = ['WAITING', 'IN_CONSULTATION'].includes(appointment.status);
   return patientAlreadyArrived || dateKey(appointment.scheduledAt) === dateKey();
 }));
+const overdueAppointments = computed(() => visibleAppointments.value.filter((appointment) =>
+  ['WAITING', 'IN_CONSULTATION'].includes(appointment.status)
+  && dateKey(appointment.scheduledAt) < dateKey()));
+const currentAppointments = computed(() => visibleAppointments.value.filter((appointment) =>
+  !overdueAppointments.value.some(overdue => overdue.id === appointment.id)));
 const pendingAppointments = computed(() => appointments.value
   .filter(a => a.status === 'PENDING')
   .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
@@ -1053,7 +1058,7 @@ onUnmounted(() => {
           <span class="badge">Paso 1 de 3</span>
           <h2>¿A qué paciente atenderás?</h2>
         </div>
-        <p class="muted-text">Elige una cita de hoy o busca directamente a la mascota.</p>
+        <p class="muted-text">Elige una cita de hoy o busca directamente a la mascota. Las atenciones antiguas sin cierre aparecen separadas.</p>
         <p v-if="loading" class="muted-text">Cargando citas...</p>
         <div v-else-if="!visibleAppointments.length" class="empty-state">
           <strong>Sin citas por atender ahora</strong>
@@ -1073,8 +1078,29 @@ onUnmounted(() => {
           </article>
         </div>
 
+        <div v-if="overdueAppointments.length" class="overdue-attentions">
+          <div class="overdue-heading">
+            <div>
+              <span class="badge overdue-badge">Pendientes de cierre</span>
+              <strong>{{ overdueAppointments.length }} atención{{ overdueAppointments.length === 1 ? '' : 'es' }} de días anteriores</strong>
+            </div>
+            <small>Revísalas y ciérralas para que no permanezcan mezcladas con la agenda de hoy.</small>
+          </div>
+          <button
+            v-for="appointment in overdueAppointments"
+            :key="appointment.id"
+            class="appointment-item overdue-appointment"
+            :class="{ active: selected?.id === appointment.id }"
+            @click="selectAppointment(appointment)"
+          >
+            <strong>{{ appointment.pet?.name || 'Mascota sin nombre' }}</strong>
+            <span>{{ appointment.client?.fullName || 'Cliente sin nombre' }}</span>
+            <small>{{ formatDate(appointment.scheduledAt) }} · {{ statusLabel(appointment.status) }} · requiere cierre</small>
+          </button>
+        </div>
+
         <button
-          v-for="appointment in visibleAppointments"
+          v-for="appointment in currentAppointments"
           :key="appointment.id"
           class="appointment-item"
           :class="{ active: selected?.id === appointment.id }"
