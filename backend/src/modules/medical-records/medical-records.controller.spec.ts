@@ -10,4 +10,13 @@ describe('MedicalRecordsController permissions', () => {
     expect(roles).not.toContain(Role.ADMIN);
     expect(roles).not.toContain(Role.RECEPTIONIST);
   });
+
+  it('usa siempre al veterinario autenticado como autor', () => {
+    const service = { create: jest.fn().mockReturnValue({ id: 'record' }) };
+    const controller = new MedicalRecordsController(service as any);
+
+    controller.create({ petId: 'pet', veterinarianId: 'otro', reason: 'control', diagnosis: 'ok' } as any, 'vet-real');
+
+    expect(service.create).toHaveBeenCalledWith(expect.objectContaining({ veterinarianId: 'vet-real' }));
+  });
 });
