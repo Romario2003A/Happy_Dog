@@ -1196,7 +1196,7 @@ onMounted(async () => {
       </div>
 
       <div v-if="cashSummary.byPaymentMethod?.length" class="cash-payment-summary">
-        <span class="cash-payment-label">Cobros por método</span>
+        <span class="cash-payment-label">Flujo por método</span>
         <div class="cash-methods">
           <span v-for="item in cashSummary.byPaymentMethod" :key="item.key" class="cash-chip">
             {{ paymentLabels[item.key] || item.key }} <strong>S/ {{ formatMoney(item.total) }}</strong>
