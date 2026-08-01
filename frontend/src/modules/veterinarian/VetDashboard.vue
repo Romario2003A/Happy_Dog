@@ -53,7 +53,7 @@ const expandedRecordId = ref(null);
 const lastSavedAppointmentId = ref('');
 const lastSavedPetId = ref('');
 const patientSearch = ref(null);
-const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
+const prescription = ref({ productId: '', manualName: '', quantity: 1, dosage: '', instructions: '' });
 const attentionType = ref('CONSULTATION');
 const changingAttentionType = ref(false);
 const attentionTypes = [
@@ -159,6 +159,7 @@ const activeTaskLabel = computed(() => {
   return 'Esterilización / castración';
 });
 const selectedProduct = computed(() => products.value.find(product => product.id === prescription.value.productId));
+const selectedMedicationName = computed(() => selectedProduct.value?.name || (prescription.value.productId === '__manual__' ? prescription.value.manualName.trim() : ''));
 const filteredHistory = computed(() => {
   const query = historySearch.value.trim().toLowerCase();
   if (!query) return history.value;
@@ -329,7 +330,7 @@ function whatsappPhone(value) {
 }
 
 function sendPrescriptionToWhatsApp() {
-  if (!selectedPet.value || !selectedProduct.value || !prescription.value.dosage.trim() || !prescription.value.instructions.trim()) {
+  if (!selectedPet.value || !selectedMedicationName.value || !prescription.value.dosage.trim() || !prescription.value.instructions.trim()) {
     error.value = 'Completa el medicamento, la dosis y las indicaciones antes de enviarla.';
     return;
   }
@@ -342,7 +343,7 @@ function sendPrescriptionToWhatsApp() {
     'HAPPY DOG - RECETA VETERINARIA',
     `Paciente: ${selectedPet.value.name || '-'}`,
     `Propietario: ${selectedClient.value?.fullName || '-'}`,
-    `Medicamento: ${selectedProduct.value.name}`,
+    `Medicamento: ${selectedMedicationName.value}`,
     `Cantidad: ${prescription.value.quantity || 1}`,
     `Dosis: ${prescription.value.dosage}`,
     `Indicaciones: ${prescription.value.instructions}`,
@@ -399,7 +400,7 @@ function resetForm(appointment) {
     recommendations: '',
     nextControlAt: '',
   };
-  prescription.value = { productId: '', quantity: 1, dosage: '', instructions: '' };
+  prescription.value = { productId: '', manualName: '', quantity: 1, dosage: '', instructions: '' };
   const draftClient = appointment?.client || appointment?.pet?.client || {};
   Object.assign(surgeryConsent, {
     ownerDni: draftClient.documentNumber || draftClient.dni || '',
@@ -647,6 +648,7 @@ function buildDiagnosisText() {
 function buildTreatmentText() {
   return [
     form.value.treatment && `Tratamiento: ${form.value.treatment}`,
+    prescription.value.productId === '__manual__' && selectedMedicationName.value && `Receta: ${selectedMedicationName.value}, ${prescription.value.dosage}. ${prescription.value.instructions}`,
     form.value.frequency && `Frecuencia: ${form.value.frequency}`,
     form.value.recommendations && `Recomendaciones: ${form.value.recommendations}`,
   ].filter(Boolean).join('\n');
@@ -700,7 +702,7 @@ function generatePrescriptionPdf() {
     error.value = 'Selecciona un paciente antes de generar la receta.';
     return;
   }
-  if (!selectedProduct.value) {
+  if (!selectedMedicationName.value) {
     error.value = 'Selecciona un medicamento antes de generar la receta.';
     return;
   }
@@ -709,16 +711,14 @@ function generatePrescriptionPdf() {
     return;
   }
 
-  const prescriptionRows = selectedProduct.value
-    ? `
+  const prescriptionRows = `
       <tr>
-        <td>${escapeHtml(selectedProduct.value.name)}</td>
+        <td>${escapeHtml(selectedMedicationName.value)}</td>
         <td>${escapeHtml(prescription.value.quantity || 1)}</td>
         <td>${escapeHtml(prescription.value.dosage || '-')}</td>
         <td>${escapeHtml(prescription.value.instructions || '-')}</td>
       </tr>
-    `
-    : '<tr><td colspan="4">Sin medicamento seleccionado. Completar indicaciones manuales si corresponde.</td></tr>';
+    `;
 
   const printWindow = createPrintDocument();
   if (!printWindow) {
@@ -1155,13 +1155,17 @@ async function saveRecord() {
     consultationTab.value = 'diagnosis';
     return;
   }
-  if (selectedProduct.value) {
+  if (prescription.value.productId === '__manual__' && !selectedMedicationName.value) {
+    error.value = 'Escribe el nombre del medicamento externo.';
+    return;
+  }
+  if (selectedMedicationName.value) {
     const quantity = Number(prescription.value.quantity || 0);
     if (!Number.isInteger(quantity) || quantity < 1) {
       error.value = 'La cantidad del medicamento debe ser un número entero mayor que cero.';
       return;
     }
-    if (quantity > Number(selectedProduct.value.stock || 0)) {
+    if (selectedProduct.value && quantity > Number(selectedProduct.value.stock || 0)) {
       error.value = `Stock insuficiente. Solo quedan ${selectedProduct.value.stock} unidades de ${selectedProduct.value.name}.`;
       return;
     }
@@ -1205,7 +1209,7 @@ async function saveRecord() {
 
 async function savePrescriptionRecord() {
   if (!selectedPet.value) return;
-  if (!selectedProduct.value) {
+  if (!selectedMedicationName.value) {
     error.value = 'Selecciona un medicamento antes de guardar la receta.';
     return;
   }
@@ -1214,7 +1218,7 @@ async function savePrescriptionRecord() {
     error.value = 'La cantidad del medicamento debe ser un número entero mayor que cero.';
     return;
   }
-  if (quantity > Number(selectedProduct.value.stock || 0)) {
+  if (selectedProduct.value && quantity > Number(selectedProduct.value.stock || 0)) {
     error.value = `Stock insuficiente. Solo quedan ${selectedProduct.value.stock} unidades de ${selectedProduct.value.name}.`;
     return;
   }
@@ -1234,20 +1238,24 @@ async function savePrescriptionRecord() {
       reason: form.value.reason || 'Emisión de receta médica',
       weightKg: form.value.weightKg === null || form.value.weightKg === '' ? undefined : Number(form.value.weightKg),
       diagnosis: 'Receta médica',
-      treatment: `${selectedProduct.value.name}: ${prescription.value.dosage}. ${prescription.value.instructions}`,
+      treatment: `${selectedMedicationName.value}: ${prescription.value.dosage}. ${prescription.value.instructions}`,
       observations: 'Receta emitida desde el módulo médico.',
-      prescriptions: [{
+      prescriptions: selectedProduct.value ? [{
         productId: selectedProduct.value.id,
         quantity,
         dosage: prescription.value.dosage.trim(),
         instructions: prescription.value.instructions.trim(),
-      }],
+      }] : [],
     });
-    success.value = 'Receta guardada en el historial y stock actualizado.';
+    success.value = selectedProduct.value
+      ? 'Receta guardada en el historial y stock actualizado.'
+      : 'Receta externa guardada en el historial.';
     clearCurrentDraft();
-    products.value = products.value.map(product => product.id === selectedProduct.value.id
-      ? { ...product, stock: Number(product.stock) - quantity }
-      : product);
+    if (selectedProduct.value) {
+      products.value = products.value.map(product => product.id === selectedProduct.value.id
+        ? { ...product, stock: Number(product.stock) - quantity }
+        : product);
+    }
     history.value = (await api.get(`/medical-records/pet/${selectedPet.value.id}`)).data;
     activeWorkspace.value = 'history';
   } catch (e) {
@@ -1558,13 +1566,16 @@ onUnmounted(() => {
               </div>
               <select v-model="prescription.productId">
                 <option value="">Sin medicamento</option>
+                <option value="__manual__">Otro medicamento (escribir nombre)</option>
                 <option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }} - stock {{ product.stock }}</option>
               </select>
-              <template v-if="selectedProduct">
-                <input v-model.number="prescription.quantity" type="number" min="1" :max="selectedProduct.stock" step="1" placeholder="Cantidad">
+              <template v-if="selectedMedicationName || prescription.productId === '__manual__'">
+                <input v-if="prescription.productId === '__manual__'" v-model="prescription.manualName" placeholder="Nombre del medicamento">
+                <input v-model.number="prescription.quantity" type="number" min="1" :max="selectedProduct?.stock || undefined" step="1" placeholder="Cantidad">
                 <input v-model="prescription.dosage" placeholder="Dosis">
                 <input v-model="prescription.instructions" placeholder="Indicaciones">
-                <p class="prescription-stock-note">Disponible: <strong>{{ selectedProduct.stock }}</strong> unidades.</p>
+                <p v-if="selectedProduct" class="prescription-stock-note">Disponible: <strong>{{ selectedProduct.stock }}</strong> unidades.</p>
+                <p v-else class="prescription-stock-note">Medicamento externo: se guardará en el historial sin modificar inventario.</p>
                 <button class="secondary small" type="button" @click="generatePrescriptionPdf">Vista previa de receta</button>
               </template>
             </div>
@@ -1695,15 +1706,18 @@ onUnmounted(() => {
             </div>
             <select v-model="prescription.productId">
               <option value="">Sin medicamento</option>
+              <option value="__manual__">Otro medicamento (escribir nombre)</option>
               <option v-for="product in products" :key="product.id" :value="product.id">
                 {{ product.name }} - stock {{ product.stock }}
               </option>
             </select>
+            <input v-if="prescription.productId === '__manual__'" v-model="prescription.manualName" placeholder="Nombre del medicamento">
             <input v-model.number="prescription.quantity" type="number" min="1" :max="selectedProduct?.stock || undefined" step="1" placeholder="Cantidad">
             <input v-model="prescription.dosage" placeholder="Dosis">
             <input v-model="prescription.instructions" placeholder="Indicaciones">
             <p v-if="selectedProduct" class="prescription-stock-note">Disponible: <strong>{{ selectedProduct.stock }}</strong> unidades. Al guardar, el inventario se actualiza automáticamente.</p>
-            <button type="button" :disabled="saving || !selectedProduct" @click="savePrescriptionRecord">{{ saving ? 'Guardando...' : 'Guardar receta en historial' }}</button>
+            <p v-else-if="prescription.productId === '__manual__'" class="prescription-stock-note">Medicamento externo: se guardará en el historial sin modificar inventario.</p>
+            <button type="button" :disabled="saving || !selectedMedicationName" @click="savePrescriptionRecord">{{ saving ? 'Guardando...' : 'Guardar receta en historial' }}</button>
           </section>
 
           <section v-if="activeTask === 'surgery'" class="surgery-consent-box">
