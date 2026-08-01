@@ -24,6 +24,8 @@ const error = ref('');
 const success = ref('');
 let automaticRefreshId = null;
 let refreshInProgress = false;
+let draftSaveId = null;
+const DRAFT_PREFIX = 'happy-dog:vet-draft:';
 const activeWorkspace = ref('agenda');
 const consultationTab = ref('evaluation');
 const taskChosen = ref(false);
@@ -399,6 +401,62 @@ function resetForm(appointment) {
   lastSavedPetId.value = '';
 }
 
+function draftKey(petId) {
+  return petId ? `${DRAFT_PREFIX}${petId}` : '';
+}
+
+function saveCurrentDraft() {
+  const petId = selectedPet.value?.id;
+  if (!petId || !taskChosen.value) return;
+  const draft = {
+    form: form.value,
+    prescription: prescription.value,
+    preventiveForm: { ...preventiveForm },
+    surgeryConsent: { ...surgeryConsent },
+    activeTask: activeTask.value,
+    attentionType: attentionType.value,
+    consultationTab: consultationTab.value,
+    savedAt: new Date().toISOString(),
+  };
+  sessionStorage.setItem(draftKey(petId), JSON.stringify(draft));
+}
+
+function scheduleDraftSave() {
+  if (draftSaveId) window.clearTimeout(draftSaveId);
+  draftSaveId = window.setTimeout(saveCurrentDraft, 250);
+}
+
+function restoreDraft(petId) {
+  const raw = sessionStorage.getItem(draftKey(petId));
+  if (!raw) return false;
+  try {
+    const draft = JSON.parse(raw);
+    form.value = {
+      ...form.value,
+      ...(draft.form || {}),
+      exams: { ...emptyExams(), ...(draft.form?.exams || {}) },
+    };
+    prescription.value = { ...prescription.value, ...(draft.prescription || {}) };
+    Object.assign(preventiveForm, draft.preventiveForm || {});
+    Object.assign(surgeryConsent, draft.surgeryConsent || {});
+    if (draft.activeTask) {
+      activeTask.value = draft.activeTask;
+      taskChosen.value = true;
+    }
+    if (draft.attentionType) attentionType.value = draft.attentionType;
+    if (draft.consultationTab) consultationTab.value = draft.consultationTab;
+    return true;
+  } catch {
+    sessionStorage.removeItem(draftKey(petId));
+    return false;
+  }
+}
+
+function clearCurrentDraft() {
+  const key = draftKey(selectedPet.value?.id);
+  if (key) sessionStorage.removeItem(key);
+}
+
 async function loadData({ background = false } = {}) {
   if (refreshInProgress) return;
   refreshInProgress = true;
@@ -432,6 +490,7 @@ function refreshWhenVisible() {
 }
 
 async function selectAppointment(appointment) {
+  saveCurrentDraft();
   selected.value = appointment;
   selectedStandalonePet.value = null;
   resetForm(appointment);
@@ -441,6 +500,7 @@ async function selectAppointment(appointment) {
   if (!appointment?.petId) return;
   activeWorkspace.value = 'consultation';
   startClinicalTask(taskForAppointment(appointment));
+  restoreDraft(appointment.petId);
   try {
     const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${appointment.petId}`),api.get(`/preventive-care/pet/${appointment.petId}`).catch(() => ({data:[]}))]);
     history.value = historyRes.data;
@@ -451,6 +511,7 @@ async function selectAppointment(appointment) {
 }
 
 async function selectPet(pet) {
+  saveCurrentDraft();
   selected.value = null;
   selectedStandalonePet.value = pet;
   resetForm({ pet, reason: '' });
@@ -459,6 +520,7 @@ async function selectPet(pet) {
   expandedRecordId.value = null;
   activeWorkspace.value = 'consultation';
   consultationTab.value = 'evaluation';
+  restoreDraft(pet.id);
   try {
     const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${pet.id}`),api.get(`/preventive-care/pet/${pet.id}`).catch(() => ({data:[]}))]);
     history.value = historyRes.data;
@@ -1072,6 +1134,7 @@ async function saveRecord() {
     });
     lastSavedAppointmentId.value = savedRecord.appointmentId || selected.value?.id || '';
     lastSavedPetId.value = selectedPet.value.id;
+    clearCurrentDraft();
     success.value = 'Atención guardada. La cita pasó a atendida y el historial fue actualizado.';
     await loadData();
     if (selected.value?.petId) history.value = (await api.get(`/medical-records/pet/${selected.value.petId}`)).data;
@@ -1126,6 +1189,7 @@ async function savePrescriptionRecord() {
       }],
     });
     success.value = 'Receta guardada en el historial y stock actualizado.';
+    clearCurrentDraft();
     products.value = products.value.map(product => product.id === selectedProduct.value.id
       ? { ...product, stock: Number(product.stock) - quantity }
       : product);
@@ -1138,15 +1202,24 @@ async function savePrescriptionRecord() {
   }
 }
 
-watch(selectedPet, (pet) => {
-  surgeryConsent.petAge = pet?.age || '';
-  surgeryConsent.petColor = pet?.color || '';
+watch(() => selectedPet.value?.id, (petId, previousPetId) => {
+  if (!petId || petId === previousPetId) return;
+  surgeryConsent.petAge = selectedPet.value?.age || '';
+  surgeryConsent.petColor = selectedPet.value?.color || '';
 });
 
-watch(selectedClient, (client) => {
+watch(() => selectedClient.value?.id, (clientId, previousClientId) => {
+  if (!clientId || clientId === previousClientId) return;
+  const client = selectedClient.value;
   surgeryConsent.ownerAddress = client?.address || '';
   surgeryConsent.ownerDni = client?.documentNumber || client?.dni || '';
 });
+
+watch(form, scheduleDraftSave, { deep: true });
+watch(prescription, scheduleDraftSave, { deep: true });
+watch(preventiveForm, scheduleDraftSave, { deep: true });
+watch(surgeryConsent, scheduleDraftSave, { deep: true });
+watch([activeTask, attentionType, consultationTab], scheduleDraftSave);
 
 watch(attentionType, (type) => {
   if (type !== 'SURGERY') selectedDocuments.surgeryConsent = false;
@@ -1161,6 +1234,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (automaticRefreshId) window.clearInterval(automaticRefreshId);
+  if (draftSaveId) window.clearTimeout(draftSaveId);
+  saveCurrentDraft();
   document.removeEventListener('visibilitychange', refreshWhenVisible);
   window.removeEventListener('focus', refreshWhenVisible);
 });
