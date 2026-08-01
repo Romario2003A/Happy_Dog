@@ -253,6 +253,11 @@ function applyAttentionType() {
   taskChosen.value = true;
 }
 
+function correctScheduledAttentionType() {
+  startClinicalTask('consultation', { preserveAttentionType: true });
+  changingAttentionType.value = true;
+}
+
 function returnToPatients() {
   activeWorkspace.value = 'agenda';
   taskChosen.value = false;
@@ -568,7 +573,9 @@ async function savePreventiveRecord() {
     return;
   }
   if (!preventiveForm.productName.trim()) {
-    error.value = `Escribe el nombre de ${preventiveForm.type === 'VACCINE' ? 'la vacuna' : 'el desparasitante'}.`;
+    error.value = preventiveForm.type === 'VACCINE'
+      ? 'Escribe el nombre de la vacuna.'
+      : 'Escribe el nombre del desparasitante.';
     return;
   }
   preventiveSaving.value = true;
@@ -1600,9 +1607,9 @@ onUnmounted(() => {
           <section v-if="activeTask === 'history' || activeTask === 'preventive'" class="clinical-document-editor">
             <template v-if="activeTask === 'history'">
             <div class="document-editor-head">
-              <div><span class="badge">Formato original</span><h3>Historia clínica Happy Dog</h3><p>Se conserva el PDF original completo. Los datos del paciente y sus registros se escriben sobre sus casillas sin modificar el diseño.</p></div>
+              <div><span class="badge">Documento Happy Dog</span><h3>Historia clínica Happy Dog</h3><p>Genera un historial profesional con los datos automáticos del paciente y una página ordenada por cada consulta.</p></div>
               <div class="document-head-actions">
-                <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Ver PDF original completado</button>
+                <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar historial Happy Dog</button>
                 <button type="button" :disabled="saving" @click="saveRecord">{{ saving ? 'Guardando...' : 'Guardar en historial' }}</button>
               </div>
             </div>
@@ -1644,6 +1651,7 @@ onUnmounted(() => {
             </template>
             <div v-if="activeTask === 'preventive'" class="preventive-editor standalone-preventive">
               <div class="document-section-label"><strong>Vacunas y desparasitaciones</strong><small>Se guardan en la ficha de {{ selectedPet.name }}</small></div>
+              <button v-if="selected" type="button" class="secondary small preventive-correct-type" @click="correctScheduledAttentionType">Corregir tipo de atención</button>
               <div class="document-auto-grid preventive-auto-grid">
                 <div><span>Paciente</span><strong>{{ selectedPet.name }}</strong></div>
                 <div><span>Dueño</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
