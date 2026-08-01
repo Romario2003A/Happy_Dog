@@ -23,9 +23,24 @@ export class MedicalRecordsService {
   }
 
   async create(dto: CreateMedicalRecordDto) {
+    for (const item of dto.prescriptions ?? []) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        throw new BadRequestException('La cantidad de cada medicamento debe ser un número entero mayor que cero.');
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       let appointmentId = dto.appointmentId;
-      if (!appointmentId) {
+      if (appointmentId) {
+        const appointment = await tx.appointment.findUnique({
+          where: { id: appointmentId },
+          select: { petId: true },
+        });
+        if (!appointment) throw new BadRequestException('Cita no encontrada.');
+        if (appointment.petId !== dto.petId) {
+          throw new BadRequestException('La cita seleccionada no corresponde a esta mascota.');
+        }
+      } else {
         const pet = await tx.pet.findUnique({ where: { id: dto.petId }, select: { clientId: true } });
         if (!pet) throw new BadRequestException('Paciente no encontrado');
         const directAppointment = await tx.appointment.create({

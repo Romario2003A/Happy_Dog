@@ -494,7 +494,7 @@ async function startConsultation() {
 }
 
 function buildPrescriptions() {
-  if (!selectedDocuments.prescription || !prescription.value.productId) return [];
+  if (!prescription.value.productId) return [];
   return [{
     productId: prescription.value.productId,
     quantity: Number(prescription.value.quantity || 1),
@@ -897,6 +897,21 @@ async function saveRecord() {
     error.value = 'Completa al menos un diagnóstico presuntivo o definitivo.';
     return;
   }
+  if (selectedProduct.value) {
+    const quantity = Number(prescription.value.quantity || 0);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      error.value = 'La cantidad del medicamento debe ser un número entero mayor que cero.';
+      return;
+    }
+    if (quantity > Number(selectedProduct.value.stock || 0)) {
+      error.value = `Stock insuficiente. Solo quedan ${selectedProduct.value.stock} unidades de ${selectedProduct.value.name}.`;
+      return;
+    }
+    if (!prescription.value.dosage.trim() || !prescription.value.instructions.trim()) {
+      error.value = 'Completa la dosis y las indicaciones de la receta antes de guardar la atención.';
+      return;
+    }
+  }
   saving.value = true;
   error.value = '';
   success.value = '';
@@ -989,7 +1004,7 @@ watch(selectedPet, (pet) => {
 
 watch(selectedClient, (client) => {
   surgeryConsent.ownerAddress = client?.address || '';
-  surgeryConsent.ownerDni = client?.dni || '';
+  surgeryConsent.ownerDni = client?.documentNumber || client?.dni || '';
 });
 
 watch(attentionType, (type) => {
@@ -1200,7 +1215,7 @@ onUnmounted(() => {
               <div><span>Nombre:</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
               <div><span>Telf:</span><strong>{{ selectedClient?.phone || '-' }}</strong></div>
               <div><span>Dirección:</span><strong>{{ selectedClient?.address || '-' }}</strong></div>
-              <div><span>DNI:</span><strong>{{ selectedClient?.dni || '-' }}</strong></div>
+              <div><span>DNI:</span><strong>{{ selectedClient?.documentNumber || selectedClient?.dni || '-' }}</strong></div>
             </div>
 
             <div class="sheet-subtitle">Datos de la mascota</div>
@@ -1218,7 +1233,7 @@ onUnmounted(() => {
 
             <div class="vitals-grid">
               <label>Motivo<input v-model="form.reason" required placeholder="Motivo de consulta"></label>
-              <label>Fecha<input v-model="form.nextControlAt" type="datetime-local"></label>
+              <label>Próximo control<input v-model="form.nextControlAt" type="datetime-local"></label>
               <label>Peso<input v-model.number="form.weightKg" type="number" step="0.01" placeholder="kg"></label>
               <label>T°<input v-model.number="form.temperatureC" type="number" step="0.1" placeholder="C"></label>
               <label>FC<input v-model="form.fc" placeholder="lpm"></label>
@@ -1258,6 +1273,24 @@ onUnmounted(() => {
             <div class="frequency-row">
               <label>Frecuencia<input v-model="form.frequency" placeholder="Cada 12 h, cada 24 h, por 5 días..."></label>
               <label>Recomendaciones<textarea v-model="form.recommendations" placeholder="Cuidados en casa, dieta, reposo, señales de alerta"></textarea></label>
+            </div>
+
+            <div class="consultation-prescription">
+              <div>
+                <strong>Receta opcional</strong>
+                <small>Si indicas un medicamento, quedará dentro de esta misma atención y descontará inventario al guardar.</small>
+              </div>
+              <select v-model="prescription.productId">
+                <option value="">Sin medicamento</option>
+                <option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }} - stock {{ product.stock }}</option>
+              </select>
+              <template v-if="selectedProduct">
+                <input v-model.number="prescription.quantity" type="number" min="1" :max="selectedProduct.stock" step="1" placeholder="Cantidad">
+                <input v-model="prescription.dosage" placeholder="Dosis">
+                <input v-model="prescription.instructions" placeholder="Indicaciones">
+                <p class="prescription-stock-note">Disponible: <strong>{{ selectedProduct.stock }}</strong> unidades.</p>
+                <button class="secondary small" type="button" @click="generatePrescriptionPdf">Vista previa de receta</button>
+              </template>
             </div>
             </div>
 
