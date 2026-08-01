@@ -1,6 +1,14 @@
 import { ClientPortalController } from './client-portal.controller';
 
 describe('ClientPortalController', () => {
+  it('permite que el cliente complete su WhatsApp', async () => {
+    const prisma = { client: { update: jest.fn().mockResolvedValue({ id: 'client-1', phone: '987654321' }) } };
+    const controller = new ClientPortalController(prisma as any, {} as any);
+
+    await expect(controller.updateMe('client-1', { phone: '987 654 321' })).resolves.toEqual(expect.objectContaining({ phone: '987654321' }));
+    expect(prisma.client.update).toHaveBeenCalledWith({ where: { id: 'client-1' }, data: { phone: '987654321' } });
+  });
+
   it('usa el precio del tarifario e ignora el precio enviado por el cliente', async () => {
     const prisma = {
       pet: {

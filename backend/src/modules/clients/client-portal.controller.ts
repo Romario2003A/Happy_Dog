@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PetSex } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -16,6 +16,15 @@ export class ClientPortalController {
   @Get('me')
   me(@CurrentUser('id') clientId: string) {
     return this.prisma.client.findUnique({ where: { id: clientId }, include: { pets: true } });
+  }
+
+  @Patch('me')
+  updateMe(@CurrentUser('id') clientId: string, @Body() body: any) {
+    const phone = String(body.phone || '').replace(/\D+/g, '');
+    if (!/^9\d{8}$/.test(phone)) {
+      throw new BadRequestException('Ingresa un celular peruano válido de 9 dígitos.');
+    }
+    return this.prisma.client.update({ where: { id: clientId }, data: { phone } });
   }
 
   @Get('pets')

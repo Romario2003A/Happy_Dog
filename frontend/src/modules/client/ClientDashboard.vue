@@ -23,6 +23,9 @@ const savingPet=ref(false);
 const showAppointmentForm=ref(false);
 const appointmentSection=ref(null);
 const savingAppointment=ref(false);
+const editingContact=ref(false);
+const savingContact=ref(false);
+const contactPhone=ref('');
 const appointmentForm=ref({
   petId:'',
   serviceCategory:'',
@@ -69,6 +72,7 @@ async function loadData(){
     ]);
     if(!profileResponse.data) throw new Error('CLIENT_PROFILE_NOT_FOUND');
     profile.value=profileResponse.data;
+    if(!editingContact.value) contactPhone.value=profileResponse.data.phone || '';
     pets.value=petsResponse.data;
     appointments.value=appointmentsResponse.data;
     services.value=servicesResponse.data;
@@ -79,6 +83,28 @@ async function loadData(){
       return;
     }
     error.value='No se pudo cargar tu panel. Actualiza nuevamente o intenta en unos segundos.';
+  }
+}
+
+async function saveContact(){
+  const phone=String(contactPhone.value || '').replace(/\D+/g,'');
+  if(!/^9\d{8}$/.test(phone)){
+    error.value='Ingresa un celular peruano válido de 9 dígitos.';
+    return;
+  }
+  savingContact.value=true;
+  error.value='';
+  success.value='';
+  try{
+    const {data}=await api.patch('/client-portal/me',{phone});
+    profile.value={...profile.value,...data};
+    contactPhone.value=data.phone || phone;
+    editingContact.value=false;
+    success.value='WhatsApp actualizado. Recepción ya podrá contactarte.';
+  }catch(e){
+    error.value=e.response?.data?.message || 'No se pudo actualizar tu WhatsApp.';
+  }finally{
+    savingContact.value=false;
   }
 }
 
@@ -324,6 +350,19 @@ onUnmounted(()=>clearInterval(refreshTimer));
           <span>Fotos pendientes</span>
         </article>
       </div>
+    </section>
+
+    <section class="client-contact-card glass-card" :class="{ missing: !profile?.phone }">
+      <div>
+        <span class="badge">Contacto</span>
+        <strong>WhatsApp para confirmar citas</strong>
+        <small>{{ profile?.phone || 'Falta registrar tu número' }}</small>
+      </div>
+      <form v-if="editingContact || !profile?.phone" @submit.prevent="saveContact">
+        <input v-model="contactPhone" inputmode="numeric" maxlength="9" placeholder="999 999 999" aria-label="WhatsApp de contacto">
+        <button type="submit" :disabled="savingContact">{{ savingContact ? 'Guardando...' : 'Guardar WhatsApp' }}</button>
+      </form>
+      <button v-else class="secondary small" type="button" @click="editingContact=true">Editar número</button>
     </section>
 
     <div class="client-dashboard-grid">
