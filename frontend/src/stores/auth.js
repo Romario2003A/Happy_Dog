@@ -1,15 +1,22 @@
 import { defineStore } from 'pinia';
 import { api } from '../services/api';
 
+const legacyToken = localStorage.getItem('vet_token');
+const legacyUser = localStorage.getItem('vet_user');
+if (legacyToken && !sessionStorage.getItem('vet_token')) sessionStorage.setItem('vet_token', legacyToken);
+if (legacyUser && !sessionStorage.getItem('vet_user')) sessionStorage.setItem('vet_user', legacyUser);
+localStorage.removeItem('vet_token');
+localStorage.removeItem('vet_user');
+
 export const useAuthStore = defineStore('auth',{
-  state:()=>({ token:localStorage.getItem('vet_token'), user: JSON.parse(localStorage.getItem('vet_user') || 'null') }),
+  state:()=>({ token:sessionStorage.getItem('vet_token'), user: JSON.parse(sessionStorage.getItem('vet_user') || 'null') }),
   getters:{ isAuthenticated:s=>!!s.token, role:s=>s.user?.role },
   actions:{
     setSession(data){
       this.token=data.accessToken;
       this.user=data.user;
-      localStorage.setItem('vet_token',data.accessToken);
-      localStorage.setItem('vet_user',JSON.stringify(data.user));
+      sessionStorage.setItem('vet_token',data.accessToken);
+      sessionStorage.setItem('vet_user',JSON.stringify(data.user));
       return data.user;
     },
     async login(email,password){
@@ -31,8 +38,8 @@ export const useAuthStore = defineStore('auth',{
     logout(){
       this.token=null;
       this.user=null;
-      localStorage.removeItem('vet_token');
-      localStorage.removeItem('vet_user');
+      sessionStorage.removeItem('vet_token');
+      sessionStorage.removeItem('vet_user');
     }
   }
 });

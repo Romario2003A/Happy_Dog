@@ -176,9 +176,16 @@ function lines(value) {
   return String(value || '').split('\n').map(line => line.trim()).filter(Boolean);
 }
 
-function fileUrl(url) {
-  if (!url || /^https?:\/\//i.test(url)) return url || '#';
-  return `${api.defaults.baseURL.replace(/\/api\/?$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
+async function downloadClinicalFile(file) {
+  try {
+    const { data } = await api.get(`/files/${file.id}`, { responseType: 'blob' });
+    const objectUrl = URL.createObjectURL(data);
+    const preview = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+    if (!preview) error.value = 'El navegador bloqueó la vista previa del archivo.';
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo abrir el archivo clínico.';
+  }
 }
 
 function toggleRecord(recordId) {
@@ -661,11 +668,11 @@ function generatePrescriptionPdf() {
         </section>
 
         <div class="signature"><span>Firma y sello</span></div>
-        <script>window.onload=function(){window.print()}<\/script>
       </body>
     </html>
   `);
   printWindow.document.close();
+  window.setTimeout(() => printWindow.print(), 250);
 }
 
 function generateClinicalHistoryPdf() {
@@ -716,8 +723,9 @@ function generateClinicalHistoryPdf() {
 
   printWindow.document.write(`<!doctype html><html><head><title>Historia clínica Happy Dog - ${escapeHtml(pet.name || 'Paciente')}</title><style>
     @page{size:A4 portrait;margin:10mm 16mm 12mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#111;font-size:8px}.sheet{width:100%}.title{display:grid;grid-template-columns:70px 1fr 145px;align-items:center;margin-bottom:3mm}.title img{width:56px;height:42px;object-fit:cover}.title h1{text-align:center;font-size:13px;margin:0}.title strong{text-align:right;font-size:9px}.line{margin:1.4mm 0;line-height:1.45}.section-title{font-size:9px;font-weight:800;margin:2.2mm 0 1mm}table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:2mm}th,td{border:1px solid #111;padding:2px 3px;height:4mm;text-align:center;vertical-align:middle}th{font-weight:800}.schedule td{height:3.3mm}.text{text-align:left;white-space:pre-wrap}.consult{break-inside:avoid;page-break-inside:avoid}.consult th{width:auto}.consult tr:nth-child(3) td,.consult tr:nth-child(4) td,.consult tr:nth-child(6) td{height:7mm}.owner-line{display:flex;justify-content:space-between;gap:15px}.owner-line span:first-child{flex:1}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body><main class="sheet"><header class="title"><img src="${happyDogLogo}" alt="Happy Dog"><h1>HISTORIA CLÍNICA HAPPY DOG</h1><strong>N° Historia: ${escapeHtml(String(pet.id || '').slice(0, 8).toUpperCase())}</strong></header><div class="line"><b>Fecha ingreso:</b> ${escapeHtml(formatShortDate(pet.createdAt || new Date()))}</div><div class="section-title">1. Datos del propietario:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(client.fullName || '')}</span><span><b>Teléfono:</b> ${escapeHtml(client.phone || '')}</span></div><div class="line owner-line"><span><b>Dirección:</b> ${escapeHtml(client.address || '')}</span><span><b>DNI:</b> ${escapeHtml(client.documentNumber || client.dni || '')}</span></div><div class="section-title">2. Datos del paciente:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(pet.name || '')}</span><span><b>Especie:</b> ${escapeHtml(pet.species || '')}</span><span><b>Edad:</b> ${escapeHtml(pet.age || '')}</span></div><div class="line owner-line"><span><b>Raza:</b> ${escapeHtml(pet.breed || '')}</span><span><b>Sexo:</b> ${escapeHtml(sexLabel(pet.sex))}</span><span><b>Color:</b> ${escapeHtml(pet.color || '')}</span><span><b>Peso:</b> ${escapeHtml(form.value.weightKg || pet.weightKg || '')}</span></div><div class="section-title">3. Desparasitaciones:</div><table class="schedule"><tr><th>FECHA</th><th>DESPARASITANTE</th><th>PESO</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${preventiveRows('DEWORMING',12)}</table><div class="section-title">4. Vacunas:</div><table class="schedule"><tr><th>FECHA</th><th>VACUNA</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${preventiveRows('VACCINE',11)}</table><div class="section-title">5. Consultas (${consultationBlocks.length}):</div>${renderedConsultations}</main><script>window.onload=function(){window.print()}<\/script></body></html>`);
+  </style></head><body><main class="sheet"><header class="title"><img src="${happyDogLogo}" alt="Happy Dog"><h1>HISTORIA CLÍNICA HAPPY DOG</h1><strong>N° Historia: ${escapeHtml(String(pet.id || '').slice(0, 8).toUpperCase())}</strong></header><div class="line"><b>Fecha ingreso:</b> ${escapeHtml(formatShortDate(pet.createdAt || new Date()))}</div><div class="section-title">1. Datos del propietario:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(client.fullName || '')}</span><span><b>Teléfono:</b> ${escapeHtml(client.phone || '')}</span></div><div class="line owner-line"><span><b>Dirección:</b> ${escapeHtml(client.address || '')}</span><span><b>DNI:</b> ${escapeHtml(client.documentNumber || client.dni || '')}</span></div><div class="section-title">2. Datos del paciente:</div><div class="line owner-line"><span><b>Nombre:</b> ${escapeHtml(pet.name || '')}</span><span><b>Especie:</b> ${escapeHtml(pet.species || '')}</span><span><b>Edad:</b> ${escapeHtml(pet.age || '')}</span></div><div class="line owner-line"><span><b>Raza:</b> ${escapeHtml(pet.breed || '')}</span><span><b>Sexo:</b> ${escapeHtml(sexLabel(pet.sex))}</span><span><b>Color:</b> ${escapeHtml(pet.color || '')}</span><span><b>Peso:</b> ${escapeHtml(form.value.weightKg || pet.weightKg || '')}</span></div><div class="section-title">3. Desparasitaciones:</div><table class="schedule"><tr><th>FECHA</th><th>DESPARASITANTE</th><th>PESO</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${preventiveRows('DEWORMING',12)}</table><div class="section-title">4. Vacunas:</div><table class="schedule"><tr><th>FECHA</th><th>VACUNA</th><th>FIRMA Y SELLO</th><th>PRÓXIMA CITA</th></tr>${preventiveRows('VACCINE',11)}</table><div class="section-title">5. Consultas (${consultationBlocks.length}):</div>${renderedConsultations}</main></body></html>`);
   printWindow.document.close();
+  window.setTimeout(() => printWindow.print(), 250);
 }
 
 function generateSurgeryConsentPdf() {
@@ -879,11 +887,11 @@ function generateSurgeryConsentPdf() {
             </div>
           </section>
         </main>
-        <script>window.onload=function(){window.print()}<\/script>
       </body>
     </html>
   `);
   printWindow.document.close();
+  window.setTimeout(() => printWindow.print(), 250);
 }
 
 async function saveRecord() {
@@ -1501,7 +1509,7 @@ onUnmounted(() => {
                 <h4>Receta</h4>
                 <div class="history-prescriptions"><span v-for="item in record.prescriptions" :key="item.id"><strong>{{ item.product?.name || 'Producto' }} × {{ item.quantity }}</strong><small>{{ [item.dosage, item.instructions].filter(Boolean).join(' · ') || 'Sin indicaciones adicionales' }}</small></span></div>
               </section>
-              <section v-if="record.files?.length"><h4>Archivos clínicos</h4><div class="history-files"><a v-for="file in record.files" :key="file.id" :href="fileUrl(file.url)" target="_blank" rel="noopener">{{ file.originalName }}</a></div></section>
+              <section v-if="record.files?.length"><h4>Archivos clínicos</h4><div class="history-files"><button v-for="file in record.files" :key="file.id" type="button" class="ghost small" @click="downloadClinicalFile(file)">{{ file.originalName }}</button></div></section>
               <p v-if="record.nextControlAt" class="next-control-note"><strong>Próximo control:</strong> {{ formatDate(record.nextControlAt) }}</p>
             </div>
           </article>

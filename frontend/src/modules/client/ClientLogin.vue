@@ -44,11 +44,15 @@ onMounted(() => {
     router.replace('/cliente/login');
     return;
   }
-  if (!query.googleToken || !query.googleUser) return;
+  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const googleToken = fragment.get('googleToken');
+  const googleUser = fragment.get('googleUser');
+  if (!googleToken || !googleUser) return;
   try {
+    window.history.replaceState({}, document.title, '/cliente/login');
     auth.setSession({
-      accessToken: String(query.googleToken),
-      user: JSON.parse(String(query.googleUser)),
+      accessToken: googleToken,
+      user: JSON.parse(googleUser),
     });
     router.replace('/cliente/dashboard');
   } catch {
@@ -79,7 +83,8 @@ onMounted(() => {
         <input v-if="mode === 'register'" v-model="form.fullName" required placeholder="Nombre completo">
         <input v-if="mode === 'register'" v-model="form.phone" inputmode="numeric" placeholder="Telefono / WhatsApp" @input="normalizePhone">
         <input v-model="form.email" type="email" required placeholder="Correo">
-        <input v-model="form.password" type="password" required minlength="6" placeholder="Contrase&ntilde;a">
+        <input v-model="form.password" type="password" required :minlength="mode === 'register' ? 12 : 6" placeholder="Contrase&ntilde;a">
+        <small v-if="mode === 'register'" class="muted-text">Usa 12 caracteres o más, con mayúscula, minúscula y número.</small>
         <button :disabled="loading">{{ loading ? 'Validando...' : mode === 'login' ? 'Ingresar al portal' : 'Crear mi cuenta' }}</button>
       </form>
 

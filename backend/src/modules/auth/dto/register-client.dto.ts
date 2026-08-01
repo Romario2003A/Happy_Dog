@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 export class RegisterClientDto {
   @IsString()
@@ -16,7 +16,8 @@ export class RegisterClientDto {
   email: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(12)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, { message: 'La contrasena debe incluir mayuscula, minuscula y numero.' })
   password: string;
 
   @IsOptional()

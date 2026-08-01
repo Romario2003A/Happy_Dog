@@ -81,8 +81,9 @@ async function submit() {
 
       <form class="stack" @submit.prevent="submit">
         <label>Contraseña actual<input v-model="form.currentPassword" type="password" required minlength="6" autocomplete="current-password"></label>
-        <label>Nueva contraseña<input v-model="form.newPassword" type="password" required minlength="8" autocomplete="new-password"></label>
-        <label>Confirmar nueva contraseña<input v-model="form.confirmPassword" type="password" required minlength="8" autocomplete="new-password"></label>
+        <label>Nueva contraseña<input v-model="form.newPassword" type="password" required minlength="12" autocomplete="new-password"></label>
+        <label>Confirmar nueva contraseña<input v-model="form.confirmPassword" type="password" required minlength="12" autocomplete="new-password"></label>
+        <small class="muted-text">Usa 12 caracteres o más, con mayúscula, minúscula y número.</small>
         <p v-if="error" class="error">{{ error }}</p>
         <p v-if="success" class="success">{{ success }}</p>
         <button :disabled="loading">{{ loading ? 'Guardando...' : 'Guardar nueva contraseña' }}</button>

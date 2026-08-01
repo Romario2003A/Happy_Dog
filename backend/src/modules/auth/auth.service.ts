@@ -61,10 +61,11 @@ export class AuthService {
     const payload = { sub: client.id, email: client.email, role: 'CLIENT', fullName: client.fullName };
     return { accessToken: await this.jwt.signAsync(payload), user: { id: client.id, fullName: client.fullName, email: client.email, role: 'CLIENT' } };
   }
-  googleClientUrl() {
+  async googleClientUrl() {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
     const redirectUri = this.googleCallbackUrl();
     if (!clientId) throw new BadRequestException('Google Login aun no esta configurado.');
+    const state = await this.jwt.signAsync({ purpose: 'google-client-oauth' }, { expiresIn: '10m' });
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -72,11 +73,18 @@ export class AuthService {
       scope: 'openid email profile',
       access_type: 'offline',
       prompt: 'select_account',
+      state,
     });
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
-  async googleClientLogin(code: string) {
+  async googleClientLogin(code: string, state: string) {
     if (!code) throw new BadRequestException('Google no envio codigo de acceso.');
+    try {
+      const statePayload = await this.jwt.verifyAsync(state);
+      if (statePayload?.purpose !== 'google-client-oauth') throw new Error('invalid state');
+    } catch {
+      throw new UnauthorizedException('La solicitud de Google expiro o no es valida.');
+    }
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET');
     const redirectUri = this.googleCallbackUrl();
@@ -125,7 +133,7 @@ export class AuthService {
       googleToken: data.accessToken,
       googleUser: JSON.stringify(data.user),
     });
-    return `${frontendUrl}/cliente/login?${params.toString()}`;
+    return `${frontendUrl}/cliente/login#${params.toString()}`;
   }
   frontendGoogleErrorRedirect(message: string) {
     const frontendUrl = (this.config.get<string>('FRONTEND_URL') || this.config.get<string>('CORS_ORIGIN')?.split(',')[0] || 'http://localhost:5173').replace(/\/$/, '');

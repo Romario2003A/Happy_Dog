@@ -1,23 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { Request } from 'express';
-import { existsSync, mkdirSync, readFileSync } from 'fs';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import { memoryStorage } from 'multer';
 
 const MAX_PHOTO_SIZE = 4 * 1024 * 1024;
-const PET_PHOTO_DIR = join(process.cwd(), 'uploads', 'pets');
-
 export const petPhotoUploadOptions = {
-  storage: diskStorage({
-    destination: (_req, _file, cb) => {
-      if (!existsSync(PET_PHOTO_DIR)) mkdirSync(PET_PHOTO_DIR, { recursive: true });
-      cb(null, PET_PHOTO_DIR);
-    },
-    filename: (_req, file, cb) => {
-      const extension = extname(file.originalname).toLowerCase() || '.jpg';
-      cb(null, `pet-${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`);
-    },
-  }),
+  storage: memoryStorage(),
   fileFilter: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
     if (!/^image\/(jpeg|png)$/i.test(file.mimetype)) {
       cb(new BadRequestException('Solo se permiten imagenes JPG o PNG para el carnet.'), false);
@@ -35,7 +22,6 @@ export function publicUploadUrl(req: Request, path: string) {
 }
 
 export function uploadedFileDataUrl(file: Express.Multer.File) {
-  const buffer = file.buffer || readFileSync(file.path);
-  return `data:${file.mimetype};base64,${buffer.toString('base64')}`;
+  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 }
 

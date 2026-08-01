@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { SensitiveFieldsInterceptor } from './common/interceptors/sensitive-fields.interceptor';
+import { validateEnvironment } from './config/env.validation';
 import { PrismaService } from './database/prisma.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -15,5 +19,28 @@ import { CashModule } from './modules/cash/cash.module';
 import { PreventiveCareModule } from './modules/preventive-care/preventive-care.module';
 import { ServicesModule } from './modules/services/services.module';
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, ClientsModule, PetsModule, AppointmentsModule, MedicalRecordsModule, PreventiveCareModule, InventoryModule, ServicesModule, SalesModule, FilesModule, ReportsModule, CashModule], providers: [PrismaService] })
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    AuthModule,
+    UsersModule,
+    ClientsModule,
+    PetsModule,
+    AppointmentsModule,
+    MedicalRecordsModule,
+    PreventiveCareModule,
+    InventoryModule,
+    ServicesModule,
+    SalesModule,
+    FilesModule,
+    ReportsModule,
+    CashModule,
+  ],
+  providers: [
+    PrismaService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: SensitiveFieldsInterceptor },
+  ],
+})
 export class AppModule {}

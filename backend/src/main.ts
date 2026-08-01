@@ -3,26 +3,31 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-import * as express from 'express';
-import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  const isProduction = config.get('NODE_ENV') === 'production' || config.get('RENDER') === 'true';
+  const allowedOrigins = (config.get<string>('CORS_ORIGIN') || 'http://localhost:5173')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
   app.use(helmet({ crossOriginResourcePolicy: false }));
-  app.enableCors({ origin: config.get('CORS_ORIGIN')?.split(',') ?? true, credentials: true });
-  app.use('/uploads', (_req, res, next) => {
-    res.removeHeader('Cross-Origin-Resource-Policy');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+  app.enableCors({ origin: allowedOrigins, credentials: true });
+  app.use('/api/auth', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
     next();
-  }, express.static(join(process.cwd(), 'uploads')));
+  });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  const swagger = new DocumentBuilder().setTitle('Happy Dog API').setVersion('1.0').addBearerAuth().build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
+  if (!isProduction || config.get('ENABLE_SWAGGER') === 'true') {
+    const swagger = new DocumentBuilder().setTitle('Happy Dog API').setVersion('1.0').addBearerAuth().build();
+    SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
+  }
   await app.listen(config.get<number>('PORT') || 3000);
 }
 bootstrap();

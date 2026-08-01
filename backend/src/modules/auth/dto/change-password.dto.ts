@@ -1,4 +1,4 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsString, Matches, MinLength } from 'class-validator';
 
 export class ChangePasswordDto {
   @IsString()
@@ -6,6 +6,7 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(12)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, { message: 'La contrasena debe incluir mayuscula, minuscula y numero.' })
   newPassword: string;
 }

@@ -1129,7 +1129,7 @@ onMounted(async () => {
         <form class="stack" @submit.prevent="saveStaff">
           <label>Nombre completo<input v-model="staffForm.fullName" required></label>
           <label>Correo de acceso<input v-model="staffForm.email" type="email" required></label>
-          <label v-if="!editingStaffId">Contraseña temporal<input v-model="staffForm.password" type="password" minlength="6" required></label>
+          <label v-if="!editingStaffId">Contraseña temporal<input v-model="staffForm.password" type="password" minlength="12" required><small>12 caracteres o más, con mayúscula, minúscula y número.</small></label>
           <label>Rol<select v-model="staffForm.role"><option value="RECEPTIONIST">Recepción</option><option value="VETERINARIAN">Veterinaria</option><option value="ADMIN">Administración</option></select></label>
           <label>Horario<input v-model="staffForm.workSchedule" placeholder="Ej. 8:00 a. m. – 6:00 p. m."></label>
           <label>Número de cuenta<input v-model="staffForm.bankAccount" autocomplete="off" placeholder="Se mostrará enmascarado"></label>
