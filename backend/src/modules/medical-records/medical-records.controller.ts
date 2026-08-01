@@ -12,7 +12,7 @@ export class MedicalRecordsController {
   @Roles(Role.ADMIN, Role.VETERINARIAN) @Get() all(){return this.service.findAll()}
   @Roles(Role.ADMIN, Role.VETERINARIAN, Role.RECEPTIONIST) @Get('pet/:petId') byPet(@Param('petId') petId:string){return this.service.findByPet(petId)}
   @Roles(Role.VETERINARIAN) @Post()
-  create(@Body() dto:CreateMedicalRecordDto,@CurrentUser('sub') veterinarianId:string){
+  create(@Body() dto:CreateMedicalRecordDto,@CurrentUser('id') veterinarianId:string){
     return this.service.create({...dto,veterinarianId});
   }
 }

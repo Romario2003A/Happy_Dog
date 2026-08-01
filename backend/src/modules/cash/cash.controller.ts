@@ -42,17 +42,17 @@ export class CashController {
   }
 
   @Post('receivables')
-  createReceivable(@Body() dto: CreateReceivableDto, @CurrentUser('sub') userId?: string) {
+  createReceivable(@Body() dto: CreateReceivableDto, @CurrentUser('id') userId?: string) {
     return this.service.createReceivable(dto, userId);
   }
 
   @Post('receivables/:id/payments')
-  payReceivable(@Param('id') id: string, @Body() dto: PayReceivableDto, @CurrentUser('sub') userId?: string) {
+  payReceivable(@Param('id') id: string, @Body() dto: PayReceivableDto, @CurrentUser('id') userId?: string) {
     return this.service.payReceivable(id, dto, userId);
   }
 
   @Post('movements')
-  createMovement(@Body() dto: CreateCashMovementDto, @CurrentUser('sub') userId?: string) {
+  createMovement(@Body() dto: CreateCashMovementDto, @CurrentUser('id') userId?: string) {
     return this.service.createMovement(dto, userId);
   }
 
@@ -67,7 +67,7 @@ export class CashController {
   }
 
   @Post('closing')
-  closeDay(@Body() dto: CreateCashClosingDto, @CurrentUser('sub') userId?: string) {
+  closeDay(@Body() dto: CreateCashClosingDto, @CurrentUser('id') userId?: string) {
     return this.service.closeDay(dto, userId);
   }
 
