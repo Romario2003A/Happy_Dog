@@ -389,6 +389,21 @@ function resetForm(appointment) {
     nextControlAt: '',
   };
   prescription.value = { productId: '', quantity: 1, dosage: '', instructions: '' };
+  const draftClient = appointment?.client || appointment?.pet?.client || {};
+  Object.assign(surgeryConsent, {
+    ownerDni: draftClient.documentNumber || draftClient.dni || '',
+    ownerAddress: draftClient.address || '',
+    petAge: appointment?.pet?.age || '',
+    petColor: appointment?.pet?.color || '',
+    lastMeal: '',
+    digestiveIssue: false,
+    medicalCondition: false,
+    medicalConditionDetail: '',
+    medication: '',
+    alternativeName: '',
+    alternativePhone: '',
+    staffNotes: '',
+  });
   selectedDocuments.prescription = false;
   selectedDocuments.clinicalHistory = false;
   selectedDocuments.surgeryConsent = false;
@@ -1204,15 +1219,15 @@ async function savePrescriptionRecord() {
 
 watch(() => selectedPet.value?.id, (petId, previousPetId) => {
   if (!petId || petId === previousPetId) return;
-  surgeryConsent.petAge = selectedPet.value?.age || '';
-  surgeryConsent.petColor = selectedPet.value?.color || '';
+  if (!surgeryConsent.petAge) surgeryConsent.petAge = selectedPet.value?.age || '';
+  if (!surgeryConsent.petColor) surgeryConsent.petColor = selectedPet.value?.color || '';
 });
 
 watch(() => selectedClient.value?.id, (clientId, previousClientId) => {
   if (!clientId || clientId === previousClientId) return;
   const client = selectedClient.value;
-  surgeryConsent.ownerAddress = client?.address || '';
-  surgeryConsent.ownerDni = client?.documentNumber || client?.dni || '';
+  if (!surgeryConsent.ownerAddress) surgeryConsent.ownerAddress = client?.address || '';
+  if (!surgeryConsent.ownerDni) surgeryConsent.ownerDni = client?.documentNumber || client?.dni || '';
 });
 
 watch(form, scheduleDraftSave, { deep: true });
