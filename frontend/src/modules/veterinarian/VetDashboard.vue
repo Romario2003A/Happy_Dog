@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
+import { parseDateOnly } from '../../utils/dateOnly';
 import { attentionTypeForAppointment, preventiveDefaultsForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
 import { isVetDraftCompatible, vetDraftKey } from '../../utils/vetDraft';
 import {
@@ -306,7 +307,8 @@ async function changeAccountPassword() {
 }
 
 function formatShortDate(value = new Date()) {
-  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value));
+  const date = parseDateOnly(value) || new Date(value);
+  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
 }
 
 function formatPrice(value) {
@@ -314,7 +316,7 @@ function formatPrice(value) {
 }
 
 function dateParts(value) {
-  const date = new Date(value);
+  const date = parseDateOnly(value) || new Date(value);
   const yearStart = new Date(date.getFullYear(), 0, 1);
   return {
     year: date.getFullYear(),
