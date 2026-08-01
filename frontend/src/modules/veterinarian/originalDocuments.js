@@ -144,36 +144,36 @@ export async function generateOriginalConsultationPdf(data) {
   const { pet = {}, client = {}, consultation = {}, preventive = [], doctor = '' } = data;
   const sex = sexFlags(pet);
 
-  draw(page1, bold, consultation.date, 70, 779, { size: 8, maxWidth: 57 });
+  draw(page1, bold, consultation.date, 70, 785, { size: 8, maxWidth: 57 });
   draw(page1, bold, historyCode(pet), 500, 779, { size: 8, maxWidth: 56 });
-  draw(page1, font, client.fullName, 70, 657, { maxWidth: 280 });
-  draw(page1, font, client.phone, 365, 657, { maxWidth: 175 });
-  draw(page1, font, client.address, 70, 630, { maxWidth: 280 });
-  draw(page1, font, client.documentNumber || client.dni, 365, 630, { maxWidth: 175 });
-  draw(page1, font, pet.name, 100, 586, { size: 6.5, maxWidth: 105 });
+  draw(page1, font, client.fullName, 86, 657, { maxWidth: 265 });
+  draw(page1, font, client.phone, 400, 657, { maxWidth: 140 });
+  draw(page1, font, client.address, 86, 630, { maxWidth: 265 });
+  draw(page1, font, client.documentNumber || client.dni, 400, 630, { maxWidth: 140 });
+  draw(page1, font, pet.name, 108, 586, { size: 6.5, maxWidth: 97 });
   draw(page1, font, pet.species, 260, 586, { size: 6.5, maxWidth: 95 });
-  draw(page1, font, pet.breed, 405, 586, { size: 6.5, maxWidth: 98 });
-  mark(page1, bold, sex.male, 106, 565, 9);
-  mark(page1, bold, sex.female, 133, 565, 9);
-  draw(page1, font, pet.age, 260, 571, { size: 6.5, maxWidth: 95 });
-  draw(page1, font, consultation.weight || pet.weightKg, 405, 571, { size: 6.5, maxWidth: 98 });
+  draw(page1, font, pet.breed, 395, 586, { size: 6.5, maxWidth: 108 });
+  mark(page1, bold, sex.female, 109, 574, 9);
+  mark(page1, bold, sex.male, 137, 574, 9);
+  draw(page1, font, pet.age, 280, 571, { size: 6.5, maxWidth: 75 });
+  draw(page1, font, consultation.weight || pet.weightKg, 438, 571, { size: 6.5, maxWidth: 65 });
   draw(page1, font, pet.color, 100, 555, { size: 6.5, maxWidth: 105 });
   mark(page1, bold, Boolean(pet.sterilized), 301, 561, 9);
   mark(page1, bold, pet.sterilized === false, 334, 561, 9);
-  draw(page1, font, pet.origin, 430, 547, { size: 6.5, maxWidth: 73 });
+  draw(page1, font, pet.origin, 438, 555, { size: 6.5, maxWidth: 65 });
 
-  draw(page1, font, consultation.date, 36, 510, { maxWidth: 92 });
-  draw(page1, font, consultation.weight, 140, 510, { maxWidth: 70 });
-  draw(page1, font, consultation.temperature, 224, 510, { maxWidth: 43 });
-  draw(page1, font, consultation.fc, 278, 510, { maxWidth: 56 });
-  draw(page1, font, consultation.fr, 350, 510, { maxWidth: 32 });
-  draw(page1, font, consultation.mucosas, 393, 510, { maxWidth: 157 });
+  draw(page1, font, consultation.date, 75, 510, { maxWidth: 55 });
+  draw(page1, font, consultation.weight, 173, 510, { maxWidth: 37 });
+  draw(page1, font, consultation.temperature, 237, 510, { maxWidth: 30 });
+  draw(page1, font, consultation.fc, 297, 510, { maxWidth: 37 });
+  draw(page1, font, consultation.fr, 363, 510, { maxWidth: 19 });
+  draw(page1, font, consultation.mucosas, 432, 510, { maxWidth: 118 });
   drawBlock(page1, font, consultation.anamnesis, 140, 477, 407, { size: 7, maxLines: 20, lineHeight: 9 });
 
   const examMarks = {
-    ecografia: [196, 321], rayosX: [201, 308], hemograma: [211, 302], test: [207, 283],
-    heces: [351, 321], orina: [354, 308], tgoTgpFas: [350, 296], otros: [330, 283],
-    citologia: [451, 321], raspadoPiel: [482, 308], ureaCrea: [454, 296],
+    ecografia: [199, 328], rayosX: [199, 315], hemograma: [199, 301], test: [208, 287],
+    heces: [349, 328], orina: [349, 315], tgoTgpFas: [349, 301], otros: [334, 287],
+    citologia: [450, 328], raspadoPiel: [477, 315], ureaCrea: [469, 301],
   };
   Object.entries(examMarks).forEach(([key, [x, y]]) => mark(page1, bold, consultation.exams?.[key], x, y, 8));
   draw(page1, font, consultation.examOther, 355, 281, { size: 6.2, maxWidth: 120 });

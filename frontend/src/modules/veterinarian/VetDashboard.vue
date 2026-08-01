@@ -1118,11 +1118,13 @@ async function saveRecord() {
   if (!selectedPet.value) return;
   if (!form.value.reason.trim()) {
     error.value = 'Escribe el motivo de la atención antes de guardarla.';
+    consultationTab.value = 'evaluation';
     return;
   }
   const diagnosis = buildDiagnosisText() || (attentionType.value === 'VACCINE' ? 'Vacunación preventiva' : '');
   if (!diagnosis) {
     error.value = 'Completa al menos un diagnóstico presuntivo o definitivo.';
+    consultationTab.value = 'diagnosis';
     return;
   }
   if (selectedProduct.value) {
@@ -1303,8 +1305,13 @@ onUnmounted(() => {
       </aside>
     </div>
 
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="success" class="success">{{ success }}</p>
+    <aside v-if="error || success" class="doctor-toast" :class="{ error: !!error, success: !!success }" role="status" aria-live="polite">
+      <div>
+        <strong>{{ error ? 'Revisa la atención' : 'Proceso completado' }}</strong>
+        <span>{{ error || success }}</span>
+      </div>
+      <button type="button" aria-label="Cerrar mensaje" @click="error = ''; success = ''">×</button>
+    </aside>
 
     <header class="workflow-progress" aria-label="Flujo de atención">
       <div :class="{ active: activeWorkspace === 'agenda' }"><span>1</span><strong>Elegir paciente</strong></div>
@@ -1704,8 +1711,12 @@ onUnmounted(() => {
           <div class="consultation-actions">
             <button v-if="activeTask === 'consultation' && consultationTab !== 'evaluation'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.max(0, consultationTabs.findIndex(tab => tab.value === consultationTab) - 1)].value">Anterior</button>
             <button v-if="activeTask === 'consultation' && consultationTab !== 'plan'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.min(consultationTabs.length - 1, consultationTabs.findIndex(tab => tab.value === consultationTab) + 1)].value">Continuar</button>
-            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" type="button" class="secondary" @click="generateConsultationDocumentPdf">Ver documento original</button>
-            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Guardar atención directa' }}</button>
+            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" type="button" class="secondary" @click="generateConsultationDocumentPdf">Vista previa del documento</button>
+            <div v-if="activeTask === 'consultation' && consultationTab === 'plan'" class="save-attention-explanation">
+              <strong>Finalizar la atención</strong>
+              <span>Guarda esta consulta en el historial y marca la cita como atendida.</span>
+            </div>
+            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Finalizar y guardar atención' : 'Guardar atención directa' }}</button>
           </div>
           <p v-if="activeTask === 'consultation' && consultationTab === 'plan' && !selected" class="direct-care-note">Esta atención se guardará directamente en el historial del paciente.</p>
         </form>
