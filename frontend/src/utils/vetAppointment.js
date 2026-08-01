@@ -29,3 +29,15 @@ export function attentionTypeForAppointment(appointment) {
   if (/control|seguimiento/.test(text)) return 'FOLLOW_UP';
   return 'CONSULTATION';
 }
+
+export function preventiveDefaultsForAppointment(appointment) {
+  const text = normalizedAppointmentText(appointment);
+  if (!/vacun|desparasit/.test(text)) return null;
+
+  return {
+    type: /desparasit/.test(text) ? 'DEWORMING' : 'VACCINE',
+    productName: String(appointment?.service?.name || '').trim(),
+    weightKg: appointment?.pet?.weightKg ?? null,
+    amountCharged: appointment?.quotedPrice ?? appointment?.service?.price ?? null,
+  };
+}

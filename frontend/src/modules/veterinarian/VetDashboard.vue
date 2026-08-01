@@ -5,7 +5,7 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
-import { attentionTypeForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
+import { attentionTypeForAppointment, preventiveDefaultsForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
 import { isVetDraftCompatible, vetDraftKey } from '../../utils/vetDraft';
 import {
   generateOriginalConsultationPdf,
@@ -29,7 +29,7 @@ let automaticRefreshId = null;
 let refreshInProgress = false;
 let draftSaveId = null;
 const DRAFT_PREFIX = 'happy-dog:vet-draft:';
-const DRAFT_VERSION = 3;
+const DRAFT_VERSION = 4;
 const activeWorkspace = ref('agenda');
 const consultationTab = ref('evaluation');
 const taskChosen = ref(false);
@@ -401,6 +401,21 @@ function resetForm(appointment) {
     nextControlAt: '',
   };
   prescription.value = { productId: '', manualName: '', quantity: 1, dosage: '', instructions: '' };
+  Object.assign(preventiveForm, {
+    type: 'DEWORMING',
+    appliedAt: dateKey(),
+    productName: '',
+    nextProductName: '',
+    weightKg: null,
+    amountCharged: null,
+    nextAppointmentAt: '',
+    dewormed: false,
+    followUpCalled: false,
+    sterilizationRecommended: false,
+    sterilizationCallDone: false,
+    notes: '',
+    ...(preventiveDefaultsForAppointment(appointment) || {}),
+  });
   const draftClient = appointment?.client || appointment?.pet?.client || {};
   Object.assign(surgeryConsent, {
     ownerDni: draftClient.documentNumber || draftClient.dni || '',
