@@ -39,6 +39,8 @@ const accountForm = ref({ currentPassword: '', newPassword: '', confirmPassword:
 const petSearch = ref('');
 const historySearch = ref('');
 const expandedRecordId = ref(null);
+const lastSavedAppointmentId = ref('');
+const lastSavedPetId = ref('');
 const patientSearch = ref(null);
 const prescription = ref({ productId: '', quantity: 1, dosage: '', instructions: '' });
 const attentionType = ref('CONSULTATION');
@@ -381,6 +383,8 @@ function resetForm(appointment) {
   changingAttentionType.value = false;
   success.value = '';
   error.value = '';
+  lastSavedAppointmentId.value = '';
+  lastSavedPetId.value = '';
 }
 
 async function loadData({ background = false } = {}) {
@@ -688,7 +692,10 @@ function generateClinicalHistoryPdf() {
   const selectedExams = checkedExams().join(', ');
   const noteValue = (text, label) => String(text || '').split('\n').find(line => line.startsWith(`${label}:`))?.slice(label.length + 1).trim() || '';
   const consultation = data => `<table class="consult"><tr><th>FECHA</th><th>PESO</th><th>FC</th><th>FR</th><th>T°</th></tr><tr><td>${escapeHtml(data.date || '')}</td><td>${escapeHtml(data.weight || '')}</td><td>${escapeHtml(data.fc || '')}</td><td>${escapeHtml(data.fr || '')}</td><td>${escapeHtml(data.temperature || '')}</td></tr><tr><th colspan="2">Anamnesis y exploración física</th><td colspan="3" class="text">${escapeHtml(data.anamnesis || '')}</td></tr><tr><th colspan="2">Exámenes complementarios</th><td colspan="3" class="text">${escapeHtml(data.exams || '')}</td></tr><tr><th>Dx. P-P</th><td colspan="2" class="text">${escapeHtml(data.presumptiveDx || '')}</td><th>Dx. P-D</th><td class="text">${escapeHtml(data.definitiveDx || '')}</td></tr><tr><th colspan="2">Tratamiento</th><td colspan="3" class="text">${escapeHtml(data.treatment || '')}</td></tr><tr><th colspan="2">Frecuencia</th><td colspan="3" class="text">${escapeHtml(data.frequency || '')}</td></tr></table>`;
-  const hasCurrentDraft = Boolean(form.value.anamnesis || form.value.presumptiveDx || form.value.definitiveDx || form.value.treatment || form.value.fc || form.value.fr || form.value.temperatureC);
+  const currentDraftAlreadyPersisted = lastSavedPetId.value === pet.id
+    && (!selected.value?.id || lastSavedAppointmentId.value === selected.value.id);
+  const hasCurrentDraft = !currentDraftAlreadyPersisted
+    && Boolean(form.value.anamnesis || form.value.presumptiveDx || form.value.definitiveDx || form.value.treatment || form.value.fc || form.value.fr || form.value.temperatureC);
   const currentConsultation = {
     date: formatShortDate(), weight: form.value.weightKg || pet.weightKg || '', fc: form.value.fc, fr: form.value.fr,
     temperature: form.value.temperatureC, anamnesis: form.value.anamnesis,
@@ -894,7 +901,7 @@ async function saveRecord() {
   error.value = '';
   success.value = '';
   try {
-    await api.post('/medical-records', {
+    const { data: savedRecord } = await api.post('/medical-records', {
       appointmentId: selected.value?.id,
       petId: selectedPet.value.id,
       veterinarianId: auth.user.id,
@@ -907,6 +914,8 @@ async function saveRecord() {
       nextControlAt: form.value.nextControlAt || undefined,
       prescriptions: buildPrescriptions(),
     });
+    lastSavedAppointmentId.value = savedRecord.appointmentId || selected.value?.id || '';
+    lastSavedPetId.value = selectedPet.value.id;
     success.value = 'Atención guardada. La cita pasó a atendida y el historial fue actualizado.';
     await loadData();
     if (selected.value?.petId) history.value = (await api.get(`/medical-records/pet/${selected.value.petId}`)).data;
