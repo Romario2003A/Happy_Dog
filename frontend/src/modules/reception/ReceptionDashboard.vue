@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReceptionLayout from '../../layouts/ReceptionLayout.vue';
 import { api } from '../../services/api';
+import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
 
 const route = useRoute();
 const router = useRouter();
@@ -78,7 +79,7 @@ const selectedService = computed(() => services.value.find(item => item.id === q
 watch(() => quick.value.serviceId, () => {
   const service = selectedService.value;
   if (!service) return;
-  quick.value.reason = [service.name, service.condition].filter(Boolean).join(' - ');
+  quick.value.reason = serviceDisplayLabel(service);
   quick.value.quotedPrice = Number(service.price || 0);
   quick.value.priceNote = service.priceLabel || '';
   quick.value.durationMinutes = Number(service.durationMinutes || 30);
@@ -329,7 +330,7 @@ function requiresTimeAssignment(appointment) {
 }
 
 function cleanAppointmentReason(reason) {
-  return String(reason || '').replace(/^CLIENT_DATE_REQUEST::/, '');
+  return dedupeServiceParts(String(reason || '').replace(/^CLIENT_DATE_REQUEST::/, ''));
 }
 
 async function confirmAppointment(appointment) {
@@ -902,7 +903,7 @@ onMounted(loadData);
           <label v-if="quick.serviceCategory">Servicio y condición
             <select v-model="quick.serviceId" required>
               <option value="">Seleccionar opción del tarifario</option>
-              <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ service.name }}{{ service.species ? ` · ${service.species}` : '' }}{{ service.condition ? ` · ${service.condition}` : '' }} — {{ service.priceLabel || `S/ ${Number(service.price).toFixed(2)}${service.maxPrice ? ` a S/ ${Number(service.maxPrice).toFixed(2)}` : ''}` }}</option>
+              <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ serviceDisplayLabel(service) }}{{ service.species ? ` · ${service.species}` : '' }} — {{ service.priceLabel || `S/ ${Number(service.price).toFixed(2)}${service.maxPrice ? ` a S/ ${Number(service.maxPrice).toFixed(2)}` : ''}` }}</option>
             </select>
           </label>
           <label v-if="selectedService">Precio acordado

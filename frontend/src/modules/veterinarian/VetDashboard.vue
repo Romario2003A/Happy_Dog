@@ -4,6 +4,8 @@ import VeterinarianLayout from '../../layouts/VeterinarianLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
+import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
+import { attentionTypeForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
 import {
   generateOriginalConsultationPdf,
   generateOriginalHistoryPdf,
@@ -26,6 +28,7 @@ let automaticRefreshId = null;
 let refreshInProgress = false;
 let draftSaveId = null;
 const DRAFT_PREFIX = 'happy-dog:vet-draft:';
+const DRAFT_VERSION = 2;
 const activeWorkspace = ref('agenda');
 const consultationTab = ref('evaluation');
 const taskChosen = ref(false);
@@ -55,7 +58,7 @@ const changingAttentionType = ref(false);
 const attentionTypes = [
   { value: 'CONSULTATION', label: 'Consulta', help: 'Evaluación, diagnóstico y tratamiento' },
   { value: 'VACCINE', label: 'Vacunación', help: 'Aplicación y próximo control' },
-  { value: 'SURGERY', label: 'Cirugía', help: 'Incluye autorización quirúrgica' },
+  { value: 'SURGERY', label: 'Cirugía / procedimiento', help: 'Evaluación, intervención y seguimiento' },
   { value: 'FOLLOW_UP', label: 'Control', help: 'Seguimiento o procedimiento médico' },
 ];
 const surgeryConsent = reactive({
@@ -138,13 +141,17 @@ const selectedPet = computed(() => selected.value?.pet || selectedStandalonePet.
 const selectedClient = computed(() => selected.value?.client || selectedStandalonePet.value?.client);
 const scheduledServiceLabel = computed(() => {
   if (!selected.value) return '';
-  return selected.value.service?.name
-    || String(selected.value.reason || '').replace(/^CLIENT_DATE_REQUEST::/, '')
+  return serviceDisplayLabel(selected.value.service)
+    || dedupeServiceParts(String(selected.value.reason || '').replace(/^CLIENT_DATE_REQUEST::/, ''))
     || 'Atención veterinaria';
 });
 const attentionTypeLabel = computed(() => attentionTypes.find(type => type.value === attentionType.value)?.label || 'Consulta');
 const activeTaskLabel = computed(() => {
-  if (activeTask.value === 'consultation') return attentionType.value === 'FOLLOW_UP' ? 'Control médico' : 'Consulta médica';
+  if (activeTask.value === 'consultation') {
+    if (attentionType.value === 'FOLLOW_UP') return 'Control médico';
+    if (attentionType.value === 'SURGERY') return 'Cirugía / procedimiento';
+    return 'Consulta médica';
+  }
   if (activeTask.value === 'preventive') return 'Vacuna o desparasitación';
   if (activeTask.value === 'prescription') return 'Receta médica';
   if (activeTask.value === 'history') return 'Historia clínica';
@@ -199,13 +206,13 @@ function toggleRecord(recordId) {
   expandedRecordId.value = expandedRecordId.value === recordId ? null : recordId;
 }
 
-function startClinicalTask(task) {
+function startClinicalTask(task, { preserveAttentionType = false } = {}) {
   activeTask.value = task;
   selectedDocuments.prescription = false;
   selectedDocuments.clinicalHistory = false;
   selectedDocuments.surgeryConsent = false;
   if (task === 'consultation') {
-    attentionType.value = 'CONSULTATION';
+    if (!preserveAttentionType) attentionType.value = 'CONSULTATION';
     consultationTab.value = 'evaluation';
   } else if (task === 'prescription') {
     consultationTab.value = 'documents';
@@ -225,10 +232,7 @@ function startClinicalTask(task) {
 }
 
 function taskForAppointment(appointment) {
-  const text = `${appointment?.service?.category || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
-  if (text.includes('vacun') || text.includes('desparasit')) return 'preventive';
-  if (text.includes('cirug') || text.includes('esteriliz') || text.includes('castr')) return 'surgery';
-  return 'consultation';
+  return vetTaskForAppointment(appointment);
 }
 
 function applyAttentionType() {
@@ -238,7 +242,9 @@ function applyAttentionType() {
     return;
   }
   if (attentionType.value === 'SURGERY') {
-    startClinicalTask('surgery');
+    activeTask.value = 'consultation';
+    consultationTab.value = 'evaluation';
+    taskChosen.value = true;
     return;
   }
   activeTask.value = 'consultation';
@@ -368,10 +374,9 @@ function sexLabel(sex) {
 }
 
 function resetForm(appointment) {
-  const serviceText = `${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
-  attentionType.value = serviceText.includes('vacun') ? 'VACCINE' : serviceText.includes('cirug') || serviceText.includes('esteriliz') || serviceText.includes('castr') ? 'SURGERY' : 'CONSULTATION';
+  attentionType.value = attentionTypeForAppointment(appointment);
   form.value = {
-    reason: appointment?.reason || '',
+    reason: serviceDisplayLabel(appointment?.service) || dedupeServiceParts(appointment?.reason || ''),
     weightKg: appointment?.pet?.weightKg ?? null,
     temperatureC: null,
     fc: '',
@@ -424,6 +429,7 @@ function saveCurrentDraft() {
   const petId = selectedPet.value?.id;
   if (!petId || !taskChosen.value) return;
   const draft = {
+    version: DRAFT_VERSION,
     form: form.value,
     prescription: prescription.value,
     preventiveForm: { ...preventiveForm },
@@ -446,6 +452,10 @@ function restoreDraft(petId) {
   if (!raw) return false;
   try {
     const draft = JSON.parse(raw);
+    if (draft.version !== DRAFT_VERSION) {
+      sessionStorage.removeItem(draftKey(petId));
+      return false;
+    }
     form.value = {
       ...form.value,
       ...(draft.form || {}),
@@ -514,7 +524,7 @@ async function selectAppointment(appointment) {
   expandedRecordId.value = null;
   if (!appointment?.petId) return;
   activeWorkspace.value = 'consultation';
-  startClinicalTask(taskForAppointment(appointment));
+  startClinicalTask(taskForAppointment(appointment), { preserveAttentionType: true });
   restoreDraft(appointment.petId);
   try {
     const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${appointment.petId}`),api.get(`/preventive-care/pet/${appointment.petId}`).catch(() => ({data:[]}))]);

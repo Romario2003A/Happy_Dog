@@ -5,6 +5,7 @@ import ClientLayout from '../../layouts/ClientLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
+import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
 
 const router=useRouter();
 const auth=useAuthStore();
@@ -86,7 +87,7 @@ function selectAppointmentService(){
   if(!service) return;
   appointmentForm.value.quotedPrice=Number(service.price || 0);
   appointmentForm.value.priceNote=service.priceLabel || '';
-  appointmentForm.value.reason=[service.name,service.condition].filter(Boolean).join(' - ');
+  appointmentForm.value.reason=serviceDisplayLabel(service);
 }
 
 function requestedDateToIso(value){
@@ -101,7 +102,7 @@ function isDateOnlyRequest(appointment){
 }
 
 function cleanAppointmentReason(reason){
-  return String(reason || '').replace(/^CLIENT_DATE_REQUEST::/, '') || 'Consulta veterinaria';
+  return dedupeServiceParts(String(reason || '').replace(/^CLIENT_DATE_REQUEST::/, '')) || 'Consulta veterinaria';
 }
 
 function formatAppointmentDate(appointment){
@@ -347,7 +348,7 @@ onUnmounted(()=>clearInterval(refreshTimer));
           </select>
           <select v-if="appointmentForm.serviceCategory" v-model="appointmentForm.serviceId" required @change="selectAppointmentService">
             <option value="" disabled>Selecciona servicio y condición</option>
-            <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ service.name }}{{ service.condition ? ` · ${service.condition}` : '' }} — {{ service.priceLabel || `S/ ${Number(service.price).toFixed(2)}` }}</option>
+            <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ serviceDisplayLabel(service) }} — {{ service.priceLabel || `S/ ${Number(service.price).toFixed(2)}` }}</option>
           </select>
           <div v-if="selectedService" class="appointment-price-note">
             <strong>{{ selectedService.priceLabel || `S/ ${Number(selectedService.price).toFixed(2)}` }}</strong>

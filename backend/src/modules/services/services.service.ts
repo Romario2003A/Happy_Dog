@@ -70,10 +70,11 @@ export class ServicesService {
       const {price,maxPrice,requiresQuote}=this.priceParts(priceLabel); if(!price) continue;
       const condition=third || (second && first && !categoryNames.has(first.toUpperCase()) ? second : '');
       const species=/CANINO|FELINO/i.test([first,second].join(' ')) ? [first,second].join(' ').match(/CANINO[^,]*|FELINO/i)?.[0] || null : null;
-      const name=[procedure,condition].filter(Boolean).join(' - ');
+      const name=procedure.trim();
+      const legacyName=[procedure,condition].filter(Boolean).join(' - ');
       const category=this.serviceCategory(procedure,section);
       const durationMinutes=this.serviceDuration(category,procedure);
-      const existing=await this.prisma.service.findFirst({where:{name,condition:condition||null}});
+      const existing=await this.prisma.service.findFirst({where:{condition:condition||null,OR:[{name},{name:legacyName}]}});
       const data={name,category,species,condition:condition||null,price,maxPrice,priceLabel,requiresQuote,durationMinutes,active:true};
       if(existing) await this.prisma.service.update({where:{id:existing.id},data}); else await this.prisma.service.create({data});
       imported++;
