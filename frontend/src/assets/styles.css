@@ -207,6 +207,7 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .surgery-consent-box{grid-column:1/-1;display:grid;gap:14px;padding:18px;border-radius:20px;background:linear-gradient(145deg,rgba(255,250,238,.86),rgba(235,250,244,.74));border:1px solid rgba(15,143,125,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
 .surgery-grid{margin-top:2px}
 .surgery-grid textarea{min-height:96px}
+.surgery-next-step{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border-radius:16px;background:rgba(21,91,102,.06);border:1px solid var(--line)}.surgery-next-step>div{display:grid;gap:4px}.surgery-next-step span{color:var(--muted);font-size:12px;font-weight:700;line-height:1.4}.surgery-next-step button{flex:0 0 auto}
 .checkbox-row{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.72);font-weight:800;color:var(--ink)}
 .checkbox-row input{width:auto;min-width:18px;min-height:18px;accent-color:var(--blue)}
 .medical-form{display:grid;gap:16px}
@@ -571,6 +572,7 @@ th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left}
 @media(max-width:900px){.document-picker-grid{grid-template-columns:1fr}.selected-document-card{align-items:flex-start;flex-direction:column}}
 @media(max-width:900px){.doctor-toolbar{align-items:flex-start;flex-direction:column}.doctor-toolbar nav{width:100%}.doctor-toolbar nav button{flex:1;padding:9px 7px}}
 @media(max-width:700px){.clinical-task-grid{grid-template-columns:1fr}.current-task-bar,.confirmed-attention-type{align-items:flex-start;flex-direction:column}.confirmed-attention-type button{width:100%}}
+@media(max-width:700px){.surgery-next-step{align-items:stretch;flex-direction:column}.surgery-next-step button{width:100%}}
 @media(max-width:700px){.workflow-progress{grid-template-columns:1fr}.workflow-progress div:not(.active){display:none}.patient-context-bar{align-items:stretch;flex-direction:column}.patient-context-bar>div{order:-1}.clinical-task-grid .task-secondary{grid-column:auto}.patient-selection-step .appointment-list{padding:18px}}
 @media(max-width:700px){.app-shell.veterinarian-theme.sidebar-hidden{padding:10px}.veterinarian-theme.sidebar-hidden .topbar{align-items:center;flex-direction:row;padding:13px}.veterinarian-theme.sidebar-hidden .topbar h1{font-size:19px}.veterinarian-theme.sidebar-hidden .topbar p{display:none}.doctor-account-trigger>div{display:none}.doctor-account-trigger{padding:5px!important;border-radius:12px}}
 @media(max-width:700px){.app-shell.calm-workspace-theme.sidebar-hidden{padding:10px}.calm-workspace-theme.sidebar-hidden .topbar{align-items:center;flex-direction:row;padding:13px}.calm-workspace-theme.sidebar-hidden .topbar h1{font-size:19px}.calm-workspace-theme.sidebar-hidden .topbar p{display:none}.account-pill>div{display:none}.account-pill{padding:5px!important;border-radius:12px}.calm-section-nav{width:100%;justify-content:flex-start}.calm-section-nav button{flex:1;padding:9px 12px}}

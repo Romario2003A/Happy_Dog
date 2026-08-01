@@ -1,6 +1,7 @@
 import { PreventiveCareType } from '@prisma/client';
 import { IsBoolean, IsDateString, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 export class CreatePreventiveCareDto {
+  @IsOptional() @IsString() appointmentId?: string;
   @IsEnum(PreventiveCareType) type: PreventiveCareType;
   @IsDateString() appliedAt: string;
   @IsString() productName: string;

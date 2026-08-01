@@ -6,6 +6,7 @@ import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
 import { attentionTypeForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
+import { isVetDraftCompatible, vetDraftKey } from '../../utils/vetDraft';
 import {
   generateOriginalConsultationPdf,
   generateOriginalHistoryPdf,
@@ -28,7 +29,7 @@ let automaticRefreshId = null;
 let refreshInProgress = false;
 let draftSaveId = null;
 const DRAFT_PREFIX = 'happy-dog:vet-draft:';
-const DRAFT_VERSION = 2;
+const DRAFT_VERSION = 3;
 const activeWorkspace = ref('agenda');
 const consultationTab = ref('evaluation');
 const taskChosen = ref(false);
@@ -421,8 +422,8 @@ function resetForm(appointment) {
   lastSavedPetId.value = '';
 }
 
-function draftKey(petId) {
-  return petId ? `${DRAFT_PREFIX}${petId}` : '';
+function draftKey(petId, appointmentId = selected.value?.id || null) {
+  return vetDraftKey(DRAFT_PREFIX, petId, appointmentId);
 }
 
 function saveCurrentDraft() {
@@ -430,6 +431,7 @@ function saveCurrentDraft() {
   if (!petId || !taskChosen.value) return;
   const draft = {
     version: DRAFT_VERSION,
+    appointmentId: selected.value?.id || null,
     form: form.value,
     prescription: prescription.value,
     preventiveForm: { ...preventiveForm },
@@ -447,13 +449,14 @@ function scheduleDraftSave() {
   draftSaveId = window.setTimeout(saveCurrentDraft, 250);
 }
 
-function restoreDraft(petId) {
-  const raw = sessionStorage.getItem(draftKey(petId));
+function restoreDraft(petId, appointmentId = null) {
+  const key = draftKey(petId, appointmentId);
+  const raw = sessionStorage.getItem(key);
   if (!raw) return false;
   try {
     const draft = JSON.parse(raw);
-    if (draft.version !== DRAFT_VERSION) {
-      sessionStorage.removeItem(draftKey(petId));
+    if (!isVetDraftCompatible(draft, DRAFT_VERSION, appointmentId)) {
+      sessionStorage.removeItem(key);
       return false;
     }
     form.value = {
@@ -472,7 +475,7 @@ function restoreDraft(petId) {
     if (draft.consultationTab) consultationTab.value = draft.consultationTab;
     return true;
   } catch {
-    sessionStorage.removeItem(draftKey(petId));
+    sessionStorage.removeItem(key);
     return false;
   }
 }
@@ -525,7 +528,7 @@ async function selectAppointment(appointment) {
   if (!appointment?.petId) return;
   activeWorkspace.value = 'consultation';
   startClinicalTask(taskForAppointment(appointment), { preserveAttentionType: true });
-  restoreDraft(appointment.petId);
+  restoreDraft(appointment.petId, appointment.id);
   try {
     const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${appointment.petId}`),api.get(`/preventive-care/pet/${appointment.petId}`).catch(() => ({data:[]}))]);
     history.value = historyRes.data;
@@ -545,7 +548,7 @@ async function selectPet(pet) {
   expandedRecordId.value = null;
   activeWorkspace.value = 'consultation';
   consultationTab.value = 'evaluation';
-  restoreDraft(pet.id);
+  restoreDraft(pet.id, null);
   try {
     const [historyRes, preventiveRes] = await Promise.all([api.get(`/medical-records/pet/${pet.id}`),api.get(`/preventive-care/pet/${pet.id}`).catch(() => ({data:[]}))]);
     history.value = historyRes.data;
@@ -556,12 +559,25 @@ async function selectPet(pet) {
 }
 
 async function savePreventiveRecord() {
-  if (!selectedPet.value || !preventiveForm.productName.trim()) return;
+  if (!selectedPet.value) {
+    error.value = 'Selecciona un paciente antes de guardar el registro preventivo.';
+    return;
+  }
+  if (!preventiveForm.appliedAt) {
+    error.value = 'Selecciona la fecha de aplicación.';
+    return;
+  }
+  if (!preventiveForm.productName.trim()) {
+    error.value = `Escribe el nombre de ${preventiveForm.type === 'VACCINE' ? 'la vacuna' : 'el desparasitante'}.`;
+    return;
+  }
   preventiveSaving.value = true;
   error.value = '';
+  success.value = '';
   try {
     const { data } = await api.post('/preventive-care', {
       ...preventiveForm,
+      appointmentId: selected.value?.id || undefined,
       sterilizationCallDone: preventiveForm.sterilizationRecommended && preventiveForm.sterilizationCallDone,
       petId:selectedPet.value.id,
       veterinarianId:auth.user.id,
@@ -571,6 +587,11 @@ async function savePreventiveRecord() {
     });
     preventiveRecords.value = [data, ...preventiveRecords.value];
     preventiveForm.productName = ''; preventiveForm.nextProductName = ''; preventiveForm.weightKg = null; preventiveForm.amountCharged = null; preventiveForm.nextAppointmentAt = ''; preventiveForm.dewormed = false; preventiveForm.followUpCalled = false; preventiveForm.sterilizationRecommended = false; preventiveForm.sterilizationCallDone = false; preventiveForm.notes = '';
+    clearCurrentDraft();
+    success.value = selected.value
+      ? 'Registro preventivo guardado. La cita fue marcada como atendida.'
+      : 'Registro preventivo guardado en la ficha del paciente.';
+    if (selected.value) await loadData({ background:true });
   } catch (e) { error.value = e.response?.data?.message || 'No se pudo guardar el registro preventivo.'; }
   finally { preventiveSaving.value = false; }
 }
@@ -1704,6 +1725,10 @@ onUnmounted(() => {
               </label>
               <textarea v-model="surgeryConsent.medicalConditionDetail" :required="surgeryConsent.medicalCondition" placeholder="Detalle del problema médico, si aplica"></textarea>
               <textarea v-model="surgeryConsent.staffNotes" placeholder="Anotaciones u observaciones del personal"></textarea>
+            </div>
+            <div class="surgery-next-step">
+              <div><strong>La autorización no finaliza la cita</strong><span>Después de revisarla con el propietario, completa la evaluación médica y guarda la atención.</span></div>
+              <button type="button" @click="attentionType = 'SURGERY'; startClinicalTask('consultation', { preserveAttentionType: true })">Continuar con evaluación médica</button>
             </div>
           </section>
           </div>

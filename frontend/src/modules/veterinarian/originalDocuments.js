@@ -294,59 +294,128 @@ export async function generateOriginalConsultationPdf(data) {
 }
 
 export async function generateOriginalHistoryPdf(data) {
-  const { PDFDocument, StandardFonts } = await loadPdfLib();
-  const sourceBytes = await fetchBytes(ORIGINALS.history);
-  const pdf = await PDFDocument.load(sourceBytes);
-  const template = await PDFDocument.load(sourceBytes);
+  const { PDFDocument, StandardFonts, rgb } = await loadPdfLib();
+  const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const logo = await pdf.embedPng(await fetchBytes('/documents/happy-dog-pdf-logo.png'));
   const { pet = {}, client = {}, preventive = [], consultations = [], entryDate = '' } = data;
-  const page1 = pdf.getPage(0);
+  const colors = {
+    teal: rgb(0.082, 0.357, 0.4), mint: rgb(0.52, 0.82, 0.66), pale: rgb(0.94, 0.975, 0.965),
+    paleBlue: rgb(0.94, 0.97, 0.975), ink: rgb(0.08, 0.14, 0.13), muted: rgb(0.36, 0.44, 0.42),
+    line: rgb(0.76, 0.84, 0.82), white: rgb(1, 1, 1),
+  };
+  const margin = 36;
+  const contentWidth = 523.32;
+  const totalPages = Math.max(2, consultations.length + 1);
+  const header = (page, subtitle, pageNumber) => {
+    page.drawRectangle({x:margin,y:754,width:contentWidth,height:62,color:colors.paleBlue});
+    page.drawRectangle({x:margin,y:754,width:7,height:62,color:colors.teal});
+    page.drawImage(logo,{x:48,y:761,width:48,height:48});
+    draw(page,bold,'HAPPY DOG',110,791,{size:17,maxWidth:180,color:colors.teal});
+    draw(page,font,subtitle,110,774,{size:9,maxWidth:270,color:colors.muted});
+    draw(page,bold,`N. HISTORIA: ${historyCode(pet) || '-'}`,410,792,{size:7.2,maxWidth:135});
+    draw(page,font,`Ingreso: ${entryDate || '-'}`,410,777,{size:7.2,maxWidth:135});
+    draw(page,font,`Página ${pageNumber} de ${totalPages}`,468,762,{size:6.5,maxWidth:77});
+  };
+  const footer = page => {
+    page.drawLine({start:{x:margin,y:25},end:{x:margin+contentWidth,y:25},color:colors.line,thickness:.7});
+    draw(page,font,'Historia clínica acumulativa - Happy Dog',margin,12,{size:6.3,maxWidth:250});
+    draw(page,font,'Documento generado desde el sistema médico',370,12,{size:6.3,maxWidth:189});
+  };
+  const section = (page,title,y) => {
+    page.drawRectangle({x:margin,y,width:contentWidth,height:20,color:colors.pale});
+    page.drawRectangle({x:margin,y,width:4,height:20,color:colors.mint});
+    draw(page,bold,title.toUpperCase(),margin+12,y+6,{size:8.5,maxWidth:contentWidth-20});
+  };
+  const field = (page,label,value,x,y,width,height=30) => {
+    page.drawRectangle({x,y,width,height,color:colors.white,borderColor:colors.line,borderWidth:.7});
+    draw(page,bold,label.toUpperCase(),x+7,y+height-10,{size:5.8,maxWidth:width-14});
+    draw(page,font,value || '-',x+7,y+7,{size:8,maxWidth:width-14});
+  };
+  const textBox = (page,label,value,x,y,width,height,maxLines=6) => {
+    page.drawRectangle({x,y,width,height,color:colors.white,borderColor:colors.line,borderWidth:.7});
+    draw(page,bold,label.toUpperCase(),x+8,y+height-13,{size:6.4,maxWidth:width-16});
+    drawBlock(page,font,value || '-',x+8,y+height-28,width-16,{size:7.4,lineHeight:9,maxLines});
+  };
+  const table = (page,title,rows,yTop,productLabel) => {
+    section(page,title,yTop);
+    const widths=[82,158,91,192.32];
+    const labels=['Fecha',productLabel,'Próxima cita','Médico responsable'];
+    let x=margin;
+    widths.forEach((width,index)=>{
+      page.drawRectangle({x,y:yTop-28,width,height:26,color:colors.teal,borderColor:colors.white,borderWidth:.5});
+      draw(page,bold,labels[index],x+6,yTop-19,{size:6.5,maxWidth:width-12,color:colors.white});
+      x+=width;
+    });
+    for(let rowIndex=0;rowIndex<6;rowIndex+=1){
+      const item=rows[rowIndex] || {};
+      const rowY=yTop-54-rowIndex*31;
+      const hasRecord=Boolean(item.appliedAt || item.productName || item.nextAppointmentAt || item.doctor);
+      const values=[item.appliedAt || '',item.productName || '',item.nextAppointmentAt || '',hasRecord?(item.doctor || ''):''];
+      let cellX=margin;
+      widths.forEach((width,index)=>{
+        page.drawRectangle({x:cellX,y:rowY,width,height:31,color:rowIndex%2?colors.paleBlue:colors.white,borderColor:colors.line,borderWidth:.55});
+        drawBlock(page,font,values[index],cellX+6,rowY+19,width-12,{size:6.8,lineHeight:8,maxLines:2});
+        cellX+=width;
+      });
+    }
+  };
 
-  draw(page1, font, historyCode(pet), 431, 727, { size: 7, maxWidth: 60 });
-  draw(page1, font, entryDate, 154, 703, { size: 7, maxWidth: 105 });
-  draw(page1, font, client.fullName, 128, 644, { size: 7, maxWidth: 258 });
-  draw(page1, font, client.phone, 438, 644, { size: 7, maxWidth: 71 });
-  draw(page1, font, client.address, 130, 615, { size: 7, maxWidth: 260 });
-  draw(page1, font, client.documentNumber || client.dni, 420, 615, { size: 7, maxWidth: 90 });
-  draw(page1, font, pet.name, 128, 549, { size: 7, maxWidth: 135 });
-  draw(page1, font, pet.species, 313, 549, { size: 7, maxWidth: 92 });
-  draw(page1, font, pet.age, 443, 549, { size: 7, maxWidth: 65 });
-  draw(page1, font, pet.breed, 111, 526, { size: 7, maxWidth: 135 });
-  draw(page1, font, safeText(pet.sex), 280, 526, { size: 7, maxWidth: 35 });
-  draw(page1, font, pet.color, 338, 526, { size: 7, maxWidth: 68 });
-  draw(page1, font, pet.weightKg, 443, 526, { size: 7, maxWidth: 65 });
+  const summary = pdf.addPage([595.32,841.92]);
+  header(summary,'HISTORIA CLÍNICA - RESUMEN DEL PACIENTE',1);
+  section(summary,'Datos del propietario',724);
+  field(summary,'Nombre',client.fullName,margin,692,292);
+  field(summary,'Teléfono',client.phone,328,692,110);
+  field(summary,'DNI',client.documentNumber || client.dni,438,692,121.32);
+  field(summary,'Dirección',client.address,margin,662,contentWidth);
+  section(summary,'Datos del paciente',635);
+  const third=contentWidth/3;
+  field(summary,'Nombre',pet.name,margin,603,third);
+  field(summary,'Especie',pet.species,margin+third,603,third);
+  field(summary,'Raza',pet.breed,margin+third*2,603,third);
+  field(summary,'Sexo',pet.sex,margin,573,third);
+  field(summary,'Edad',pet.age,margin+third,573,third);
+  field(summary,'Peso base',pet.weightKg?`${pet.weightKg} kg`:'-',margin+third*2,573,third);
+  field(summary,'Color',pet.color,margin,543,third);
+  field(summary,'Consultas',String(consultations.length),margin+third,543,third);
+  field(summary,'Registros preventivos',String(preventive.length),margin+third*2,543,third);
+  table(summary,'Desparasitaciones recientes',preventive.filter(item=>item.type==='DEWORMING'),510,'Producto');
+  table(summary,'Vacunas recientes',preventive.filter(item=>item.type==='VACCINE'),256,'Vacuna');
+  draw(summary,font,'Se muestran hasta seis registros recientes por tabla. El sistema conserva el historial completo.',margin,38,{size:7,maxWidth:contentWidth});
+  footer(summary);
 
-  const deworming = preventive.filter(item => item.type === 'DEWORMING').slice(0, 12);
-  deworming.forEach((item, index) => {
-    const y = 447 - index * 14;
-    draw(page1, font, item.appliedAt, 95, y, { size: 5.6, maxWidth: 68 });
-    draw(page1, font, item.productName, 172, y, { size: 5.6, maxWidth: 83 });
-    draw(page1, font, item.weight, 267, y, { size: 5.6, maxWidth: 50 });
-    draw(page1, font, item.doctor, 329, y, { size: 5.6, maxWidth: 72 });
-    draw(page1, font, item.nextAppointmentAt, 414, y, { size: 5.6, maxWidth: 88 });
+  const consultationRows = consultations.length ? consultations : [null];
+  consultationRows.forEach((consultation,index)=>{
+    const page=pdf.addPage([595.32,841.92]);
+    header(page,consultation?`CONSULTA ${index+1} - ${consultation.date || 'Sin fecha'}`:'CONSULTAS CLÍNICAS',index+2);
+    if(!consultation){
+      section(page,'Consultas registradas',700);
+      page.drawRectangle({x:margin,y:530,width:contentWidth,height:150,color:colors.paleBlue,borderColor:colors.line,borderWidth:.7});
+      draw(page,bold,'Aún no hay consultas clínicas guardadas para este paciente.',82,600,{size:13,maxWidth:430,color:colors.teal});
+      draw(page,font,'Cuando el doctor finalice una atención, aparecerá automáticamente en este documento.',82,580,{size:8.5,maxWidth:430,color:colors.muted});
+      footer(page);
+      return;
+    }
+    section(page,'Signos y evaluación',724);
+    const vitalWidths=[110,90,90,80,80,73.32];
+    const labels=['Fecha','Peso','Temperatura','FC','FR','Consulta'];
+    const values=[consultation.date,consultation.weight,consultation.temperature,consultation.fc,consultation.fr,String(index+1)];
+    let x=margin;
+    vitalWidths.forEach((width,cellIndex)=>{field(page,labels[cellIndex],values[cellIndex],x,686,width,34);x+=width;});
+    textBox(page,'Anamnesis y exploración física',consultation.anamnesis,margin,520,contentWidth,150,12);
+    section(page,'Exámenes complementarios',493);
+    textBox(page,'Exámenes realizados',consultation.exams,margin,425,contentWidth,66,4);
+    section(page,'Diagnóstico',398);
+    textBox(page,'Diagnóstico presuntivo',consultation.presumptiveDx,margin,332,261.66,64,4);
+    textBox(page,'Diagnóstico definitivo',consultation.definitiveDx,297.66,332,261.66,64,4);
+    section(page,'Tratamiento y seguimiento',305);
+    textBox(page,'Tratamiento',consultation.treatment,margin,159,contentWidth,144,11);
+    textBox(page,'Frecuencia',consultation.frequency,margin,105,250,50,2);
+    page.drawLine({start:{x:335,y:124},end:{x:535,y:124},color:colors.muted,thickness:.7});
+    draw(page,font,'Firma y sello del médico veterinario',359,108,{size:6.5,maxWidth:160});
+    footer(page);
   });
-  const vaccines = preventive.filter(item => item.type === 'VACCINE').slice(0, 11);
-  vaccines.forEach((item, index) => {
-    const y = 217 - index * 14;
-    draw(page1, font, item.appliedAt, 95, y, { size: 5.6, maxWidth: 88 });
-    draw(page1, font, item.productName, 198, y, { size: 5.6, maxWidth: 88 });
-    draw(page1, font, item.doctor, 306, y, { size: 5.6, maxWidth: 88 });
-    draw(page1, font, item.nextAppointmentAt, 414, y, { size: 5.6, maxWidth: 88 });
-  });
-
-  const consultationPages = Math.max(1, Math.ceil(consultations.length / 2));
-  for (let index = 1; index < consultationPages; index += 1) {
-    const [copy] = await pdf.copyPages(template, [1]);
-    pdf.addPage(copy);
-  }
-  const pages = pdf.getPages();
-  for (let index = 0; index < consultationPages; index += 1) {
-    const page = pages[index + 1];
-    const first = consultations[index * 2];
-    const second = consultations[index * 2 + 1];
-    if (first) drawConsultationBlock(page, font, first, 755);
-    if (second) drawConsultationBlock(page, font, second, 397);
-  }
 
   const bytes = await pdf.save();
   if (data.returnBytes) return bytes;
