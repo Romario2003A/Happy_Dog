@@ -4,6 +4,11 @@ import VeterinarianLayout from '../../layouts/VeterinarianLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
+import {
+  generateOriginalConsultationPdf,
+  generateOriginalHistoryPdf,
+  generateOriginalSurgeryPdf,
+} from './originalDocuments';
 
 const auth = useAuthStore();
 const appointments = ref([]);
@@ -675,7 +680,7 @@ function generatePrescriptionPdf() {
   window.setTimeout(() => printWindow.print(), 250);
 }
 
-function generateClinicalHistoryPdf() {
+function generateLegacyClinicalHistoryPdf() {
   if (!selectedPet.value) {
     error.value = 'Selecciona un paciente antes de generar la historia clínica.';
     return;
@@ -728,7 +733,7 @@ function generateClinicalHistoryPdf() {
   window.setTimeout(() => printWindow.print(), 250);
 }
 
-function generateSurgeryConsentPdf() {
+function generateLegacySurgeryConsentPdf() {
   if (!selectedPet.value) {
     error.value = 'Selecciona un paciente antes de generar la autorización quirúrgica.';
     return;
@@ -892,6 +897,134 @@ function generateSurgeryConsentPdf() {
   `);
   printWindow.document.close();
   window.setTimeout(() => printWindow.print(), 250);
+}
+
+function documentPreventiveRecords() {
+  return preventiveRecords.value.map(record => ({
+    type: record.type,
+    appliedAt: formatShortDate(record.appliedAt),
+    productName: record.productName || '',
+    weight: record.weightKg ? `${record.weightKg} kg` : '',
+    temperature: '',
+    doctor: record.veterinarian?.fullName || auth.user?.fullName || '',
+    nextAppointmentAt: record.nextAppointmentAt ? formatShortDate(record.nextAppointmentAt) : '',
+  }));
+}
+
+function observationValue(text, label) {
+  return String(text || '').split('\n').find(line => line.startsWith(`${label}:`))?.slice(label.length + 1).trim() || '';
+}
+
+function currentDocumentConsultation() {
+  return {
+    date: formatShortDate(),
+    weight: form.value.weightKg || selectedPet.value?.weightKg || '',
+    temperature: form.value.temperatureC || '',
+    fc: form.value.fc || '',
+    fr: form.value.fr || '',
+    mucosas: form.value.mucosas || '',
+    anamnesis: form.value.anamnesis || form.value.reason || '',
+    exams: form.value.exams,
+    examOther: form.value.examOther || '',
+    presumptiveDx: form.value.presumptiveDx || '',
+    definitiveDx: form.value.definitiveDx || '',
+    prognosis: form.value.prognosis || '',
+    treatment: form.value.treatment || '',
+    frequency: form.value.frequency || '',
+    recommendations: form.value.recommendations || '',
+  };
+}
+
+function accumulatedDocumentConsultations() {
+  const current = currentDocumentConsultation();
+  const currentForHistory = {
+    ...current,
+    exams: [checkedExams().join(', '), current.examOther].filter(Boolean).join(', '),
+  };
+  const currentHasData = Boolean(
+    current.anamnesis || current.presumptiveDx || current.definitiveDx
+    || current.treatment || current.fc || current.fr || current.temperature,
+  );
+  const currentAlreadySaved = lastSavedPetId.value === selectedPet.value?.id
+    && (!selected.value?.id || lastSavedAppointmentId.value === selected.value.id);
+  const previous = history.value.map(record => ({
+    date: formatShortDate(record.visitDate),
+    weight: record.weightKg || '',
+    temperature: record.temperatureC || '',
+    fc: observationValue(record.observations, 'FC'),
+    fr: observationValue(record.observations, 'FR'),
+    anamnesis: [record.reason, observationValue(record.observations, 'Anamnesis')].filter(Boolean).join('\n'),
+    exams: observationValue(record.observations, 'Exámenes complementarios'),
+    presumptiveDx: observationValue(record.diagnosis, 'DX presuntivo'),
+    definitiveDx: observationValue(record.diagnosis, 'DX definitivo') || record.diagnosis || '',
+    treatment: record.treatment || '',
+    frequency: observationValue(record.treatment, 'Frecuencia'),
+  }));
+  return [...(currentHasData && !currentAlreadySaved ? [currentForHistory] : []), ...previous];
+}
+
+async function generateConsultationDocumentPdf() {
+  if (!selectedPet.value) {
+    error.value = 'Selecciona un paciente antes de generar la historia clínica.';
+    return;
+  }
+  error.value = '';
+  try {
+    await generateOriginalConsultationPdf({
+      pet: { ...selectedPet.value, sex: sexLabel(selectedPet.value.sex) },
+      client: selectedClient.value || {},
+      consultation: currentDocumentConsultation(),
+      preventive: documentPreventiveRecords(),
+      doctor: auth.user?.fullName || '',
+    });
+  } catch (e) {
+    error.value = e.message || 'No se pudo generar el documento clínico original.';
+  }
+}
+
+async function generateClinicalHistoryPdf() {
+  if (!selectedPet.value) {
+    error.value = 'Selecciona un paciente antes de generar la historia clínica.';
+    return;
+  }
+  error.value = '';
+  try {
+    await generateOriginalHistoryPdf({
+      pet: { ...selectedPet.value, sex: sexLabel(selectedPet.value.sex) },
+      client: selectedClient.value || {},
+      preventive: documentPreventiveRecords(),
+      consultations: accumulatedDocumentConsultations(),
+      entryDate: formatShortDate(selectedPet.value.createdAt || new Date()),
+    });
+  } catch (e) {
+    error.value = e.message || 'No se pudo generar el historial clínico original.';
+  }
+}
+
+async function generateSurgeryConsentPdf() {
+  if (!selectedPet.value) {
+    error.value = 'Selecciona un paciente antes de generar la autorización quirúrgica.';
+    return;
+  }
+  if (!surgeryConsent.ownerDni.trim() || !surgeryConsent.ownerAddress.trim() || !surgeryConsent.lastMeal.trim()) {
+    error.value = 'Completa el DNI, la dirección del dueño y la última comida antes de generar la autorización.';
+    return;
+  }
+  if (surgeryConsent.medicalCondition && !surgeryConsent.medicalConditionDetail.trim()) {
+    error.value = 'Describe el problema médico preexistente antes de generar la autorización.';
+    return;
+  }
+  error.value = '';
+  try {
+    await generateOriginalSurgeryPdf({
+      pet: selectedPet.value,
+      client: selectedClient.value || {},
+      consent: surgeryConsent,
+      date: formatShortDate(),
+    });
+  } catch (e) {
+    error.value = e.message || 'No se pudo generar la autorización original.';
+  }
 }
 
 async function saveRecord() {
@@ -1339,9 +1472,9 @@ onUnmounted(() => {
           <section v-if="activeTask === 'history' || activeTask === 'preventive'" class="clinical-document-editor">
             <template v-if="activeTask === 'history'">
             <div class="document-editor-head">
-              <div><span class="badge">Documento editable</span><h3>Historia clínica Happy Dog</h3><p>Los datos del paciente se completan automáticamente. El doctor registra únicamente la información médica.</p></div>
+              <div><span class="badge">Formato original</span><h3>Historia clínica Happy Dog</h3><p>Se conserva el PDF original completo. Los datos del paciente y sus registros se escriben sobre sus casillas sin modificar el diseño.</p></div>
               <div class="document-head-actions">
-                <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar PDF</button>
+                <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Ver PDF original completado</button>
                 <button type="button" :disabled="saving" @click="saveRecord">{{ saving ? 'Guardando...' : 'Guardar en historial' }}</button>
               </div>
             </div>
@@ -1441,9 +1574,9 @@ onUnmounted(() => {
             <div class="prescription-head">
               <div>
                 <h3>Documento de esterilización / castración</h3>
-                <p class="muted-text">Este es el formulario específico de autorización. Completa los datos y genera el documento para firma.</p>
+                <p class="muted-text">Completa los datos y genera una copia fiel del formulario original para firma.</p>
               </div>
-              <button class="secondary small" type="button" @click="generateSurgeryConsentPdf">Generar autorización PDF</button>
+              <button class="secondary small" type="button" @click="generateSurgeryConsentPdf">Ver autorización original</button>
             </div>
             <div class="form-grid surgery-grid">
               <input v-model="surgeryConsent.ownerDni" required placeholder="DNI del dueño *">
@@ -1471,6 +1604,7 @@ onUnmounted(() => {
           <div class="consultation-actions">
             <button v-if="activeTask === 'consultation' && consultationTab !== 'evaluation'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.max(0, consultationTabs.findIndex(tab => tab.value === consultationTab) - 1)].value">Anterior</button>
             <button v-if="activeTask === 'consultation' && consultationTab !== 'plan'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.min(consultationTabs.length - 1, consultationTabs.findIndex(tab => tab.value === consultationTab) + 1)].value">Continuar</button>
+            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" type="button" class="secondary" @click="generateConsultationDocumentPdf">Ver documento original</button>
             <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" :disabled="!selectedPet || saving">{{ saving ? 'Guardando...' : selected ? 'Guardar atención' : 'Guardar atención directa' }}</button>
           </div>
           <p v-if="activeTask === 'consultation' && consultationTab === 'plan' && !selected" class="direct-care-note">Esta atención se guardará directamente en el historial del paciente.</p>
