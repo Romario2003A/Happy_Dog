@@ -38,7 +38,7 @@ function draw(page, font, value, x, y, options = {}) {
   if (value === undefined || value === null || value === '') return;
   const size = options.size || 7.5;
   page.drawText(fitText(value, font, size, options.maxWidth), {
-    x, y, size, font,
+    x, y, size, font, color: options.color,
   });
 }
 
@@ -136,75 +136,157 @@ function drawConsultationBlock(page, font, consultation, topY) {
 }
 
 export async function generateOriginalConsultationPdf(data) {
-  const { PDFDocument, StandardFonts } = await loadPdfLib();
-  const pdf = await PDFDocument.load(await fetchBytes(ORIGINALS.consultation));
+  const { PDFDocument, StandardFonts, rgb } = await loadPdfLib();
+  const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const [page1, page2] = pdf.getPages();
+  const logo = await pdf.embedPng(await fetchBytes('/documents/happy-dog-pdf-logo.png'));
+  const page1 = pdf.addPage([595.32, 841.92]);
+  const page2 = pdf.addPage([595.32, 841.92]);
   const { pet = {}, client = {}, consultation = {}, preventive = [], doctor = '' } = data;
   const sex = sexFlags(pet);
-
-  draw(page1, bold, consultation.date, 70, 785, { size: 8, maxWidth: 57 });
-  draw(page1, bold, historyCode(pet), 500, 779, { size: 8, maxWidth: 56 });
-  draw(page1, font, client.fullName, 86, 657, { maxWidth: 265 });
-  draw(page1, font, client.phone, 400, 657, { maxWidth: 140 });
-  draw(page1, font, client.address, 86, 630, { maxWidth: 265 });
-  draw(page1, font, client.documentNumber || client.dni, 400, 630, { maxWidth: 140 });
-  draw(page1, font, pet.name, 108, 586, { size: 6.5, maxWidth: 97 });
-  draw(page1, font, pet.species, 260, 586, { size: 6.5, maxWidth: 95 });
-  draw(page1, font, pet.breed, 395, 586, { size: 6.5, maxWidth: 108 });
-  mark(page1, bold, sex.female, 109, 574, 9);
-  mark(page1, bold, sex.male, 137, 574, 9);
-  draw(page1, font, pet.age, 280, 571, { size: 6.5, maxWidth: 75 });
-  draw(page1, font, consultation.weight || pet.weightKg, 438, 571, { size: 6.5, maxWidth: 65 });
-  draw(page1, font, pet.color, 100, 555, { size: 6.5, maxWidth: 105 });
-  mark(page1, bold, Boolean(pet.sterilized), 301, 561, 9);
-  mark(page1, bold, pet.sterilized === false, 334, 561, 9);
-  draw(page1, font, pet.origin, 438, 555, { size: 6.5, maxWidth: 65 });
-
-  draw(page1, font, consultation.date, 75, 510, { maxWidth: 55 });
-  draw(page1, font, consultation.weight, 173, 510, { maxWidth: 37 });
-  draw(page1, font, consultation.temperature, 237, 510, { maxWidth: 30 });
-  draw(page1, font, consultation.fc, 297, 510, { maxWidth: 37 });
-  draw(page1, font, consultation.fr, 363, 510, { maxWidth: 19 });
-  draw(page1, font, consultation.mucosas, 432, 510, { maxWidth: 118 });
-  drawBlock(page1, font, consultation.anamnesis, 140, 477, 407, { size: 7, maxLines: 20, lineHeight: 9 });
-
-  const examMarks = {
-    ecografia: [199, 328], rayosX: [199, 315], hemograma: [199, 301], test: [208, 287],
-    heces: [349, 328], orina: [349, 315], tgoTgpFas: [349, 301], otros: [334, 287],
-    citologia: [450, 328], raspadoPiel: [477, 315], ureaCrea: [469, 301],
+  const colors = {
+    teal: rgb(0.082, 0.357, 0.4),
+    mint: rgb(0.52, 0.82, 0.66),
+    pale: rgb(0.94, 0.975, 0.965),
+    paleBlue: rgb(0.94, 0.97, 0.975),
+    ink: rgb(0.08, 0.14, 0.13),
+    muted: rgb(0.36, 0.44, 0.42),
+    line: rgb(0.76, 0.84, 0.82),
+    white: rgb(1, 1, 1),
   };
-  Object.entries(examMarks).forEach(([key, [x, y]]) => mark(page1, bold, consultation.exams?.[key], x, y, 8));
-  draw(page1, font, consultation.examOther, 355, 281, { size: 6.2, maxWidth: 120 });
-  draw(page1, font, consultation.presumptiveDx, 140, 258, { size: 6.7, maxWidth: 407 });
-  draw(page1, font, consultation.definitiveDx, 140, 238, { size: 6.7, maxWidth: 150 });
-  draw(page1, font, consultation.prognosis, 400, 238, { size: 6.7, maxWidth: 145 });
-  drawBlock(page1, font, consultation.treatment, 140, 211, 407, { size: 6.7, maxLines: 10, lineHeight: 8 });
-  draw(page1, font, consultation.frequency, 140, 109, { size: 6.7, maxWidth: 105 });
-  drawBlock(page1, font, consultation.recommendations, 140, 91, 265, { size: 6.5, maxLines: 7, lineHeight: 7.5 });
-  draw(page1, font, doctor, 466, 70, { size: 6.5, maxWidth: 80 });
+  const margin = 36;
+  const contentWidth = 523.32;
+  const sectionTitle = (page, title, y) => {
+    page.drawRectangle({ x: margin, y, width: contentWidth, height: 20, color: colors.pale });
+    page.drawRectangle({ x: margin, y, width: 4, height: 20, color: colors.mint });
+    draw(page, bold, title.toUpperCase(), margin + 12, y + 6, { size: 8.5, maxWidth: contentWidth - 20 });
+  };
+  const field = (page, label, value, x, y, width, height = 28) => {
+    page.drawRectangle({ x, y, width, height, color: colors.white, borderColor: colors.line, borderWidth: 0.7 });
+    draw(page, bold, safeText(label).toUpperCase(), x + 7, y + height - 10, { size: 5.8, maxWidth: width - 14 });
+    draw(page, font, value || '-', x + 7, y + 7, { size: 8, maxWidth: width - 14 });
+  };
+  const textBox = (page, label, value, x, y, width, height, options = {}) => {
+    page.drawRectangle({ x, y, width, height, color: options.color || colors.white, borderColor: colors.line, borderWidth: 0.7 });
+    draw(page, bold, safeText(label).toUpperCase(), x + 8, y + height - 13, { size: 6.5, maxWidth: width - 16 });
+    drawBlock(page, font, value || '-', x + 8, y + height - 28, width - 16, {
+      size: options.size || 7.5,
+      lineHeight: options.lineHeight || 9,
+      maxLines: options.maxLines || Math.max(1, Math.floor((height - 32) / 9)),
+    });
+  };
+  const header = (page, subtitle, pageNumber) => {
+    page.drawRectangle({ x: margin, y: 754, width: contentWidth, height: 62, color: colors.paleBlue });
+    page.drawRectangle({ x: margin, y: 754, width: 7, height: 62, color: colors.teal });
+    page.drawImage(logo, { x: 48, y: 761, width: 48, height: 48 });
+    draw(page, bold, 'HAPPY DOG', 110, 791, { size: 17, maxWidth: 180, color: colors.teal });
+    draw(page, font, subtitle, 110, 774, { size: 9, maxWidth: 270, color: colors.muted });
+    draw(page, bold, `N. HISTORIA: ${historyCode(pet) || '-'}`, 410, 792, { size: 7.2, maxWidth: 135 });
+    draw(page, font, `Fecha: ${consultation.date || '-'}`, 410, 777, { size: 7.2, maxWidth: 135 });
+    draw(page, font, `Página ${pageNumber} de 2`, 474, 762, { size: 6.5, maxWidth: 71 });
+  };
+  const footer = (page) => {
+    page.drawLine({ start: { x: margin, y: 25 }, end: { x: margin + contentWidth, y: 25 }, color: colors.line, thickness: 0.7 });
+    draw(page, font, 'Historia clínica veterinaria - Happy Dog', margin, 12, { size: 6.3, maxWidth: 250 });
+    draw(page, font, 'Documento generado desde el sistema médico', 370, 12, { size: 6.3, maxWidth: 189 });
+  };
 
-  const vaccineRows = preventive.filter(item => item.type === 'VACCINE').slice(0, 8);
-  const dewormingRows = preventive.filter(item => item.type === 'DEWORMING').slice(0, 8);
-  vaccineRows.forEach((item, index) => {
-    const y = 308 - index * 14.3;
-    draw(page2, font, item.appliedAt, 69, y, { size: 5.8, maxWidth: 73 });
-    draw(page2, font, item.productName, 151, y, { size: 5.8, maxWidth: 79 });
-    draw(page2, font, item.nextAppointmentAt, 239, y, { size: 5.8, maxWidth: 71 });
-    draw(page2, font, pet.age, 326, y, { size: 5.8, maxWidth: 43 });
-    draw(page2, font, item.temperature, 382, y, { size: 5.8, maxWidth: 30 });
-    draw(page2, font, item.doctor || doctor, 427, y, { size: 5.8, maxWidth: 88 });
+  header(page1, 'HISTORIA CLÍNICA - CONSULTA MÉDICA', 1);
+  sectionTitle(page1, 'Datos del propietario', 724);
+  field(page1, 'Nombre', client.fullName, margin, 692, 292, 30);
+  field(page1, 'Teléfono', client.phone, 328, 692, 110, 30);
+  field(page1, 'DNI', client.documentNumber || client.dni, 438, 692, 121.32, 30);
+  field(page1, 'Direccion', client.address, margin, 662, contentWidth, 30);
+
+  sectionTitle(page1, 'Datos del paciente', 635);
+  const third = contentWidth / 3;
+  field(page1, 'Nombre', pet.name, margin, 603, third, 30);
+  field(page1, 'Especie', pet.species, margin + third, 603, third, 30);
+  field(page1, 'Raza', pet.breed, margin + third * 2, 603, third, 30);
+  field(page1, 'Sexo', sex.female ? 'Hembra' : sex.male ? 'Macho' : pet.sex, margin, 573, third, 30);
+  field(page1, 'Edad', pet.age, margin + third, 573, third, 30);
+  field(page1, 'Peso', consultation.weight || pet.weightKg ? `${consultation.weight || pet.weightKg} kg` : '-', margin + third * 2, 573, third, 30);
+  field(page1, 'Color', pet.color, margin, 543, third, 30);
+  field(page1, 'Esterilizado', pet.sterilized === true ? 'Sí' : pet.sterilized === false ? 'No' : '-', margin + third, 543, third, 30);
+  field(page1, 'Procedencia', pet.origin, margin + third * 2, 543, third, 30);
+
+  sectionTitle(page1, 'Evaluación de la consulta', 516);
+  const vitalWidths = [88, 70, 70, 62, 62, 171.32];
+  const vitalLabels = ['Fecha', 'Peso', 'T', 'FC', 'FR', 'Mucosas'];
+  const vitalValues = [consultation.date, consultation.weight, consultation.temperature, consultation.fc, consultation.fr, consultation.mucosas];
+  let vitalX = margin;
+  vitalWidths.forEach((width, index) => {
+    field(page1, vitalLabels[index], vitalValues[index], vitalX, 484, width, 30);
+    vitalX += width;
   });
-  dewormingRows.forEach((item, index) => {
-    const y = 138 - index * 14.3;
-    draw(page2, font, item.appliedAt, 69, y, { size: 5.8, maxWidth: 73 });
-    draw(page2, font, item.productName, 151, y, { size: 5.8, maxWidth: 79 });
-    draw(page2, font, item.nextAppointmentAt, 239, y, { size: 5.8, maxWidth: 71 });
-    draw(page2, font, pet.age, 326, y, { size: 5.8, maxWidth: 43 });
-    draw(page2, font, item.temperature, 382, y, { size: 5.8, maxWidth: 30 });
-    draw(page2, font, item.doctor || doctor, 427, y, { size: 5.8, maxWidth: 88 });
+  textBox(page1, 'Anamnesis y exploración física', consultation.anamnesis, margin, 391, contentWidth, 85, { maxLines: 6 });
+
+  sectionTitle(page1, 'Exámenes complementarios', 364);
+  page1.drawRectangle({ x: margin, y: 299, width: contentWidth, height: 63, color: colors.white, borderColor: colors.line, borderWidth: 0.7 });
+  const exams = [
+    ['ecografia', 'Ecografía'], ['rayosX', 'Rayos X'], ['hemograma', 'Hemograma'], ['test', 'Test'],
+    ['heces', 'Examen de heces'], ['orina', 'Examen de orina'], ['tgoTgpFas', 'TGO, TGP y FAS'],
+    ['citologia', 'Citología'], ['raspadoPiel', 'Raspado de piel'], ['ureaCrea', 'Urea y crea'], ['otros', 'Otros'],
+  ];
+  exams.forEach(([key, label], index) => {
+    const column = index % 3;
+    const row = Math.floor(index / 3);
+    const x = margin + 10 + column * 172;
+    const y = 344 - row * 14;
+    page1.drawRectangle({ x, y: y - 1, width: 8, height: 8, borderColor: colors.teal, borderWidth: 0.8, color: consultation.exams?.[key] ? colors.teal : colors.white });
+    if (consultation.exams?.[key]) draw(page1, bold, 'X', x + 1.5, y, { size: 5.8 });
+    draw(page1, font, label, x + 13, y, { size: 6.8, maxWidth: 150 });
   });
+  draw(page1, font, consultation.examOther, 396, 304, { size: 6.5, maxWidth: 145 });
+
+  sectionTitle(page1, 'Diagnóstico y pronóstico', 272);
+  textBox(page1, 'DX presuntivo', consultation.presumptiveDx, margin, 224, 261.66, 46, { maxLines: 2, size: 7 });
+  textBox(page1, 'DX definitivo', consultation.definitiveDx, 297.66, 224, 261.66, 46, { maxLines: 2, size: 7 });
+  textBox(page1, 'Pronostico', consultation.prognosis, margin, 184, contentWidth, 38, { maxLines: 1, size: 7 });
+
+  sectionTitle(page1, 'Plan médico', 157);
+  textBox(page1, 'Tratamiento', consultation.treatment, margin, 88, 330, 67, { maxLines: 4, size: 7 });
+  textBox(page1, 'Frecuencia', consultation.frequency, 370, 121, 189.32, 34, { maxLines: 1, size: 7 });
+  textBox(page1, 'Recomendaciones', consultation.recommendations, 370, 88, 189.32, 32, { maxLines: 1, size: 6.5 });
+  draw(page1, bold, 'MÉDICO VETERINARIO', margin, 62, { size: 6.5, maxWidth: 130 });
+  draw(page1, font, doctor || '-', 132, 62, { size: 7.5, maxWidth: 205 });
+  page1.drawLine({ start: { x: 370, y: 62 }, end: { x: 535, y: 62 }, color: colors.muted, thickness: 0.7 });
+  draw(page1, font, 'Firma y sello', 421, 49, { size: 6.2, maxWidth: 90 });
+  footer(page1);
+
+  header(page2, 'PREVENCION Y SEGUIMIENTO', 2);
+  const table = (title, rows, yTop, emptyProductLabel) => {
+    sectionTitle(page2, title, yTop);
+    const x = margin;
+    const widths = [82, 158, 91, 192.32];
+    const labels = ['Fecha', emptyProductLabel, 'Próxima cita', 'Médico responsable'];
+    let headerX = x;
+    widths.forEach((width, index) => {
+      page2.drawRectangle({ x: headerX, y: yTop - 28, width, height: 26, color: colors.teal, borderColor: colors.white, borderWidth: 0.5 });
+      draw(page2, bold, labels[index], headerX + 6, yTop - 19, { size: 6.5, maxWidth: width - 12, color: colors.white });
+      headerX += width;
+    });
+    const visibleRows = rows.slice(0, 8);
+    for (let rowIndex = 0; rowIndex < 8; rowIndex += 1) {
+      const item = visibleRows[rowIndex] || {};
+      const rowY = yTop - 54 - rowIndex * 31;
+      const hasRecord = Boolean(item.appliedAt || item.productName || item.nextAppointmentAt || item.doctor);
+      const values = [item.appliedAt || '', item.productName || '', item.nextAppointmentAt || '', hasRecord ? (item.doctor || doctor || '') : ''];
+      let cellX = x;
+      widths.forEach((width, index) => {
+        page2.drawRectangle({ x: cellX, y: rowY, width, height: 31, color: rowIndex % 2 ? colors.paleBlue : colors.white, borderColor: colors.line, borderWidth: 0.55 });
+        drawBlock(page2, font, values[index], cellX + 6, rowY + 19, width - 12, { size: 6.8, lineHeight: 8, maxLines: 2 });
+        cellX += width;
+      });
+    }
+  };
+  const vaccineRows = preventive.filter(item => item.type === 'VACCINE');
+  const dewormingRows = preventive.filter(item => item.type === 'DEWORMING');
+  table('Cronograma de vacunación', vaccineRows, 714, 'Vacuna');
+  table('Cronograma de desparasitación', dewormingRows, 399, 'Producto');
+  draw(page2, font, 'Las filas vacías quedan disponibles para completar futuros controles impresos.', margin, 94, { size: 7, maxWidth: contentWidth });
+  footer(page2);
 
   const bytes = await pdf.save();
   if (data.returnBytes) return bytes;

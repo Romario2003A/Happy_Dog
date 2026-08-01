@@ -1711,7 +1711,7 @@ onUnmounted(() => {
           <div class="consultation-actions">
             <button v-if="activeTask === 'consultation' && consultationTab !== 'evaluation'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.max(0, consultationTabs.findIndex(tab => tab.value === consultationTab) - 1)].value">Anterior</button>
             <button v-if="activeTask === 'consultation' && consultationTab !== 'plan'" type="button" class="secondary" @click="consultationTab = consultationTabs[Math.min(consultationTabs.length - 1, consultationTabs.findIndex(tab => tab.value === consultationTab) + 1)].value">Continuar</button>
-            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" type="button" class="secondary" @click="generateConsultationDocumentPdf">Vista previa del documento</button>
+            <button v-if="activeTask === 'consultation' && consultationTab === 'plan'" type="button" class="secondary" @click="generateConsultationDocumentPdf">Generar documento Happy Dog</button>
             <div v-if="activeTask === 'consultation' && consultationTab === 'plan'" class="save-attention-explanation">
               <strong>Finalizar la atención</strong>
               <span>Guarda esta consulta en el historial y marca la cita como atendida.</span>
