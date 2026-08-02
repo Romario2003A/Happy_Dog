@@ -391,6 +391,11 @@ async function loadData() {
   }
 }
 
+async function refreshInventory() {
+  const response = await api.get('/inventory');
+  inventory.value = response.data;
+}
+
 function resetProductForm() {
   productForm.value = defaultProductForm();
 }
@@ -609,11 +614,15 @@ async function saveCashMovement() {
   error.value = '';
   success.value = '';
   try {
-    await api.post('/cash/movements', cashPayload());
+    const payload = cashPayload();
+    await api.post('/cash/movements', payload);
     success.value = 'Movimiento de caja registrado.';
     resetCashForm();
     showCashForm.value = false;
-    await loadCash();
+    await Promise.all([
+      loadCash(),
+      payload.productId ? refreshInventory() : Promise.resolve(),
+    ]);
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo registrar el movimiento.';
   } finally {
@@ -631,7 +640,10 @@ async function deleteCashMovement(movement) {
   try {
     await api.delete(`/cash/movements/${movement.id}`);
     success.value = 'Movimiento eliminado.';
-    await loadCash();
+    await Promise.all([
+      loadCash(),
+      movement.productId ? refreshInventory() : Promise.resolve(),
+    ]);
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo eliminar el movimiento.';
   } finally {
