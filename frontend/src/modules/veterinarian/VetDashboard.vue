@@ -11,6 +11,7 @@ import { isVetDraftCompatible, vetDraftKey } from '../../utils/vetDraft';
 import {
   generateOriginalConsultationPdf,
   generateOriginalHistoryPdf,
+  generateOriginalPrescriptionPdf,
   generateOriginalSurgeryPdf,
 } from './originalDocuments';
 
@@ -714,7 +715,7 @@ function createPrintDocument() {
   return printDocument;
 }
 
-function generatePrescriptionPdf() {
+async function generatePrescriptionPdf() {
   if (!selectedPet.value) {
     error.value = 'Selecciona un paciente antes de generar la receta.';
     return;
@@ -728,88 +729,29 @@ function generatePrescriptionPdf() {
     return;
   }
 
-  const prescriptionRows = `
-      <tr>
-        <td>${escapeHtml(selectedMedicationName.value)}</td>
-        <td>${escapeHtml(prescription.value.quantity || 1)}</td>
-        <td>${escapeHtml(prescription.value.dosage || '-')}</td>
-        <td>${escapeHtml(prescription.value.instructions || '-')}</td>
-      </tr>
-    `;
-
-  const printWindow = createPrintDocument();
-  if (!printWindow) {
-    error.value = 'No se pudo preparar el documento para impresión.';
-    return;
+  error.value = '';
+  try {
+    await generateOriginalPrescriptionPdf({
+      pet: selectedPet.value,
+      client: selectedClient.value || {},
+      prescription: {
+        name: selectedMedicationName.value,
+        quantity: prescription.value.quantity || 1,
+        dosage: prescription.value.dosage,
+        instructions: prescription.value.instructions,
+      },
+      evaluation: {
+        reason: form.value.reason || selected.value?.reason || '',
+        diagnosis: buildDiagnosisText(),
+        treatment: buildTreatmentText(),
+        weight: form.value.weightKg || selectedPet.value.weightKg || '',
+      },
+      doctor: auth.user?.fullName || 'Doctor veterinario',
+      date: formatShortDate(),
+    });
+  } catch (e) {
+    error.value = e.message || 'No se pudo generar la receta en PDF.';
   }
-
-  printWindow.document.write(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Receta - ${escapeHtml(selectedPet.value.name || 'Paciente')}</title>
-        <style>
-          body{font-family:Arial,sans-serif;color:#172522;margin:36px}
-          .header{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #155b66;padding-bottom:18px;margin-bottom:22px}
-          .brand{display:flex;align-items:center;gap:12px;font-size:30px;font-weight:800;color:#155b66}
-          .brand img{width:70px;height:56px;object-fit:cover;border-radius:12px}
-          .muted{color:#66736f}
-          .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin:18px 0}
-          .box{border:1px solid #d9e8e3;border-radius:12px;padding:14px;margin:14px 0}
-          h1,h2{margin:0 0 10px}
-          table{width:100%;border-collapse:collapse;margin-top:10px}
-          th,td{border-bottom:1px solid #d9e8e3;text-align:left;padding:10px;vertical-align:top}
-          .signature{margin-top:64px;text-align:right}
-          .signature span{display:inline-block;border-top:1px solid #172522;padding:10px 42px 0}
-          @media print{button{display:none}body{margin:24px}}
-        </style>
-      </head>
-      <body>
-        <section class="header">
-          <div>
-            <div class="brand"><img src="${happyDogLogo}" alt="Happy Dog"><span>Happy Dog</span></div>
-            <div class="muted">Receta veterinaria oficial</div>
-          </div>
-          <div>
-            <strong>Fecha:</strong> ${escapeHtml(formatDate(new Date()))}<br>
-            <strong>Veterinario:</strong> ${escapeHtml(auth.user?.fullName || 'Doctor veterinario')}
-          </div>
-        </section>
-
-        <section class="box">
-          <h2>Paciente</h2>
-          <div class="grid">
-            <div><strong>Mascota:</strong> ${escapeHtml(selectedPet.value.name || '-')}</div>
-            <div><strong>Especie:</strong> ${escapeHtml(selectedPet.value.species || '-')}</div>
-            <div><strong>Raza:</strong> ${escapeHtml(selectedPet.value.breed || '-')}</div>
-            <div><strong>Dueño:</strong> ${escapeHtml(selectedClient.value?.fullName || '-')}</div>
-            <div><strong>Peso actual:</strong> ${escapeHtml(form.value.weightKg || selectedPet.value.weightKg || '-')} kg</div>
-            <div><strong>Temperatura:</strong> ${escapeHtml(form.value.temperatureC || '-')} C</div>
-          </div>
-        </section>
-
-        <section class="box">
-          <h2>Evaluación</h2>
-          <p><strong>Motivo:</strong> ${escapeHtml(form.value.reason || selected.value?.reason || '-')}</p>
-          <p><strong>Diagnóstico:</strong> ${escapeHtml(buildDiagnosisText() || '-')}</p>
-          <p><strong>Evolución / tratamiento:</strong> ${escapeHtml(buildTreatmentText() || '-')}</p>
-          <p><strong>Observaciones:</strong> ${escapeHtml(buildObservationNotes() || '-')}</p>
-        </section>
-
-        <section class="box">
-          <h2>Medicación indicada</h2>
-          <table>
-            <thead><tr><th>Producto</th><th>Cantidad</th><th>Dosis</th><th>Indicaciones</th></tr></thead>
-            <tbody>${prescriptionRows}</tbody>
-          </table>
-        </section>
-
-        <div class="signature"><span>Firma y sello</span></div>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-  window.setTimeout(() => printWindow.print(), 250);
 }
 
 function generateLegacyClinicalHistoryPdf() {

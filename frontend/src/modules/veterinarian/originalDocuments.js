@@ -112,6 +112,25 @@ function speciesFlags(pet) {
   };
 }
 
+function formatWeight(value) {
+  const text = safeText(value).trim();
+  if (!text) return '-';
+  return /\bkg\b/i.test(text) ? text : `${text} kg`;
+}
+
+function examSummary(value, other = '') {
+  if (!value || typeof value !== 'object') return [safeText(value), safeText(other)].filter(Boolean).join(', ');
+  const labels = {
+    ecografia: 'Ecografía', rayosX: 'Rayos X', hemograma: 'Hemograma', test: 'Test', heces: 'Examen de heces',
+    orina: 'Examen de orina', tgoTgpFas: 'TGO, TGP y FAS', citologia: 'Citología', raspadoPiel: 'Raspado de piel',
+    ureaCrea: 'Urea y creatinina', otros: 'Otros',
+  };
+  return [
+    ...Object.entries(value).filter(([, selected]) => selected).map(([key]) => labels[key] || key),
+    safeText(other),
+  ].filter(Boolean).join(', ');
+}
+
 function drawConsultationBlock(page, font, consultation, topY) {
   const exams = consultation.exams && typeof consultation.exams === 'object'
     ? Object.entries(consultation.exams).filter(([, selected]) => selected).map(([name]) => name).join(', ')
@@ -206,7 +225,7 @@ export async function generateOriginalConsultationPdf(data) {
   field(page1, 'Raza', pet.breed, margin + third * 2, 603, third, 30);
   field(page1, 'Sexo', sex.female ? 'Hembra' : sex.male ? 'Macho' : pet.sex, margin, 573, third, 30);
   field(page1, 'Edad', pet.age, margin + third, 573, third, 30);
-  field(page1, 'Peso', consultation.weight || pet.weightKg ? `${consultation.weight || pet.weightKg} kg` : '-', margin + third * 2, 573, third, 30);
+  field(page1, 'Peso', formatWeight(consultation.weight || pet.weightKg), margin + third * 2, 573, third, 30);
   field(page1, 'Color', pet.color, margin, 543, third, 30);
   field(page1, 'Esterilizado', pet.sterilized === true ? 'Sí' : pet.sterilized === false ? 'No' : '-', margin + third, 543, third, 30);
   field(page1, 'Procedencia', pet.origin, margin + third * 2, 543, third, 30);
@@ -259,8 +278,11 @@ export async function generateOriginalConsultationPdf(data) {
   const table = (title, rows, yTop, emptyProductLabel) => {
     sectionTitle(page2, title, yTop);
     const x = margin;
-    const widths = [82, 158, 91, 192.32];
-    const labels = ['Fecha', emptyProductLabel, 'Próxima cita', 'Médico responsable'];
+    const deworming = emptyProductLabel === 'Producto';
+    const widths = deworming ? [72, 150, 58, 150, 93.32] : [82, 165, 175, 101.32];
+    const labels = deworming
+      ? ['Fecha', 'Desparasitante', 'Peso', 'Firma y sello', 'Próxima cita']
+      : ['Fecha', 'Vacuna', 'Firma y sello', 'Próxima cita'];
     let headerX = x;
     widths.forEach((width, index) => {
       page2.drawRectangle({ x: headerX, y: yTop - 28, width, height: 26, color: colors.teal, borderColor: colors.white, borderWidth: 0.5 });
@@ -272,7 +294,9 @@ export async function generateOriginalConsultationPdf(data) {
       const item = visibleRows[rowIndex] || {};
       const rowY = yTop - 54 - rowIndex * 31;
       const hasRecord = Boolean(item.appliedAt || item.productName || item.nextAppointmentAt || item.doctor);
-      const values = [item.appliedAt || '', item.productName || '', item.nextAppointmentAt || '', hasRecord ? (item.doctor || doctor || '') : ''];
+      const values = deworming
+        ? [item.appliedAt || '', item.productName || '', item.weight || '', hasRecord ? (item.doctor || doctor || '') : '', item.nextAppointmentAt || '']
+        : [item.appliedAt || '', item.productName || '', hasRecord ? (item.doctor || doctor || '') : '', item.nextAppointmentAt || ''];
       let cellX = x;
       widths.forEach((width, index) => {
         page2.drawRectangle({ x: cellX, y: rowY, width, height: 31, color: rowIndex % 2 ? colors.paleBlue : colors.white, borderColor: colors.line, borderWidth: 0.55 });
@@ -291,6 +315,88 @@ export async function generateOriginalConsultationPdf(data) {
   const bytes = await pdf.save();
   if (data.returnBytes) return bytes;
   openGeneratedPdf(bytes, `historia-clinica-consulta-${safeText(pet.name) || 'paciente'}.pdf`);
+}
+
+export async function generateOriginalPrescriptionPdf(data) {
+  const { PDFDocument, StandardFonts, rgb } = await loadPdfLib();
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595.32, 841.92]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const logo = await pdf.embedPng(await fetchBytes('/documents/happy-dog-pdf-logo.png'));
+  const { pet = {}, client = {}, prescription = {}, evaluation = {}, doctor = '', date = '' } = data;
+  const colors = {
+    teal: rgb(0.082, 0.357, 0.4), mint: rgb(0.52, 0.82, 0.66), pale: rgb(0.94, 0.975, 0.965),
+    paleBlue: rgb(0.94, 0.97, 0.975), muted: rgb(0.36, 0.44, 0.42), line: rgb(0.76, 0.84, 0.82), white: rgb(1, 1, 1),
+  };
+  const margin = 42;
+  const contentWidth = 511.32;
+  const section = (title, y) => {
+    page.drawRectangle({ x: margin, y, width: contentWidth, height: 23, color: colors.pale });
+    page.drawRectangle({ x: margin, y, width: 5, height: 23, color: colors.mint });
+    draw(page, bold, title.toUpperCase(), margin + 13, y + 7, { size: 8.5, maxWidth: contentWidth - 22 });
+  };
+  const field = (label, value, x, y, width, height = 38) => {
+    page.drawRectangle({ x, y, width, height, color: colors.white, borderColor: colors.line, borderWidth: 0.7 });
+    draw(page, bold, label.toUpperCase(), x + 8, y + height - 12, { size: 6, maxWidth: width - 16 });
+    draw(page, font, value || '-', x + 8, y + 9, { size: 8.5, maxWidth: width - 16 });
+  };
+  const textBox = (label, value, x, y, width, height, maxLines = 6) => {
+    page.drawRectangle({ x, y, width, height, color: colors.white, borderColor: colors.line, borderWidth: 0.7 });
+    draw(page, bold, label.toUpperCase(), x + 9, y + height - 14, { size: 6.5, maxWidth: width - 18 });
+    drawBlock(page, font, value || '-', x + 9, y + height - 31, width - 18, { size: 8, lineHeight: 10, maxLines });
+  };
+
+  page.drawRectangle({ x: margin, y: 743, width: contentWidth, height: 70, color: colors.paleBlue });
+  page.drawRectangle({ x: margin, y: 743, width: 7, height: 70, color: colors.teal });
+  page.drawImage(logo, { x: 55, y: 753, width: 50, height: 50 });
+  draw(page, bold, 'RECETA VETERINARIA', 119, 782, { size: 18, maxWidth: 260, color: colors.teal });
+  draw(page, font, 'Happy Dog - indicaciones médicas', 119, 761, { size: 9, maxWidth: 260, color: colors.muted });
+  draw(page, bold, `Fecha: ${date || '-'}`, 407, 784, { size: 7.5, maxWidth: 130 });
+  draw(page, font, `Historia: ${historyCode(pet) || '-'}`, 407, 765, { size: 7.5, maxWidth: 130 });
+
+  section('Paciente y propietario', 706);
+  field('Paciente', pet.name, margin, 659, 170.44);
+  field('Especie / raza', [pet.species, pet.breed].filter(Boolean).join(' - '), margin + 170.44, 659, 170.44);
+  field('Peso actual', formatWeight(evaluation.weight || pet.weightKg), margin + 340.88, 659, 170.44);
+  field('Propietario', client.fullName, margin, 616, 310);
+  field('Teléfono', client.phone, margin + 310, 616, 201.32);
+
+  section('Evaluación médica', 579);
+  textBox('Motivo', evaluation.reason, margin, 518, contentWidth, 58, 3);
+  textBox('Diagnóstico', evaluation.diagnosis, margin, 440, contentWidth, 74, 5);
+
+  section('Medicación indicada', 403);
+  const columns = [205, 58, 86, 162.32];
+  const headers = ['Medicamento', 'Cant.', 'Dosis', 'Indicaciones'];
+  let x = margin;
+  columns.forEach((width, index) => {
+    page.drawRectangle({ x, y: 370, width, height: 30, color: colors.teal, borderColor: colors.white, borderWidth: 0.5 });
+    draw(page, bold, headers[index], x + 7, 381, { size: 7, maxWidth: width - 14, color: colors.white });
+    x += width;
+  });
+  const values = [prescription.name, String(prescription.quantity || 1), prescription.dosage, prescription.instructions];
+  x = margin;
+  columns.forEach((width, index) => {
+    page.drawRectangle({ x, y: 283, width, height: 87, color: index % 2 ? colors.paleBlue : colors.white, borderColor: colors.line, borderWidth: 0.6 });
+    drawBlock(page, font, values[index] || '-', x + 7, 352, width - 14, { size: 8, lineHeight: 10, maxLines: 7 });
+    x += width;
+  });
+
+  textBox('Tratamiento y recomendaciones adicionales', evaluation.treatment, margin, 190, contentWidth, 76, 5);
+  draw(page, bold, 'MÉDICO VETERINARIO', margin, 145, { size: 7, maxWidth: 150 });
+  draw(page, font, doctor || '-', margin, 128, { size: 9, maxWidth: 250 });
+  page.drawLine({ start: { x: 352, y: 126 }, end: { x: 529, y: 126 }, color: colors.muted, thickness: 0.8 });
+  draw(page, font, 'Firma y sello', 410, 110, { size: 7, maxWidth: 90 });
+  page.drawRectangle({ x: margin, y: 53, width: contentWidth, height: 35, color: colors.pale });
+  draw(page, font, 'Siga únicamente las indicaciones del médico veterinario. Ante una reacción adversa, comuníquese con Happy Dog.', margin + 12, 67, { size: 7, maxWidth: contentWidth - 24, color: colors.muted });
+  page.drawLine({ start: { x: margin, y: 31 }, end: { x: margin + contentWidth, y: 31 }, color: colors.line, thickness: 0.7 });
+  draw(page, font, 'Receta veterinaria - Happy Dog', margin, 17, { size: 6.5, maxWidth: 220 });
+  draw(page, font, 'Documento generado desde el sistema médico', 362, 17, { size: 6.5, maxWidth: 191 });
+
+  const bytes = await pdf.save();
+  if (data.returnBytes) return bytes;
+  openGeneratedPdf(bytes, `receta-${safeText(pet.name) || 'paciente'}.pdf`);
 }
 
 export async function generateOriginalHistoryPdf(data) {
@@ -340,8 +446,9 @@ export async function generateOriginalHistoryPdf(data) {
   };
   const table = (page,title,rows,yTop,productLabel) => {
     section(page,title,yTop);
-    const widths=[82,158,91,192.32];
-    const labels=['Fecha',productLabel,'Próxima cita','Médico responsable'];
+    const deworming=productLabel==='Producto';
+    const widths=deworming?[72,150,58,150,93.32]:[82,165,175,101.32];
+    const labels=deworming?['Fecha','Desparasitante','Peso','Firma y sello','Próxima cita']:['Fecha','Vacuna','Firma y sello','Próxima cita'];
     let x=margin;
     widths.forEach((width,index)=>{
       page.drawRectangle({x,y:yTop-28,width,height:26,color:colors.teal,borderColor:colors.white,borderWidth:.5});
@@ -352,7 +459,9 @@ export async function generateOriginalHistoryPdf(data) {
       const item=rows[rowIndex] || {};
       const rowY=yTop-54-rowIndex*31;
       const hasRecord=Boolean(item.appliedAt || item.productName || item.nextAppointmentAt || item.doctor);
-      const values=[item.appliedAt || '',item.productName || '',item.nextAppointmentAt || '',hasRecord?(item.doctor || ''):''];
+      const values=deworming
+        ?[item.appliedAt || '',item.productName || '',item.weight || '',hasRecord?(item.doctor || ''):'',item.nextAppointmentAt || '']
+        :[item.appliedAt || '',item.productName || '',hasRecord?(item.doctor || ''):'',item.nextAppointmentAt || ''];
       let cellX=margin;
       widths.forEach((width,index)=>{
         page.drawRectangle({x:cellX,y:rowY,width,height:31,color:rowIndex%2?colors.paleBlue:colors.white,borderColor:colors.line,borderWidth:.55});
@@ -374,7 +483,8 @@ export async function generateOriginalHistoryPdf(data) {
   field(summary,'Nombre',pet.name,margin,603,third);
   field(summary,'Especie',pet.species,margin+third,603,third);
   field(summary,'Raza',pet.breed,margin+third*2,603,third);
-  field(summary,'Sexo',pet.sex,margin,573,third);
+  const historySex=sexFlags(pet);
+  field(summary,'Sexo',historySex.female?'Hembra':historySex.male?'Macho':pet.sex,margin,573,third);
   field(summary,'Edad',pet.age,margin+third,573,third);
   field(summary,'Peso base',pet.weightKg?`${pet.weightKg} kg`:'-',margin+third*2,573,third);
   field(summary,'Color',pet.color,margin,543,third);
@@ -405,7 +515,7 @@ export async function generateOriginalHistoryPdf(data) {
     vitalWidths.forEach((width,cellIndex)=>{field(page,labels[cellIndex],values[cellIndex],x,686,width,34);x+=width;});
     textBox(page,'Anamnesis y exploración física',consultation.anamnesis,margin,520,contentWidth,150,12);
     section(page,'Exámenes complementarios',493);
-    textBox(page,'Exámenes realizados',consultation.exams,margin,425,contentWidth,66,4);
+    textBox(page,'Exámenes realizados',examSummary(consultation.exams,consultation.examOther),margin,425,contentWidth,66,4);
     section(page,'Diagnóstico',398);
     textBox(page,'Diagnóstico presuntivo',consultation.presumptiveDx,margin,332,261.66,64,4);
     textBox(page,'Diagnóstico definitivo',consultation.definitiveDx,297.66,332,261.66,64,4);
