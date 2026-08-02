@@ -31,4 +31,34 @@ describe('CashService daily closing', () => {
       paymentMethod: 'CASH',
     } as any)).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('lists charges by completion day and returns service metadata for cash classification', async () => {
+    const prisma = {
+      appointment: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new CashService(prisma as any);
+
+    await service.pendingAppointments('2026-08-02');
+
+    const query = prisma.appointment.findMany.mock.calls[0][0];
+    expect(query.where.OR).toEqual([
+      { completedAt: { gte: expect.any(Date), lte: expect.any(Date) } },
+      { completedAt: null, scheduledAt: { gte: expect.any(Date), lte: expect.any(Date) } },
+    ]);
+    expect(query.where.sale).toEqual({ is: null });
+    expect(query.include.service.select).toMatchObject({ category: true, condition: true, priceLabel: true });
+  });
+
+  it('rejects collecting an appointment that is not finished', async () => {
+    const prisma = {
+      cashClosing: { findUnique: jest.fn().mockResolvedValue(null) },
+      appointment: { findUnique: jest.fn().mockResolvedValue({ id: 'a1', status: 'CONFIRMED', clientId: 'c1', petId: 'p1', sale: null }) },
+    };
+    const service = new CashService(prisma as any);
+
+    await expect(service.createMovement({
+      type: 'INCOME', category: 'SURGERY', description: 'Cesárea', amount: 500,
+      paymentMethod: 'CASH', appointmentId: 'a1', clientId: 'c1', petId: 'p1',
+    } as any)).rejects.toThrow('Solo se puede cobrar una atención terminada.');
+  });
 });

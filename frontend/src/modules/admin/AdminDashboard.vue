@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import { api } from '../../services/api';
 import { daysUntilDateOnly, formatDateOnly } from '../../utils/dateOnly';
+import { appointmentCashCategory, appointmentServiceLabel } from '../../utils/cashAppointment';
 
 const route = useRoute();
 const router = useRouter();
@@ -745,20 +746,6 @@ async function toggleService(service) {
   } finally {
     saving.value = false;
   }
-}
-
-function appointmentServiceLabel(appointment) {
-  if (appointment.service?.name) return appointment.service.name;
-  const type = String(appointment.notes || '').match(/SERVICE_TYPE:([A-Z_]+)/)?.[1];
-  return ({ GROOMING: 'Baño y corte', VACCINE: 'Vacuna o desparasitación', SURGERY: 'Cirugía', MEDICAL: 'Consulta médica' })[type] || appointment.reason || 'Atención';
-}
-
-function appointmentCashCategory(appointment) {
-  const text = `${appointment.service?.name || ''} ${appointment.notes || ''} ${appointment.reason || ''}`.toUpperCase();
-  if (text.includes('GROOM') || text.includes('BAÑO') || text.includes('BANO') || text.includes('CORTE')) return 'GROOMING';
-  if (text.includes('VACUN') || text.includes('DESPARASIT')) return 'VACCINE';
-  if (text.includes('CIRUG')) return 'SURGERY';
-  return 'CONSULTATION';
 }
 
 function selectPendingCharge(appointment) {

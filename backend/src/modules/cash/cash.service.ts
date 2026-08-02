@@ -37,14 +37,18 @@ export class CashService {
     const appointments = await (this.prisma as any).appointment.findMany({
       where: {
         status: 'ATTENDED',
-        scheduledAt: { gte: start, lte: end },
+        OR: [
+          { completedAt: { gte: start, lte: end } },
+          { completedAt: null, scheduledAt: { gte: start, lte: end } },
+        ],
         cashMovements: { none: { type: { in: ['INCOME', 'DEBT_PAYMENT'] } } },
+        sale: { is: null },
       },
       orderBy: { scheduledAt: 'asc' },
       include: {
         client: { select: { id: true, fullName: true, phone: true, email: true } },
         pet: { select: { id: true, name: true, species: true, breed: true } },
-        service: { select: { id: true, name: true, price: true } },
+        service: { select: { id: true, name: true, category: true, condition: true, price: true, priceLabel: true } },
       },
     });
 
@@ -111,6 +115,15 @@ export class CashService {
     await this.assertDayOpen(dto.occurredAt || new Date());
 
     if (dto.appointmentId && dto.type !== CashMovementType.EXPENSE) {
+      const appointment = await (this.prisma as any).appointment.findUnique({
+        where: { id: dto.appointmentId },
+        select: { id: true, status: true, clientId: true, petId: true, sale: { select: { id: true, status: true } } },
+      });
+      if (!appointment) throw new BadRequestException('La atención seleccionada no existe.');
+      if (appointment.status !== 'ATTENDED') throw new BadRequestException('Solo se puede cobrar una atención terminada.');
+      if (dto.clientId && dto.clientId !== appointment.clientId) throw new BadRequestException('El cliente no corresponde a la atención.');
+      if (dto.petId && dto.petId !== appointment.petId) throw new BadRequestException('La mascota no corresponde a la atención.');
+      if (appointment.sale) throw new BadRequestException('Esta atención ya tiene una cuenta por cobrar. Registra el pago desde esa cuenta.');
       const existing = await (this.prisma as any).cashMovement.findFirst({
         where: {
           appointmentId: dto.appointmentId,
@@ -253,12 +266,23 @@ export class CashService {
     if (initialPayment > total) throw new BadRequestException('El adelanto no puede superar el total.');
     if(initialPayment>0) await this.assertDayOpen(new Date());
 
-    const [client, pet] = await Promise.all([
+    const [client, pet, appointment] = await Promise.all([
       (this.prisma as any).client.findUnique({ where: { id: dto.clientId } }),
       dto.petId ? (this.prisma as any).pet.findUnique({ where: { id: dto.petId } }) : null,
+      dto.appointmentId ? (this.prisma as any).appointment.findUnique({
+        where: { id: dto.appointmentId },
+        include: { sale: { select: { id: true } }, cashMovements: { where: { type: { in: ['INCOME', 'DEBT_PAYMENT'] } }, select: { id: true } } },
+      }) : null,
     ]);
     if (!client) throw new BadRequestException('El cliente seleccionado no existe.');
     if (dto.petId && (!pet || pet.clientId !== dto.clientId)) throw new BadRequestException('La mascota no pertenece al cliente seleccionado.');
+    if (dto.appointmentId) {
+      if (!appointment) throw new BadRequestException('La atención seleccionada no existe.');
+      if (appointment.status !== 'ATTENDED') throw new BadRequestException('Solo se puede generar una cuenta para una atención terminada.');
+      if (appointment.clientId !== dto.clientId) throw new BadRequestException('El cliente no corresponde a la atención.');
+      if (dto.petId && appointment.petId !== dto.petId) throw new BadRequestException('La mascota no corresponde a la atención.');
+      if (appointment.sale || appointment.cashMovements.length) throw new BadRequestException('Esta atención ya fue cobrada o ya tiene una cuenta pendiente.');
+    }
 
     return (this.prisma as any).$transaction(async (tx: any) => {
       const sale = await tx.sale.create({
