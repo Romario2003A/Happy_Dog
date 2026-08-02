@@ -1,10 +1,31 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post } from '@nestjs/common';
 import { AppointmentStatus, PetSex } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 @Controller('public')
 export class PublicController {
   constructor(private prisma: PrismaService) {}
+
+  @Get('services')
+  services() {
+    return this.prisma.service.findMany({
+      where: { active: true },
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        species: true,
+        condition: true,
+        price: true,
+        maxPrice: true,
+        socialPrice: true,
+        priceLabel: true,
+        requiresQuote: true,
+        durationMinutes: true,
+      },
+    });
+  }
 
   @Post('appointment-request')
   async request(@Body() body: any) {
@@ -14,9 +35,14 @@ export class PublicController {
     const petName = String(body.petName || '').trim();
     const reason = String(body.reason || '').trim();
     const scheduledAt = new Date(body.scheduledAt);
+    const serviceId = String(body.serviceId || '').trim();
+    const service = serviceId
+      ? await this.prisma.service.findFirst({ where: { id: serviceId, active: true } })
+      : null;
 
-    if (!fullName || !phone || !petName || !reason || Number.isNaN(scheduledAt.getTime())) {
-      throw new BadRequestException('Completa nombre, WhatsApp, mascota, fecha y motivo de la visita.');
+    if (serviceId && !service) throw new BadRequestException('El servicio seleccionado ya no está disponible.');
+    if (!fullName || !phone || !petName || (!reason && !service) || Number.isNaN(scheduledAt.getTime())) {
+      throw new BadRequestException('Completa nombre, WhatsApp, mascota, fecha y servicio solicitado.');
     }
 
     let client = await this.prisma.client.findFirst({
@@ -64,6 +90,10 @@ export class PublicController {
         scheduledAt,
         status: AppointmentStatus.PENDING,
         notes: 'CLIENT_REQUESTED_DATE_ONLY',
+        serviceId: service?.id,
+        quotedPrice: service && !service.requiresQuote ? Number(service.price) : undefined,
+        priceNote: service?.priceLabel || undefined,
+        durationMinutes: service?.durationMinutes || undefined,
       },
     });
   }

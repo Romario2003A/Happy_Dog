@@ -1,9 +1,10 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { api } from '../../services/api';
 import doctorDog from '../../assets/images/happy-dog-doctor-teal.webp';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import happyDogLocation from '../../assets/images/happy-dog-location.jpeg';
+import { serviceDisplayLabel } from '../../utils/serviceDisplay';
 
 const facebookUrl = 'https://www.facebook.com/share/1DARyzQs2j/';
 const whatsappUrl = 'https://wa.me/51953280579';
@@ -17,12 +18,42 @@ const form = ref({
   sex: 'UNKNOWN',
   age: '',
   weightKg: '',
+  serviceCategory: '',
+  serviceId: '',
   reason: '',
   scheduledAt: '',
 });
+const services = ref([]);
 const sent = ref(false);
 const error = ref('');
 const loading = ref(false);
+const serviceCategories = computed(() => [...new Set(services.value.map(service => service.category || 'Otros'))].sort());
+const availableServices = computed(() => services.value.filter(service => (service.category || 'Otros') === form.value.serviceCategory));
+const selectedService = computed(() => services.value.find(service => service.id === form.value.serviceId));
+
+function servicePriceLabel(service) {
+  if (!service) return '';
+  if (service.priceLabel) return service.priceLabel;
+  if (service.requiresQuote) return 'Precio por confirmar';
+  const minimum = Number(service.price || 0);
+  const maximum = service.maxPrice == null ? null : Number(service.maxPrice);
+  return maximum && maximum !== minimum ? `S/ ${minimum.toFixed(2)} - S/ ${maximum.toFixed(2)}` : `S/ ${minimum.toFixed(2)}`;
+}
+
+function serviceOptionLabel(service) {
+  return `${serviceDisplayLabel(service)} — ${servicePriceLabel(service)}`;
+}
+
+async function loadServices() {
+  try {
+    const response = await api.get('/public/services');
+    services.value = response.data;
+  } catch {
+    error.value = 'No se pudo cargar el tarifario. Intenta nuevamente en unos segundos.';
+  }
+}
+
+onMounted(loadServices);
 
 async function submit() {
   error.value = '';
@@ -39,6 +70,11 @@ async function submit() {
     return;
   }
 
+  if (!selectedService.value) {
+    error.value = 'Selecciona la atención que necesita tu mascota.';
+    return;
+  }
+
   loading.value = true;
   try {
     await api.post('/public/appointment-request', {
@@ -47,7 +83,8 @@ async function submit() {
       fullName: form.value.fullName.trim(),
       phone,
       petName: form.value.petName.trim(),
-      reason: `CLIENT_DATE_REQUEST::${form.value.reason.trim()}`,
+      serviceId: selectedService.value.id,
+      reason: `CLIENT_DATE_REQUEST::${[serviceDisplayLabel(selectedService.value), form.value.reason.trim()].filter(Boolean).join(' · ')}`,
       species: form.value.species || 'No especificada',
       sex: form.value.sex || 'UNKNOWN',
     });
@@ -99,7 +136,20 @@ async function submit() {
             <input v-model="form.scheduledAt" type="date" required>
             <small>Recepción te confirmará la hora disponible por WhatsApp.</small>
           </label>
-          <textarea v-model="form.reason" required placeholder="Motivo de la visita"></textarea>
+          <label>¿Qué atención necesita?
+            <select v-model="form.serviceCategory" required @change="form.serviceId = ''">
+              <option value="">Selecciona una categoría</option>
+              <option v-for="category in serviceCategories" :key="category" :value="category">{{ category }}</option>
+            </select>
+          </label>
+          <label>Servicio y condición
+            <select v-model="form.serviceId" required :disabled="!form.serviceCategory">
+              <option value="">Selecciona una opción</option>
+              <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ serviceOptionLabel(service) }}</option>
+            </select>
+            <small v-if="selectedService">{{ servicePriceLabel(selectedService) }}</small>
+          </label>
+          <textarea v-model="form.reason" placeholder="Detalle adicional (opcional)"></textarea>
           <button :disabled="loading">{{ loading ? 'Enviando...' : 'Enviar y esperar confirmaci&oacute;n' }}</button>
         </form>
         <p v-if="error" class="error">{{ error }}</p>
