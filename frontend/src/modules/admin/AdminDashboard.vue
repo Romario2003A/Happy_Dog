@@ -16,6 +16,7 @@ const clients = ref([]);
 const appointments = ref([]);
 const pets = ref([]);
 const preventiveFollowUps = ref([]);
+const pendingClientDelete = ref(null);
 const adminTabs = ['resumen', 'servicios', 'inventario', 'clientes', 'caja', 'personal'];
 const active = ref(tabFromRoute());
 const error = ref('');
@@ -393,18 +394,13 @@ async function loadData() {
 }
 
 async function deleteClient(client) {
-  const petNames = client.pets?.map(pet => pet.name).filter(Boolean).join(', ') || 'sin mascotas';
-  const confirmed = window.confirm(
-    `¿Eliminar definitivamente a ${client.fullName} y sus datos vinculados (${petNames})? Esta acción no se puede deshacer.`,
-  );
-  if (!confirmed) return;
-
   saving.value = true;
   error.value = '';
   success.value = '';
   try {
     const { data } = await api.delete(`/clients/${client.id}`);
     success.value = `Cliente eliminado junto con ${data.pets || 0} mascota(s) y ${data.appointments || 0} cita(s).`;
+    pendingClientDelete.value = null;
     await loadData();
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo eliminar el cliente y sus datos vinculados.';
@@ -1126,7 +1122,7 @@ onMounted(async () => {
             <td>{{ client.fullName }}</td>
             <td>{{ client.phone || client.email || '-' }}</td>
             <td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td>
-            <td><button class="danger small" type="button" :disabled="saving" @click="deleteClient(client)">Eliminar</button></td>
+            <td><button class="danger small" type="button" :disabled="saving" @click="pendingClientDelete=client">Eliminar</button></td>
           </tr>
         </tbody>
       </table>
@@ -1471,6 +1467,19 @@ onMounted(async () => {
       <h2>Resumen administrativo</h2>
       <p class="muted-text">Usa las pestañas para gestionar inventario, clientes y caja. La agenda diaria vive en Recepción.</p>
     </section>
+
+    <div v-if="pendingClientDelete" class="client-delete-overlay" @click.self="pendingClientDelete=null">
+      <section class="glass-card client-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="client-delete-title">
+        <span class="badge">Confirmar eliminación</span>
+        <h2 id="client-delete-title">¿Eliminar a {{ pendingClientDelete.fullName }}?</h2>
+        <p>También se eliminarán sus mascotas y citas vinculadas. Esta acción no se puede deshacer.</p>
+        <p class="client-delete-pets"><strong>Mascotas:</strong> {{ pendingClientDelete.pets?.map(pet => pet.name).join(', ') || 'Ninguna' }}</p>
+        <div class="client-delete-actions">
+          <button class="secondary" type="button" :disabled="saving" @click="pendingClientDelete=null">Cancelar</button>
+          <button class="danger" type="button" :disabled="saving" @click="deleteClient(pendingClientDelete)">{{ saving ? 'Eliminando...' : 'Sí, eliminar definitivamente' }}</button>
+        </div>
+      </section>
+    </div>
   </AdminLayout>
 </template>
 
@@ -1852,6 +1861,27 @@ onMounted(async () => {
 .empty.compact {
   padding: 10px 0;
 }
+
+.client-delete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(10 33 36 / 44%);
+  backdrop-filter: blur(8px);
+}
+
+.client-delete-dialog {
+  width: min(460px, 100%);
+  padding: 26px;
+}
+
+.client-delete-dialog h2 { margin: 14px 0 8px; }
+.client-delete-dialog p { color: #60716d; }
+.client-delete-pets { padding: 12px; border-radius: 12px; background: #eef7f4; }
+.client-delete-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
 @media (max-width: 980px) {
   .cash-category-summary { grid-template-columns: 1fr; }
