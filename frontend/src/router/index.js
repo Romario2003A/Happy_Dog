@@ -31,7 +31,7 @@ const router=createRouter({history:createWebHistory(),routes});
 function homeByRole(role) {
  if(role==='CLIENT') return '/cliente/dashboard';
  if(role==='VETERINARIAN') return '/veterinario';
- if(role==='ADMIN') return '/admin';
+ if(role==='ADMIN') return '/recepcion';
  return '/recepcion';
 }
 

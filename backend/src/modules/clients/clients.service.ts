@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 @Injectable()
@@ -8,5 +8,44 @@ export class ClientsService {
   findOne(id:string){ return (this.prisma as any).client.findUnique({ where:{id}, include: { pets:true } }); }
   async create(dto:CreateClientDto){ return (this.prisma as any).client.create({ data: dto as any }); }
   update(id:string, dto:Partial<CreateClientDto>){ return (this.prisma as any).client.update({ where:{id}, data:dto as any }); }
-  remove(id:string){ return (this.prisma as any).client.delete({ where:{id} }); }
+  remove(id: string) {
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const client = await tx.client.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          pets: { select: { id: true } },
+          appointments: { select: { id: true } },
+          sales: { select: { id: true } },
+        },
+      });
+      if (!client) throw new NotFoundException('Cliente no encontrado.');
+
+      const petIds = client.pets.map((pet: { id: string }) => pet.id);
+      const appointmentIds = client.appointments.map((appointment: { id: string }) => appointment.id);
+
+      if (appointmentIds.length || petIds.length) {
+        await tx.medicalRecord.deleteMany({
+          where: {
+            OR: [
+              ...(appointmentIds.length ? [{ appointmentId: { in: appointmentIds } }] : []),
+              ...(petIds.length ? [{ petId: { in: petIds } }] : []),
+            ],
+          },
+        });
+      }
+      await tx.sale.deleteMany({ where: { clientId: id } });
+      await tx.appointment.deleteMany({ where: { clientId: id } });
+      await tx.pet.deleteMany({ where: { clientId: id } });
+      await tx.client.delete({ where: { id } });
+
+      return {
+        deleted: true,
+        clientId: id,
+        pets: petIds.length,
+        appointments: appointmentIds.length,
+        sales: client.sales.length,
+      };
+    });
+  }
 }

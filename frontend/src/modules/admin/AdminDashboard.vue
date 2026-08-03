@@ -392,6 +392,27 @@ async function loadData() {
   }
 }
 
+async function deleteClient(client) {
+  const petNames = client.pets?.map(pet => pet.name).filter(Boolean).join(', ') || 'sin mascotas';
+  const confirmed = window.confirm(
+    `¿Eliminar definitivamente a ${client.fullName} y sus datos vinculados (${petNames})? Esta acción no se puede deshacer.`,
+  );
+  if (!confirmed) return;
+
+  saving.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    const { data } = await api.delete(`/clients/${client.id}`);
+    success.value = `Cliente eliminado junto con ${data.pets || 0} mascota(s) y ${data.appointments || 0} cita(s).`;
+    await loadData();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo eliminar el cliente y sus datos vinculados.';
+  } finally {
+    saving.value = false;
+  }
+}
+
 async function refreshInventory() {
   const response = await api.get('/inventory');
   inventory.value = response.data;
@@ -1098,10 +1119,15 @@ onMounted(async () => {
     <section v-else-if="active==='clientes'" class="glass-card">
       <h2>Clientes registrados</h2>
       <table>
-        <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Contacto</th><th>Mascotas</th><th>Acciones</th></tr></thead>
         <tbody>
-          <tr v-if="!clients.length"><td colspan="3" class="empty">No hay clientes cargados en esta vista.</td></tr>
-          <tr v-for="client in clients" :key="client.id"><td>{{ client.fullName }}</td><td>{{ client.phone || client.email || '-' }}</td><td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td></tr>
+          <tr v-if="!clients.length"><td colspan="4" class="empty">No hay clientes cargados en esta vista.</td></tr>
+          <tr v-for="client in clients" :key="client.id">
+            <td>{{ client.fullName }}</td>
+            <td>{{ client.phone || client.email || '-' }}</td>
+            <td>{{ client.pets?.map(p => p.name).join(', ') || '-' }}</td>
+            <td><button class="danger small" type="button" :disabled="saving" @click="deleteClient(client)">Eliminar</button></td>
+          </tr>
         </tbody>
       </table>
     </section>

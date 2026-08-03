@@ -17,7 +17,7 @@ const accountForm = ref({ currentPassword: '', newPassword: '', confirmPassword:
 function goHome() {
   if (auth.role === 'CLIENT') return router.push('/cliente/dashboard');
   if (auth.role === 'VETERINARIAN') return router.push('/veterinario');
-  if (auth.role === 'ADMIN') return router.push('/admin');
+  if (auth.role === 'ADMIN') return router.push('/recepcion');
   return router.push('/recepcion');
 }
 

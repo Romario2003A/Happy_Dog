@@ -13,7 +13,7 @@ const loading = ref(false);
 
 function pathByRole(role) {
   if (role === 'VETERINARIAN') return '/veterinario';
-  if (role === 'ADMIN') return '/admin';
+  if (role === 'ADMIN') return '/recepcion';
   if (role === 'RECEPTIONIST') return '/recepcion';
   if (role === 'CLIENT') return '/cliente/dashboard';
   return '/cliente';
