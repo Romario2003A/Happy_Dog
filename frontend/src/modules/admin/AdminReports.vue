@@ -304,15 +304,15 @@ onMounted(loadReport);
         </div>
 
         <div v-else-if="reportView === 'staff'" class="report-table-scroll">
-          <table><thead><tr><th>NOMBRE</th><th>CORREO</th><th>ROL</th><th>HORARIO DE TRABAJO</th><th>ESTADO</th></tr></thead>
+          <table><thead><tr><th>NOMBRE</th><th>CARGO</th><th>HORARIO DE TRABAJO</th><th>CUENTA DE ACCESO</th><th>ESTADO</th></tr></thead>
           <tbody><tr v-if="!filteredStaff.length"><td colspan="5" class="report-empty-cell">No hay personal registrado con este criterio.</td></tr>
-          <tr v-for="row in filteredStaff" :key="row.id"><td><strong>{{ row.fullName }}</strong></td><td>{{ row.email }}</td><td>{{ roleLabels[row.role] || row.role }}</td><td>{{ row.workSchedule || 'No especificado' }}</td><td><span class="report-status" :data-status="row.active ? 'ATTENDED' : 'CANCELLED'">{{ row.active ? 'Activo' : 'Inactivo' }}</span></td></tr></tbody></table>
+          <tr v-for="row in filteredStaff" :key="row.id"><td><strong>{{ row.fullName }}</strong></td><td>{{ row.jobTitle }}</td><td>{{ row.workSchedule || 'No especificado' }}</td><td>{{ row.user?.email || 'No necesita acceso' }}<small v-if="row.user">{{ roleLabels[row.user.role] || row.user.role }}</small></td><td><span class="report-status" :data-status="row.active ? 'ATTENDED' : 'CANCELLED'">{{ row.active ? 'Activo' : 'Inactivo' }}</span></td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'payroll'" class="report-table-scroll">
           <table><thead><tr><th>MES</th><th>TRABAJADOR</th><th>ROL</th><th>ESTADO</th><th>FECHA DE PAGO</th><th>MÉTODO</th><th>REFERENCIA</th><th>MONTO</th></tr></thead>
           <tbody><tr v-if="!filteredPayroll.length"><td colspan="8" class="report-empty-cell">No hay pagos del personal en este periodo.</td></tr>
-          <tr v-for="row in filteredPayroll" :key="row.id"><td><strong>{{ row.period }}</strong></td><td>{{ row.staffName }}</td><td>{{ roleLabels[row.staffRole] || row.staffRole }}</td><td><span class="report-status" :data-status="row.status === 'PAID' ? 'ATTENDED' : row.status">{{ row.status === 'PAID' ? 'Pagado' : row.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente' }}</span></td><td>{{ formatDateTime(row.paidAt) }}</td><td>{{ paymentLabels[row.paymentMethod] || '—' }}</td><td>{{ row.referenceCode || '—' }}</td><td class="total-cell">S/ {{ money(row.amount) }}</td></tr></tbody></table>
+          <tr v-for="row in filteredPayroll" :key="row.id"><td><strong>{{ row.period }}</strong></td><td>{{ row.staffName }}</td><td>{{ row.jobTitle }}</td><td><span class="report-status" :data-status="row.status === 'PAID' ? 'ATTENDED' : row.status">{{ row.status === 'PAID' ? 'Pagado' : row.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente' }}</span></td><td>{{ formatDateTime(row.paidAt) }}</td><td>{{ paymentLabels[row.paymentMethod] || '—' }}</td><td>{{ row.referenceCode || '—' }}</td><td class="total-cell">S/ {{ money(row.amount) }}</td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'preventive'" class="report-table-scroll">

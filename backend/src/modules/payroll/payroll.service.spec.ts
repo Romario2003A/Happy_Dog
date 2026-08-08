@@ -5,7 +5,7 @@ import { PayrollService } from './payroll.service';
 describe('PayrollService workflow', () => {
   it('uses the configured monthly salary when creating a pending period', async () => {
     const prisma = {
-      user: { findUnique: jest.fn().mockResolvedValue({ id: 'staff-1', role: 'VETERINARIAN', monthlySalary: 1800 }) },
+      staffMember: { findUnique: jest.fn().mockResolvedValue({ id: 'staff-1', jobTitle: 'Veterinaria', monthlySalary: 1800 }) },
       payrollPayment: { create: jest.fn().mockResolvedValue({ id: 'pay-1', status: 'PENDING' }) },
     };
     const service = new PayrollService(prisma as any);

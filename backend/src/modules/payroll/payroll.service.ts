@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CashMovementCategory, CashMovementType, PayrollPaymentStatus, Prisma, Role } from '@prisma/client';
+import { CashMovementCategory, CashMovementType, PayrollPaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreatePayrollPaymentDto } from './dto/create-payroll-payment.dto';
 import { PayPayrollPaymentDto } from './dto/pay-payroll-payment.dto';
@@ -16,7 +16,7 @@ export class PayrollService {
       where: period ? { period } : undefined,
       orderBy: [{ period: 'desc' }, { createdAt: 'desc' }],
       include: {
-        staff: { select: { id: true, fullName: true, role: true, active: true, monthlySalary: true, payDay: true, bankAccount: true } },
+        staff: { select: { id: true, fullName: true, jobTitle: true, active: true, monthlySalary: true, payDay: true, bankAccount: true } },
         registeredBy: { select: { id: true, fullName: true } },
         cashMovement: { select: { id: true, occurredAt: true, amount: true } },
       },
@@ -24,8 +24,8 @@ export class PayrollService {
   }
 
   async create(dto: CreatePayrollPaymentDto, registeredById?: string) {
-    const staff = await this.prisma.user.findUnique({ where: { id: dto.staffId } });
-    if (!staff || staff.role === Role.CLIENT) throw new BadRequestException('El trabajador seleccionado no existe.');
+    const staff = await this.prisma.staffMember.findUnique({ where: { id: dto.staffId } });
+    if (!staff) throw new BadRequestException('El trabajador seleccionado no existe.');
     const amount = dto.amount == null ? Number(staff.monthlySalary || 0) : Number(dto.amount);
     if (amount <= 0) throw new BadRequestException('Registra un sueldo mensual o indica un monto mayor a cero.');
 
@@ -38,7 +38,7 @@ export class PayrollService {
           notes: dto.notes?.trim() || null,
           registeredById: registeredById || null,
         },
-        include: { staff: { select: { id: true, fullName: true, role: true, active: true, monthlySalary: true, payDay: true, bankAccount: true } } },
+        include: { staff: { select: { id: true, fullName: true, jobTitle: true, active: true, monthlySalary: true, payDay: true, bankAccount: true } } },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -95,7 +95,7 @@ export class PayrollService {
         where: { id },
         data: { cashMovementId: movement.id },
         include: {
-          staff: { select: { id: true, fullName: true, role: true, active: true, monthlySalary: true, payDay: true, bankAccount: true } },
+          staff: { select: { id: true, fullName: true, jobTitle: true, active: true, monthlySalary: true, payDay: true, bankAccount: true } },
           registeredBy: { select: { id: true, fullName: true } },
           cashMovement: { select: { id: true, occurredAt: true, amount: true } },
         },

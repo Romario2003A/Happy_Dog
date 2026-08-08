@@ -19,6 +19,7 @@ import { CashModule } from './modules/cash/cash.module';
 import { PreventiveCareModule } from './modules/preventive-care/preventive-care.module';
 import { ServicesModule } from './modules/services/services.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { StaffModule } from './modules/staff/staff.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { PayrollModule } from './modules/payroll/payroll.module';
     ReportsModule,
     CashModule,
     PayrollModule,
+    StaffModule,
   ],
   providers: [
     PrismaService,

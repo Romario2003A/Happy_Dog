@@ -9,7 +9,7 @@ describe('ReportsController classic view', () => {
       appointment: { findMany: jest.fn().mockResolvedValue(data.appointments || []) },
       preventiveCareRecord: { findMany: jest.fn().mockResolvedValue(data.preventive || []) },
       service: { findMany: jest.fn().mockResolvedValue(data.services || []) },
-      user: { findMany: jest.fn().mockResolvedValue(data.staff || []) },
+      staffMember: { findMany: jest.fn().mockResolvedValue(data.staff || []) },
       payrollPayment: { findMany: jest.fn().mockResolvedValue(data.payroll || []) },
     };
     return { controller: new ReportsController(prisma as any), prisma };
@@ -35,7 +35,7 @@ describe('ReportsController classic view', () => {
         veterinarian: { fullName: 'Doctora' },
       }],
       services: [{ id: 's1', name: 'Consulta', category: 'CONSULTAS', price: 30, active: true }],
-      staff: [{ id: 'u1', fullName: 'Doctora', email: 'doctor@happydog.com', role: 'VETERINARIAN', active: true }],
+      staff: [{ id: 'u1', fullName: 'Doctora', jobTitle: 'Veterinaria', active: true, user: { email: 'doctor@happydog.com', role: 'VETERINARIAN', active: true } }],
     });
 
     const report = await controller.classic('2026-08-01', '2026-08-31');
@@ -45,7 +45,7 @@ describe('ReportsController classic view', () => {
     expect(report.appointments[0]).toMatchObject({ diagnosis: 'Dermatitis', treatment: 'Baño medicado' });
     expect(report.preventiveRecords[0]).toMatchObject({ productName: 'Quíntuple', veterinarianName: 'Doctora' });
     expect(report.services[0]).toMatchObject({ name: 'Consulta', price: 30 });
-    expect(report.staff[0]).toMatchObject({ fullName: 'Doctora', role: 'VETERINARIAN' });
+    expect(report.staff[0]).toMatchObject({ fullName: 'Doctora', jobTitle: 'Veterinaria' });
     expect(report.summary).toMatchObject({ services: 1, staff: 1 });
   });
 

@@ -13,6 +13,7 @@ const summary = ref({});
 const inventory = ref([]);
 const services = ref([]);
 const staff = ref([]);
+const employees = ref([]);
 const clients = ref([]);
 const appointments = ref([]);
 const pets = ref([]);
@@ -42,6 +43,9 @@ const showStaffForm = ref(false);
 const editingStaffId = ref('');
 const staffForm = ref({ fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' });
 const staffWorkspace = ref('team');
+const showEmployeeForm = ref(false);
+const editingEmployeeId = ref('');
+const employeeForm = ref(defaultEmployeeForm());
 const payrollPayments = ref([]);
 const showPayrollForm = ref(false);
 const payrollForm = ref(defaultPayrollForm());
@@ -177,6 +181,10 @@ const cashInitialLoading = computed(() => cashLoading.value
   && pendingCharges.value.length === 0);
 const receivableTotal = computed(() => receivables.value.reduce((sum, item) => sum + Number(item.balance || 0), 0));
 const receivablePets = computed(() => clients.value.find(client => client.id === receivableForm.value.clientId)?.pets || []);
+const availableAccessAccounts = computed(() => staff.value.filter(account => {
+  const linkedEmployee = employees.value.find(member => member.userId === account.id);
+  return !linkedEmployee || linkedEmployee.id === editingEmployeeId.value;
+}));
 
 function openInventory() {
   setActive('inventario');
@@ -356,7 +364,7 @@ async function loadData() {
   adminLoading.value = true;
   error.value = '';
   try {
-    const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes, followUpsRes, payrollRes] = await Promise.allSettled([
+    const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes, followUpsRes, payrollRes, employeesRes] = await Promise.allSettled([
       api.get('/reports/summary'),
       api.get('/inventory'),
       api.get('/clients'),
@@ -366,6 +374,7 @@ async function loadData() {
       api.get('/users'),
       api.get('/preventive-care/follow-ups'),
       api.get('/payroll'),
+      api.get('/staff'),
     ]);
   preventiveFollowUps.value = followUpsRes.status === 'fulfilled' ? followUpsRes.value.data : [];
 
@@ -376,6 +385,7 @@ async function loadData() {
   if (servicesRes.status === 'fulfilled') services.value = servicesRes.value.data;
   if (staffRes.status === 'fulfilled') staff.value = staffRes.value.data.filter(user => user.role !== 'CLIENT');
   if (payrollRes.status === 'fulfilled') payrollPayments.value = payrollRes.value.data;
+  if (employeesRes.status === 'fulfilled') employees.value = employeesRes.value.data;
 
   if (summaryRes.status === 'fulfilled') {
     summary.value = summaryRes.value.data;
@@ -873,6 +883,59 @@ function resetStaffForm() {
   staffForm.value = { fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' };
 }
 
+function defaultEmployeeForm() {
+  return { fullName: '', jobTitle: '', documentNumber: '', phone: '', workSchedule: '', bankAccount: '', monthlySalary: null, payDay: 'Fin de mes', payrollReminder: '', userId: '' };
+}
+
+function editEmployee(member) {
+  editingEmployeeId.value = member.id;
+  employeeForm.value = {
+    fullName: member.fullName || '', jobTitle: member.jobTitle || '', documentNumber: member.documentNumber || '',
+    phone: member.phone || '', workSchedule: member.workSchedule || '', bankAccount: member.bankAccount || '',
+    monthlySalary: member.monthlySalary == null ? null : Number(member.monthlySalary), payDay: member.payDay || '',
+    payrollReminder: member.payrollReminder || '', userId: member.userId || '',
+  };
+  showStaffForm.value = false;
+  showPayrollForm.value = false;
+  showEmployeeForm.value = true;
+}
+
+async function saveEmployee() {
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    const payload = {
+      ...employeeForm.value,
+      monthlySalary: employeeForm.value.monthlySalary === null || employeeForm.value.monthlySalary === '' ? undefined : Number(employeeForm.value.monthlySalary),
+      userId: employeeForm.value.userId || undefined,
+    };
+    if (editingEmployeeId.value) {
+      if (!employeeForm.value.userId) payload.userId = null;
+      await api.patch(`/staff/${editingEmployeeId.value}`, payload);
+      success.value = 'Ficha del trabajador actualizada.';
+    } else {
+      await api.post('/staff', payload);
+      success.value = 'Trabajador agregado sin crear una cuenta innecesaria.';
+    }
+    editingEmployeeId.value = '';
+    showEmployeeForm.value = false;
+    employeeForm.value = defaultEmployeeForm();
+    const { data } = await api.get('/staff');
+    employees.value = data;
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo guardar al trabajador.'; }
+  finally { saving.value = false; }
+}
+
+async function toggleEmployee(member) {
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    await api.patch(`/staff/${member.id}/active`, { active: !member.active });
+    success.value = member.active ? 'Trabajador marcado como inactivo.' : 'Trabajador reactivado.';
+    const { data } = await api.get('/staff');
+    employees.value = data;
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo cambiar el estado del trabajador.'; }
+  finally { saving.value = false; }
+}
+
 function defaultPayrollForm() {
   return { staffId: '', period: todayInputDate().slice(0, 7), amount: null, notes: '' };
 }
@@ -894,7 +957,7 @@ function openPayrollForm(member = null) {
 }
 
 function syncPayrollAmount() {
-  const member = staff.value.find(item => item.id === payrollForm.value.staffId);
+  const member = employees.value.find(item => item.id === payrollForm.value.staffId);
   payrollForm.value.amount = member?.monthlySalary == null ? null : Number(member.monthlySalary);
 }
 
@@ -1213,28 +1276,40 @@ onMounted(async () => {
       </table>
     </section>
 
-    <div v-else-if="active==='personal'" class="panel-grid" :class="{ single: !showStaffForm && !showPayrollForm }">
+    <div v-else-if="active==='personal'" class="panel-grid" :class="{ single: !showStaffForm && !showPayrollForm && !showEmployeeForm }">
       <section class="glass-card staff-panel">
         <div class="section-title">
-          <div><span class="badge">Solo administración</span><h2>{{ staffWorkspace === 'team' ? 'Personal' : 'Pagos del personal' }}</h2><p class="muted-text">{{ staffWorkspace === 'team' ? 'Accesos, horarios y datos de pago del equipo.' : 'Control mensual conectado automáticamente con Caja.' }}</p></div>
-          <button v-if="staffWorkspace === 'team'" class="secondary small" type="button" @click="editingStaffId=''; resetStaffForm(); showPayrollForm=false; showStaffForm=true">Agregar trabajador</button>
-          <button v-else class="secondary small" type="button" @click="showStaffForm=false; openPayrollForm()">Registrar mes</button>
+          <div><span class="badge">Solo administración</span><h2>{{ staffWorkspace === 'team' ? 'Personal' : staffWorkspace === 'access' ? 'Cuentas de acceso' : 'Pagos del personal' }}</h2><p class="muted-text">{{ staffWorkspace === 'team' ? 'Trabajadores, cargos y condiciones laborales, tengan acceso o no.' : staffWorkspace === 'access' ? 'Usuarios autorizados para entrar al sistema.' : 'Control mensual conectado automáticamente con Caja.' }}</p></div>
+          <button v-if="staffWorkspace === 'team'" class="secondary small" type="button" @click="editingEmployeeId=''; employeeForm=defaultEmployeeForm(); showStaffForm=false; showPayrollForm=false; showEmployeeForm=true">Agregar personal</button>
+          <button v-else-if="staffWorkspace === 'access'" class="secondary small" type="button" @click="editingStaffId=''; resetStaffForm(); showEmployeeForm=false; showPayrollForm=false; showStaffForm=true">Crear acceso</button>
+          <button v-else class="secondary small" type="button" @click="showStaffForm=false; showEmployeeForm=false; openPayrollForm()">Registrar mes</button>
         </div>
         <nav class="staff-subnav" aria-label="Secciones de personal">
-          <button type="button" :class="{ active: staffWorkspace === 'team' }" @click="staffWorkspace='team'; showPayrollForm=false">Equipo</button>
-          <button type="button" :class="{ active: staffWorkspace === 'payroll' }" @click="staffWorkspace='payroll'; showStaffForm=false">Pagos mensuales</button>
+          <button type="button" :class="{ active: staffWorkspace === 'team' }" @click="staffWorkspace='team'; showStaffForm=false; showPayrollForm=false">Equipo</button>
+          <button type="button" :class="{ active: staffWorkspace === 'payroll' }" @click="staffWorkspace='payroll'; showStaffForm=false; showEmployeeForm=false">Pagos mensuales</button>
+          <button type="button" :class="{ active: staffWorkspace === 'access' }" @click="staffWorkspace='access'; showPayrollForm=false; showEmployeeForm=false">Cuentas de acceso</button>
         </nav>
         <template v-if="staffWorkspace === 'team'">
-          <div v-if="staff.length" class="staff-list">
-            <article v-for="member in staff" :key="member.id" class="staff-card" :class="{ inactive: !member.active }">
-              <div class="staff-identity"><div class="pet-initial">{{ member.fullName?.charAt(0) || 'P' }}</div><div><strong>{{ member.fullName }}</strong><span>{{ staffRoleLabel(member.role) }}</span><small>{{ member.email }}</small></div></div>
+          <div v-if="employees.length" class="staff-list">
+            <article v-for="member in employees" :key="member.id" class="staff-card" :class="{ inactive: !member.active }">
+              <div class="staff-identity"><div class="pet-initial">{{ member.fullName?.charAt(0) || 'P' }}</div><div><strong>{{ member.fullName }}</strong><span>{{ member.jobTitle }}</span><small>{{ member.user ? `Acceso: ${member.user.email}` : 'Sin cuenta de acceso' }}</small></div></div>
               <div class="staff-detail"><span>Horario</span><strong>{{ member.workSchedule || 'Sin horario' }}</strong></div>
               <div class="staff-detail"><span>Sueldo</span><strong>{{ member.monthlySalary != null ? 'S/ ' + formatPrice(member.monthlySalary) : 'Sin registrar' }}</strong><small>{{ member.payDay || '' }}</small></div>
               <div class="staff-detail"><span>Cuenta</span><strong>{{ maskedAccount(member.bankAccount) }}</strong></div>
-              <div class="table-actions"><button class="ghost small" type="button" @click="editStaff(member)">Editar</button><button class="ghost small" type="button" @click="staffWorkspace='payroll'; showStaffForm=false; openPayrollForm(member)">Registrar pago</button><button class="secondary small" type="button" @click="toggleStaff(member)">{{ member.active ? 'Desactivar' : 'Activar' }}</button></div>
+              <div class="table-actions"><button class="ghost small" type="button" @click="editEmployee(member)">Editar ficha</button><button class="ghost small" type="button" @click="staffWorkspace='payroll'; showEmployeeForm=false; openPayrollForm(member)">Registrar pago</button><button class="secondary small" type="button" @click="toggleEmployee(member)">{{ member.active ? 'Desactivar' : 'Activar' }}</button></div>
             </article>
           </div>
-          <div v-else class="calm-empty"><strong>Sin personal registrado</strong><span>Agrega únicamente a quienes necesitan acceso al sistema.</span></div>
+          <div v-else class="calm-empty"><strong>Sin personal registrado</strong><span>Agrega a quienes trabajan en Happy Dog, aunque no necesiten iniciar sesión.</span></div>
+        </template>
+        <template v-else-if="staffWorkspace === 'access'">
+          <div v-if="staff.length" class="staff-list">
+            <article v-for="account in staff" :key="account.id" class="staff-card access-card" :class="{ inactive: !account.active }">
+              <div class="staff-identity"><div class="pet-initial">{{ account.fullName?.charAt(0) || 'A' }}</div><div><strong>{{ account.fullName }}</strong><span>{{ staffRoleLabel(account.role) }}</span><small>{{ account.email }}</small></div></div>
+              <div class="staff-detail"><span>Vinculación</span><strong>{{ employees.find(member => member.userId === account.id)?.fullName || 'Sin ficha laboral' }}</strong><small>La cuenta y la ficha son independientes</small></div>
+              <div class="table-actions"><button class="ghost small" type="button" @click="editStaff(account)">Editar acceso</button><button class="secondary small" type="button" @click="toggleStaff(account)">{{ account.active ? 'Desactivar acceso' : 'Activar acceso' }}</button></div>
+            </article>
+          </div>
+          <div v-else class="calm-empty"><strong>Sin cuentas de acceso</strong><span>Créala solo para quien realmente deba entrar al sistema.</span></div>
         </template>
         <template v-else>
           <div class="payroll-summary">
@@ -1243,7 +1318,7 @@ onMounted(async () => {
           </div>
           <div v-if="payrollPayments.length" class="payroll-list">
             <article v-for="payment in payrollPayments" :key="payment.id" class="payroll-card">
-              <div><span class="badge">{{ formatPayrollPeriod(payment.period) }}</span><h3>{{ payment.staff?.fullName }}</h3><small>{{ staffRoleLabel(payment.staff?.role) }} · {{ payment.staff?.payDay || 'Día no indicado' }}</small></div>
+              <div><span class="badge">{{ formatPayrollPeriod(payment.period) }}</span><h3>{{ payment.staff?.fullName }}</h3><small>{{ payment.staff?.jobTitle }} · {{ payment.staff?.payDay || 'Día no indicado' }}</small></div>
               <div class="staff-detail"><span>Monto</span><strong>S/ {{ formatPrice(payment.amount) }}</strong><small>{{ maskedAccount(payment.staff?.bankAccount) }}</small></div>
               <div class="staff-detail"><span>Estado</span><strong>{{ payment.status === 'PAID' ? 'Pagado' : payment.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente' }}</strong><small>{{ payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('es-PE') : 'Aún no afecta Caja' }}</small></div>
               <div v-if="payment.status === 'PENDING'" class="table-actions"><button class="secondary small" type="button" @click="startPayrollPayment(payment)">Marcar pagado</button><button class="ghost small" type="button" @click="cancelPayroll(payment)">Cancelar</button></div>
@@ -1260,26 +1335,38 @@ onMounted(async () => {
           <div v-else class="calm-empty"><strong>Sin pagos mensuales</strong><span>Registra el mes cuando corresponda; Caja solo cambia al confirmar el pago.</span></div>
         </template>
       </section>
+      <section v-if="showEmployeeForm" class="glass-card staff-editor">
+        <div class="section-title"><div><span class="badge">Ficha laboral</span><h2>{{ editingEmployeeId ? 'Editar personal' : 'Agregar personal' }}</h2><p class="muted-text">No se creará ninguna contraseña automáticamente.</p></div><button class="ghost small" type="button" @click="showEmployeeForm=false; editingEmployeeId=''; employeeForm=defaultEmployeeForm()">Cerrar</button></div>
+        <form class="stack" @submit.prevent="saveEmployee">
+          <label>Nombre completo<input v-model="employeeForm.fullName" required></label>
+          <label>Cargo<input v-model="employeeForm.jobTitle" list="job-title-options" required placeholder="Ej. Baño y corte"><datalist id="job-title-options"><option value="Veterinaria/o"></option><option value="Recepción"></option><option value="Baño y corte"></option><option value="Peluquería canina"></option><option value="Limpieza"></option><option value="Asistente veterinario"></option><option value="Administración"></option></datalist></label>
+          <label>Documento<input v-model="employeeForm.documentNumber" placeholder="DNI u otro documento"></label>
+          <label>Teléfono<input v-model="employeeForm.phone" inputmode="tel"></label>
+          <label>Horario<input v-model="employeeForm.workSchedule" placeholder="Ej. Lunes a sábado, 8:00 a. m. – 5:00 p. m."></label>
+          <label>Sueldo mensual<input v-model.number="employeeForm.monthlySalary" type="number" min="0" step="0.01"></label>
+          <label>Día de pago<input v-model="employeeForm.payDay" placeholder="Ej. Fin de mes"></label>
+          <label>Número de cuenta<input v-model="employeeForm.bankAccount" autocomplete="off" placeholder="Se mostrará enmascarado"></label>
+          <label>Cuenta de acceso (opcional)<select v-model="employeeForm.userId"><option value="">No necesita iniciar sesión</option><option v-for="account in availableAccessAccounts" :key="account.id" :value="account.id">{{ account.fullName }} · {{ staffRoleLabel(account.role) }}</option></select><small>Vincularla no cambia el cargo laboral.</small></label>
+          <label>Observación administrativa<textarea v-model="employeeForm.payrollReminder" rows="2"></textarea></label>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar ficha laboral' }}</button>
+          <button class="secondary" type="button" @click="showEmployeeForm=false; editingEmployeeId=''; employeeForm=defaultEmployeeForm()">Cancelar</button>
+        </form>
+      </section>
       <section v-if="showStaffForm" class="glass-card staff-editor">
-        <div class="section-title"><div><span class="badge">{{ editingStaffId ? 'Editar' : 'Nuevo acceso' }}</span><h2>{{ editingStaffId ? 'Datos del trabajador' : 'Agregar trabajador' }}</h2></div><button class="ghost small" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cerrar</button></div>
+        <div class="section-title"><div><span class="badge">Cuenta del sistema</span><h2>{{ editingStaffId ? 'Editar acceso' : 'Crear acceso' }}</h2><p class="muted-text">Esto permite iniciar sesión; no reemplaza la ficha laboral.</p></div><button class="ghost small" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cerrar</button></div>
         <form class="stack" @submit.prevent="saveStaff">
-          <label>Nombre completo<input v-model="staffForm.fullName" required></label>
+          <label>Nombre visible<input v-model="staffForm.fullName" required></label>
           <label>Correo de acceso<input v-model="staffForm.email" type="email" required></label>
           <label v-if="!editingStaffId">Contraseña temporal<input v-model="staffForm.password" type="password" minlength="12" required><small>12 caracteres o más, con mayúscula, minúscula y número.</small></label>
-          <label>Rol<select v-model="staffForm.role"><option value="RECEPTIONIST">Recepción</option><option value="VETERINARIAN">Veterinaria</option><option value="ADMIN">Administración</option></select></label>
-          <label>Horario<input v-model="staffForm.workSchedule" placeholder="Ej. 8:00 a. m. – 6:00 p. m."></label>
-          <label>Número de cuenta<input v-model="staffForm.bankAccount" autocomplete="off" placeholder="Se mostrará enmascarado"></label>
-          <label>Sueldo mensual<input v-model.number="staffForm.monthlySalary" type="number" min="0" step="0.01"></label>
-          <label>Día de pago<input v-model="staffForm.payDay" placeholder="Ej. Fin de mes"></label>
-          <label>Recordatorio<textarea v-model="staffForm.payrollReminder" rows="2" placeholder="Observación administrativa"></textarea></label>
-          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar trabajador' }}</button>
+          <label>Permiso<select v-model="staffForm.role"><option value="RECEPTIONIST">Recepción</option><option value="VETERINARIAN">Veterinaria</option><option value="ADMIN">Administración</option></select><small>Define qué páginas puede utilizar, no su cargo laboral.</small></label>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar cuenta de acceso' }}</button>
           <button class="secondary" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cancelar</button>
         </form>
       </section>
       <section v-if="showPayrollForm" class="glass-card staff-editor">
         <div class="section-title"><div><span class="badge">Nuevo periodo</span><h2>Registrar pago mensual</h2><p class="muted-text">Primero quedará pendiente; todavía no afectará Caja.</p></div><button class="ghost small" type="button" @click="showPayrollForm=false; payrollForm=defaultPayrollForm()">Cerrar</button></div>
         <form class="stack" @submit.prevent="savePayroll">
-          <label>Trabajador<select v-model="payrollForm.staffId" required @change="syncPayrollAmount"><option value="" disabled>Seleccionar</option><option v-for="member in staff" :key="member.id" :value="member.id">{{ member.fullName }} · {{ staffRoleLabel(member.role) }}</option></select></label>
+          <label>Trabajador<select v-model="payrollForm.staffId" required @change="syncPayrollAmount"><option value="" disabled>Seleccionar</option><option v-for="member in employees.filter(item => item.active)" :key="member.id" :value="member.id">{{ member.fullName }} · {{ member.jobTitle }}</option></select></label>
           <label>Mes<input v-model="payrollForm.period" type="month" required></label>
           <label>Monto<input v-model.number="payrollForm.amount" type="number" min="0.01" step="0.01" required></label>
           <label>Nota interna<textarea v-model="payrollForm.notes" rows="2" placeholder="Bonificación, descuento acordado u observación"></textarea></label>
@@ -1670,6 +1757,7 @@ onMounted(async () => {
 .staff-editor { align-self: start; }
 .staff-list { display: grid; gap: 10px; margin-top: 16px; }
 .staff-card { display: grid; grid-template-columns: minmax(210px,1.25fr) 1fr .8fr .65fr auto; align-items: center; gap: 15px; padding: 15px; border: 1px solid rgba(13,95,96,.13); border-radius: 19px; background: rgba(255,255,255,.78); }
+.staff-card.access-card { grid-template-columns: minmax(240px,1.2fr) minmax(220px,1fr) auto; }
 .staff-card.inactive { opacity: .62; }
 .staff-identity { display: flex; align-items: center; gap: 10px; }
 .staff-identity > div:last-child,.staff-detail { display: grid; gap: 2px; }
@@ -2027,7 +2115,7 @@ onMounted(async () => {
 
 @media (max-width: 980px) {
   .cash-category-summary { grid-template-columns: 1fr; }
-  .staff-card { grid-template-columns: 1fr; align-items: stretch; }
+  .staff-card,.staff-card.access-card { grid-template-columns: 1fr; align-items: stretch; }
   .payroll-card,.payroll-payment-form,.payroll-summary { grid-template-columns: 1fr; }
   .receivable-metrics,.receivable-form-grid,.receivable-card,.receivable-payment { grid-template-columns: 1fr; }
   .receivable-form-grid .wide { grid-column: auto; }

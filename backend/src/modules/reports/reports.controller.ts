@@ -91,17 +91,19 @@ export class ReportsController {
           durationMinutes: true, active: true,
         },
       }),
-      this.prisma.user.findMany({
-        where: { role: { not: Role.CLIENT } },
+      this.prisma.staffMember.findMany({
         orderBy: [{ active: 'desc' }, { fullName: 'asc' }],
-        select: { id: true, fullName: true, email: true, role: true, active: true, workSchedule: true },
+        select: {
+          id: true, fullName: true, jobTitle: true, active: true, workSchedule: true,
+          user: { select: { email: true, role: true, active: true } },
+        },
       }),
       role === Role.ADMIN
         ? this.prisma.payrollPayment.findMany({
           where: { period: { gte: range.from.slice(0, 7), lte: range.to.slice(0, 7) } },
           orderBy: [{ period: 'desc' }, { createdAt: 'desc' }],
           include: {
-            staff: { select: { fullName: true, role: true } },
+            staff: { select: { fullName: true, jobTitle: true } },
             registeredBy: { select: { fullName: true } },
           },
         })
@@ -224,7 +226,7 @@ export class ReportsController {
       referenceCode: payment.referenceCode || '',
       notes: payment.notes || '',
       staffName: payment.staff?.fullName || '',
-      staffRole: payment.staff?.role || '',
+      jobTitle: payment.staff?.jobTitle || '',
       responsible: payment.registeredBy?.fullName || '',
     }));
 

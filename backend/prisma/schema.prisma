@@ -118,10 +118,33 @@ model User {
   sales                 Sale[]
   cashMovements         CashMovement[]
   cashClosings          CashClosing[]
-  payrollPayments       PayrollPayment[]       @relation("StaffPayrollPayments")
+  staffProfile          StaffMember?
   registeredPayrolls    PayrollPayment[]       @relation("RegisteredPayrollPayments")
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+model StaffMember {
+  id              String           @id @default(uuid())
+  fullName        String
+  jobTitle        String
+  documentNumber  String?
+  phone           String?
+  active          Boolean          @default(true)
+  workSchedule    String?
+  bankAccount     String?
+  monthlySalary   Decimal?         @db.Decimal(10, 2)
+  payDay          String?
+  payrollReminder String?
+  userId          String?          @unique
+  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payrollPayments PayrollPayment[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([fullName])
+  @@index([jobTitle])
+  @@index([active])
 }
 
 model Client {
@@ -400,7 +423,7 @@ model PayrollPayment {
   staffId        String
   registeredById String?
   cashMovementId String?              @unique
-  staff          User                 @relation("StaffPayrollPayments", fields: [staffId], references: [id], onDelete: Restrict)
+  staff          StaffMember          @relation(fields: [staffId], references: [id], onDelete: Restrict)
   registeredBy   User?                @relation("RegisteredPayrollPayments", fields: [registeredById], references: [id], onDelete: SetNull)
   cashMovement   CashMovement?        @relation(fields: [cashMovementId], references: [id], onDelete: SetNull)
   createdAt      DateTime             @default(now())
