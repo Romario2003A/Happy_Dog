@@ -7,7 +7,7 @@ import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
 import { parseDateOnly } from '../../utils/dateOnly';
 import { limaDateTimeToIso } from '../../utils/dateTime';
-import { attentionTypeForAppointment, preventiveDefaultsForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
+import { attentionTypeForAppointment, clinicalReasonForAppointment, preventiveDefaultsForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
 import { isVetDraftCompatible, vetDraftKey } from '../../utils/vetDraft';
 import {
   generateOriginalConsultationPdf,
@@ -149,6 +149,9 @@ const scheduledServiceLabel = computed(() => {
     || dedupeServiceParts(String(selected.value.reason || '').replace(/^CLIENT_DATE_REQUEST::/, ''))
     || 'Atención veterinaria';
 });
+const scheduledReasonLabel = computed(() => selected.value
+  ? clinicalReasonForAppointment(selected.value)
+  : '');
 const attentionTypeLabel = computed(() => attentionTypes.find(type => type.value === attentionType.value)?.label || 'Consulta');
 const activeTaskLabel = computed(() => {
   if (activeTask.value === 'consultation') {
@@ -387,7 +390,7 @@ function sexLabel(sex) {
 function resetForm(appointment) {
   attentionType.value = attentionTypeForAppointment(appointment);
   form.value = {
-    reason: serviceDisplayLabel(appointment?.service) || dedupeServiceParts(appointment?.reason || ''),
+    reason: clinicalReasonForAppointment(appointment),
     weightKg: appointment?.pet?.weightKg ?? null,
     temperatureC: null,
     fc: '',
@@ -1434,7 +1437,8 @@ onUnmounted(() => {
         <form v-else class="medical-form" @submit.prevent="saveRecord">
           <div class="current-task-bar">
             <span><strong>Paso 3 de 3</strong> · {{ activeTaskLabel }}</span>
-            <small v-if="scheduledServiceLabel">Motivo de la cita: {{ scheduledServiceLabel }}</small>
+            <small v-if="scheduledServiceLabel">Servicio programado: {{ scheduledServiceLabel }}</small>
+            <small v-if="scheduledReasonLabel">Motivo reportado: {{ scheduledReasonLabel }}</small>
           </div>
           <section v-if="activeTask === 'consultation'" class="attention-type-box">
             <div v-if="selected && !changingAttentionType" class="confirmed-attention-type">

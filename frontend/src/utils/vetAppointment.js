@@ -1,8 +1,37 @@
+import { dedupeServiceParts, serviceDisplayLabel } from './serviceDisplay.js';
+
 function normalizedAppointmentText(appointment) {
   return `${appointment?.service?.category || ''} ${appointment?.service?.name || ''} ${appointment?.service?.condition || ''} ${appointment?.reason || ''}`
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+function comparableText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+export function clinicalReasonForAppointment(appointment) {
+  const service = serviceDisplayLabel(appointment?.service);
+  const rawReason = dedupeServiceParts(
+    String(appointment?.reason || '').replace(/^CLIENT_DATE_REQUEST::/, ''),
+  );
+
+  if (!rawReason) return service || '';
+  if (!service) return rawReason;
+  if (comparableText(rawReason) === comparableText(service)) return service;
+
+  const parts = rawReason.split(/\s*·\s*/).filter(Boolean);
+  if (parts.length > 1 && comparableText(parts[0]) === comparableText(service)) {
+    return parts.slice(1).join(' · ').trim() || service;
+  }
+
+  return rawReason;
 }
 
 export function isSterilizationAppointment(appointment) {

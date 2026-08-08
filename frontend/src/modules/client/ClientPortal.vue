@@ -51,6 +51,17 @@ function serviceOptionLabel(service) {
   return `${serviceDisplayLabel(service)} — ${servicePriceLabel(service)}`;
 }
 
+function formatRequestedDate(value) {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('es-PE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Lima',
+  }).format(new Date(`${value}T12:00:00-05:00`));
+}
+
 async function loadServices() {
   try {
     const response = await api.get('/public/services');
@@ -68,7 +79,7 @@ async function submit() {
   const phone = String(form.value.phone || '').replace(/\D+/g, '');
 
   if (phone.length < 7) {
-    error.value = 'Ingresa un WhatsApp valido para poder confirmarte la cita.';
+    error.value = 'Ingresa un WhatsApp válido para poder confirmarte la cita.';
     return;
   }
 
@@ -90,7 +101,7 @@ async function submit() {
   try {
     const requestSummary = {
       petName: form.value.petName.trim(),
-      scheduledAt: form.value.scheduledAt,
+      scheduledAt: formatRequestedDate(form.value.scheduledAt),
     };
     await api.post('/public/appointment-request', {
       ...form.value,
@@ -155,7 +166,7 @@ function startAnotherRequest() {
         <p class="muted-text">D&eacute;janos tus datos y te confirmamos la cita por WhatsApp.</p>
         <form v-if="!sent" class="form-grid quick-request-form" @submit.prevent="submit">
           <input v-model="form.fullName" required placeholder="Nombre del due&ntilde;o">
-          <input v-model="form.phone" required inputmode="tel" autocomplete="tel" placeholder="WhatsApp" @input="form.phone = form.phone.replace(/\s+/g, '')">
+          <input v-model="form.phone" required inputmode="numeric" autocomplete="tel" placeholder="WhatsApp" @input="form.phone = form.phone.replace(/\D+/g, '')">
           <input v-model="form.petName" required placeholder="Nombre de la mascota">
           <label>Día preferido
             <input v-model="form.scheduledAt" type="date" required>
