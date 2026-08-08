@@ -6,6 +6,7 @@ import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
 import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
 import { parseDateOnly } from '../../utils/dateOnly';
+import { limaDateTimeToIso } from '../../utils/dateTime';
 import { attentionTypeForAppointment, preventiveDefaultsForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
 import { isVetDraftCompatible, vetDraftKey } from '../../utils/vetDraft';
 import {
@@ -683,7 +684,6 @@ function buildObservationNotes() {
     exams.length && `Exámenes complementarios: ${exams.join(', ')}`,
     form.value.examOther && `Otros exámenes: ${form.value.examOther}`,
     form.value.prognosis && `Pronóstico: ${form.value.prognosis}`,
-    form.value.nextControlAt && `Próximo control: ${formatDate(form.value.nextControlAt)}`,
   ].filter(Boolean).join('\n');
 }
 
@@ -730,6 +730,7 @@ async function generatePrescriptionPdf() {
   }
 
   error.value = '';
+  success.value = '';
   try {
     await generateOriginalPrescriptionPdf({
       pet: selectedPet.value,
@@ -749,6 +750,7 @@ async function generatePrescriptionPdf() {
       doctor: auth.user?.fullName || 'Doctor veterinario',
       date: formatShortDate(),
     });
+    success.value = 'Receta PDF generada. Revisa la nueva pestaña o tus descargas.';
   } catch (e) {
     error.value = e.message || 'No se pudo generar la receta en PDF.';
   }
@@ -1043,6 +1045,7 @@ async function generateConsultationDocumentPdf() {
     return;
   }
   error.value = '';
+  success.value = '';
   try {
     await generateOriginalConsultationPdf({
       pet: { ...selectedPet.value, sex: sexLabel(selectedPet.value.sex) },
@@ -1051,6 +1054,7 @@ async function generateConsultationDocumentPdf() {
       preventive: documentPreventiveRecords(),
       doctor: auth.user?.fullName || '',
     });
+    success.value = 'Documento clínico PDF generado. Revisa la nueva pestaña o tus descargas.';
   } catch (e) {
     error.value = e.message || 'No se pudo generar el documento clínico original.';
   }
@@ -1062,6 +1066,7 @@ async function generateClinicalHistoryPdf() {
     return;
   }
   error.value = '';
+  success.value = '';
   try {
     await generateOriginalHistoryPdf({
       pet: { ...selectedPet.value, sex: sexLabel(selectedPet.value.sex) },
@@ -1070,6 +1075,7 @@ async function generateClinicalHistoryPdf() {
       consultations: accumulatedDocumentConsultations(),
       entryDate: formatShortDate(selectedPet.value.createdAt || new Date()),
     });
+    success.value = 'Historial clínico PDF generado. Revisa la nueva pestaña o tus descargas.';
   } catch (e) {
     error.value = e.message || 'No se pudo generar el historial clínico original.';
   }
@@ -1089,6 +1095,7 @@ async function generateSurgeryConsentPdf() {
     return;
   }
   error.value = '';
+  success.value = '';
   try {
     await generateOriginalSurgeryPdf({
       pet: selectedPet.value,
@@ -1096,6 +1103,7 @@ async function generateSurgeryConsentPdf() {
       consent: surgeryConsent,
       date: formatShortDate(),
     });
+    success.value = 'Autorización PDF generada. Revisa la nueva pestaña o tus descargas.';
   } catch (e) {
     error.value = e.message || 'No se pudo generar la autorización original.';
   }
@@ -1147,7 +1155,7 @@ async function saveRecord() {
       diagnosis,
       treatment: buildTreatmentText(),
       observations: buildObservationNotes(),
-      nextControlAt: form.value.nextControlAt || undefined,
+      nextControlAt: limaDateTimeToIso(form.value.nextControlAt) || undefined,
       prescriptions: buildPrescriptions(),
     });
     lastSavedAppointmentId.value = savedRecord.appointmentId || selected.value?.id || '';
