@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../layouts/AdminLayout.vue';
+import AdminReports from './AdminReports.vue';
 import { api } from '../../services/api';
 import { daysUntilDateOnly, formatDateOnly } from '../../utils/dateOnly';
 import { appointmentCashCategory, appointmentServiceLabel } from '../../utils/cashAppointment';
@@ -17,7 +18,7 @@ const appointments = ref([]);
 const pets = ref([]);
 const preventiveFollowUps = ref([]);
 const pendingClientDelete = ref(null);
-const adminTabs = ['resumen', 'servicios', 'inventario', 'clientes', 'caja', 'personal'];
+const adminTabs = ['resumen', 'servicios', 'inventario', 'clientes', 'caja', 'reportes', 'personal'];
 const active = ref(tabFromRoute());
 const error = ref('');
 const success = ref('');
@@ -923,6 +924,7 @@ onMounted(async () => {
       <button :class="{ active: active === 'inventario' }" @click="openInventory">Inventario</button>
       <button :class="{ active: active === 'clientes' }" @click="setActive('clientes')">Clientes</button>
       <button :class="{ active: active === 'caja' }" @click="setActive('caja')">Caja</button>
+      <button :class="{ active: active === 'reportes' }" @click="setActive('reportes')">Reportes</button>
       <button :class="{ active: active === 'personal' }" @click="setActive('personal')">Personal</button>
     </template>
 
@@ -1462,6 +1464,8 @@ onMounted(async () => {
         <div v-else class="receivable-empty"><strong>No hay cuentas pendientes</strong><span>Cuando un cliente deje un saldo o pague un adelanto aparecerá aquí.</span></div>
       </section>
     </section>
+
+    <AdminReports v-else-if="active==='reportes'" />
 
     <section v-else class="glass-card">
       <h2>Resumen administrativo</h2>
