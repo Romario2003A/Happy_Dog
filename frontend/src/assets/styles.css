@@ -90,7 +90,12 @@ button.danger:hover{background:#fff3f1;box-shadow:0 14px 30px rgba(165,56,56,.12
 .appointment-request-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(244,253,249,.76))}
 .appointment-request-card:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,var(--blue-dark),var(--mint),var(--sun))}
 .appointment-request-card:after{content:"";position:absolute;right:-90px;bottom:-120px;width:300px;height:220px;background:linear-gradient(120deg,transparent,rgba(134,214,173,.16),rgba(245,200,106,.16));transform:rotate(-18deg);pointer-events:none}
-.appointment-request-card .section-title,.appointment-request-card .muted-text,.appointment-request-card form,.appointment-request-card .error,.appointment-request-card .success{position:relative;z-index:1}
+.appointment-request-card .section-title,.appointment-request-card .muted-text,.appointment-request-card form,.appointment-request-card .error,.appointment-request-card .success,.appointment-request-card .request-success{position:relative;z-index:1}
+.request-success{display:grid;gap:10px;padding:18px;border:1px solid rgba(15,143,125,.22);border-radius:18px;background:rgba(232,248,243,.78)}
+.request-success strong{font-size:1.08rem;color:var(--blue-dark)}
+.request-success p{margin:0;color:var(--muted)}
+.request-success button{justify-self:start}
+.request-wait-note,.saving-note{display:block;grid-column:1/-1;padding:10px 12px;border-radius:12px;background:rgba(244,249,248,.92);color:var(--muted);line-height:1.4}
 .location-card{max-width:1160px;margin:24px auto 0;overflow:hidden}
 .location-card img{display:block;width:100%;height:auto;border-radius:18px;border:1px solid var(--line);box-shadow:0 18px 46px rgba(21,91,102,.12)}
 .contact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}

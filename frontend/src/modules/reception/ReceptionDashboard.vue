@@ -23,6 +23,9 @@ const active = ref(tabFromRoute());
 const showQuick = ref(false);
 const loading = ref(false);
 const saving = ref(false);
+const savingSlow = ref(false);
+const createdQuickIds = ref({ clientId: '', petId: '' });
+let savingSlowTimer;
 const error = ref('');
 const success = ref('');
 const search = ref('');
@@ -666,6 +669,12 @@ function resetQuick() {
   quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
   duplicateOverride.value = false;
   reschedulingPastAppointment.value = false;
+  createdQuickIds.value = { clientId: '', petId: '' };
+}
+
+function setQuickMode(mode) {
+  quickMode.value = mode;
+  createdQuickIds.value = { clientId: '', petId: '' };
 }
 
 function useExistingAppointment(appointment) {
@@ -683,6 +692,10 @@ async function saveIgnoringDuplicate() {
 
 async function saveQuickAppointment() {
   saving.value = true;
+  savingSlow.value = false;
+  savingSlowTimer = window.setTimeout(() => {
+    savingSlow.value = true;
+  }, 2500);
   error.value = '';
   success.value = '';
   try {
@@ -692,26 +705,32 @@ async function saveQuickAppointment() {
       return;
     }
 
-    let clientId = quick.value.clientId;
-    let petId = quick.value.petId;
+    let clientId = createdQuickIds.value.clientId || quick.value.clientId;
+    let petId = createdQuickIds.value.petId || quick.value.petId;
 
     if (quickMode.value === 'new') {
-      const { data: client } = await api.post('/clients', {
-        fullName: quick.value.fullName,
-        phone: quick.value.phone,
-        email: quick.value.email || undefined,
-      });
-      const { data: pet } = await api.post('/pets', {
-        name: quick.value.petName,
-        species: quick.value.species,
-        breed: quick.value.breed || undefined,
-        sex: quick.value.sex || 'UNKNOWN',
-        age: quick.value.age || undefined,
-        weightKg: quick.value.weightKg === '' ? undefined : Number(quick.value.weightKg),
-        clientId: client.id,
-      });
-      clientId = client.id;
-      petId = pet.id;
+      if (!clientId) {
+        const { data: client } = await api.post('/clients', {
+          fullName: quick.value.fullName,
+          phone: quick.value.phone,
+          email: quick.value.email || undefined,
+        });
+        clientId = client.id;
+        createdQuickIds.value = { ...createdQuickIds.value, clientId };
+      }
+      if (!petId) {
+        const { data: pet } = await api.post('/pets', {
+          name: quick.value.petName,
+          species: quick.value.species,
+          breed: quick.value.breed || undefined,
+          sex: quick.value.sex || 'UNKNOWN',
+          age: quick.value.age || undefined,
+          weightKg: quick.value.weightKg === '' ? undefined : Number(quick.value.weightKg),
+          clientId,
+        });
+        petId = pet.id;
+        createdQuickIds.value = { clientId, petId };
+      }
     }
 
     await api.post('/appointments', {
@@ -733,6 +752,8 @@ async function saveQuickAppointment() {
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo agendar desde recepción.';
   } finally {
+    window.clearTimeout(savingSlowTimer);
+    savingSlow.value = false;
     saving.value = false;
     duplicateOverride.value = false;
   }
@@ -915,8 +936,8 @@ onMounted(loadData);
             <small>La agenda reservará este tiempo y avisará si existe un cruce.</small>
           </label>
           <div class="segmented">
-            <button type="button" :class="{active:quickMode==='new'}" @click="quickMode='new'">Registrar cliente nuevo</button>
-            <button type="button" :class="{active:quickMode==='existing'}" @click="quickMode='existing'">Agendar cliente existente</button>
+            <button type="button" :class="{active:quickMode==='new'}" @click="setQuickMode('new')">Registrar cliente nuevo</button>
+            <button type="button" :class="{active:quickMode==='existing'}" @click="setQuickMode('existing')">Agendar cliente existente</button>
           </div>
 
           <template v-if="quickMode==='existing'">
@@ -971,6 +992,7 @@ onMounted(loadData);
             <button class="small secondary" type="button" :disabled="saving" @click="saveIgnoringDuplicate">Crear de todos modos</button>
           </div>
           <button :disabled="saving">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Guardar cliente, mascota y cita' : 'Guardar nueva cita' }}</button>
+          <small v-if="savingSlow" class="saving-note">El servidor está iniciando. No cierres esta pantalla: tus datos siguen guardados y el proceso continuará automáticamente.</small>
         </form>
 
         <div v-if="selectedAppointment" class="detail-box">

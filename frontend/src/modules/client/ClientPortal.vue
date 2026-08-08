@@ -8,7 +8,8 @@ import { serviceDisplayLabel } from '../../utils/serviceDisplay';
 
 const facebookUrl = 'https://www.facebook.com/share/1DARyzQs2j/';
 const whatsappUrl = 'https://wa.me/51953280579';
-const form = ref({
+function defaultRequestForm() {
+  return {
   fullName: '',
   phone: '',
   email: '',
@@ -22,11 +23,17 @@ const form = ref({
   serviceId: '',
   reason: '',
   scheduledAt: '',
-});
+  };
+}
+
+const form = ref(defaultRequestForm());
 const services = ref([]);
 const sent = ref(false);
+const sentSummary = ref(null);
 const error = ref('');
 const loading = ref(false);
+const loadingSlow = ref(false);
+let loadingSlowTimer;
 const serviceCategories = computed(() => [...new Set(services.value.map(service => service.category || 'Otros'))].sort());
 const availableServices = computed(() => services.value.filter(service => (service.category || 'Otros') === form.value.serviceCategory));
 const selectedService = computed(() => services.value.find(service => service.id === form.value.serviceId));
@@ -76,7 +83,15 @@ async function submit() {
   }
 
   loading.value = true;
+  loadingSlow.value = false;
+  loadingSlowTimer = window.setTimeout(() => {
+    loadingSlow.value = true;
+  }, 2500);
   try {
+    const requestSummary = {
+      petName: form.value.petName.trim(),
+      scheduledAt: form.value.scheduledAt,
+    };
     await api.post('/public/appointment-request', {
       ...form.value,
       scheduledAt: new Date(`${form.value.scheduledAt}T12:00:00-05:00`).toISOString(),
@@ -88,12 +103,22 @@ async function submit() {
       species: form.value.species || 'No especificada',
       sex: form.value.sex || 'UNKNOWN',
     });
+    sentSummary.value = requestSummary;
+    form.value = defaultRequestForm();
     sent.value = true;
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo enviar la solicitud. Revisa los datos e intenta nuevamente.';
   } finally {
+    window.clearTimeout(loadingSlowTimer);
+    loadingSlow.value = false;
     loading.value = false;
   }
+}
+
+function startAnotherRequest() {
+  sent.value = false;
+  sentSummary.value = null;
+  error.value = '';
 }
 </script>
 
@@ -128,7 +153,7 @@ async function submit() {
           </div>
         </div>
         <p class="muted-text">D&eacute;janos tus datos y te confirmamos la cita por WhatsApp.</p>
-        <form class="form-grid quick-request-form" @submit.prevent="submit">
+        <form v-if="!sent" class="form-grid quick-request-form" @submit.prevent="submit">
           <input v-model="form.fullName" required placeholder="Nombre del due&ntilde;o">
           <input v-model="form.phone" required inputmode="tel" autocomplete="tel" placeholder="WhatsApp" @input="form.phone = form.phone.replace(/\s+/g, '')">
           <input v-model="form.petName" required placeholder="Nombre de la mascota">
@@ -151,9 +176,14 @@ async function submit() {
           </label>
           <textarea v-model="form.reason" placeholder="Detalle adicional (opcional)"></textarea>
           <button :disabled="loading">{{ loading ? 'Enviando...' : 'Enviar y esperar confirmaci&oacute;n' }}</button>
+          <small v-if="loadingSlow" class="request-wait-note">El servidor está iniciando. Conservaremos tus datos y enviaremos la solicitud apenas responda.</small>
         </form>
         <p v-if="error" class="error">{{ error }}</p>
-        <p v-if="sent" class="success">Solicitud recibida. Recepci&oacute;n revisar&aacute; la agenda y te confirmar&aacute; pronto.</p>
+        <div v-if="sent" class="request-success" role="status">
+          <strong>Solicitud recibida</strong>
+          <p>Recepci&oacute;n revisar&aacute; la agenda de {{ sentSummary?.petName }} para el {{ sentSummary?.scheduledAt }} y te confirmar&aacute; por WhatsApp.</p>
+          <button type="button" class="secondary" @click="startAnotherRequest">Solicitar otra cita</button>
+        </div>
       </section>
 
       <section class="glass-card portal-card pet-benefit-card">
