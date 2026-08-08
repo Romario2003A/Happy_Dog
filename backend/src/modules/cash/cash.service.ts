@@ -112,6 +112,7 @@ export class CashService {
 
   async createMovement(dto: CreateCashMovementDto, userId?: string) {
     if (Number(dto.amount) <= 0) throw new BadRequestException('El monto debe ser mayor a cero.');
+    if (dto.category === 'PAYROLL') throw new BadRequestException('Los pagos del personal se registran desde el módulo Personal.');
     await this.assertDayOpen(dto.occurredAt || new Date());
 
     if (dto.appointmentId && dto.type !== CashMovementType.EXPENSE) {
@@ -180,6 +181,7 @@ export class CashService {
   async updateMovement(id: string, dto: Partial<CreateCashMovementDto>) {
     const current=await (this.prisma as any).cashMovement.findUnique({where:{id}});
     if(!current) throw new BadRequestException('Movimiento no encontrado.');
+    if(current.category === 'PAYROLL') throw new BadRequestException('Los pagos del personal no se editan desde Caja.');
     await this.assertDayOpen(current.occurredAt);
     if(dto.occurredAt) await this.assertDayOpen(dto.occurredAt);
     return (this.prisma as any).cashMovement.update({
@@ -196,6 +198,7 @@ export class CashService {
     return (this.prisma as any).$transaction(async (tx: any) => {
       const movement = await tx.cashMovement.findUnique({ where: { id } });
       if (!movement) throw new BadRequestException('Movimiento no encontrado.');
+      if (movement.category === 'PAYROLL') throw new BadRequestException('Los pagos del personal no se eliminan desde Caja.');
       await this.assertDayOpen(movement.occurredAt,tx);
       if (movement.productId && movement.productQuantity) {
         await tx.product.update({ where: { id: movement.productId }, data: { stock: { increment: movement.productQuantity } } });

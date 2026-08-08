@@ -41,6 +41,12 @@ const serviceForm = ref({ name: '', category: '', species: '', condition: '', de
 const showStaffForm = ref(false);
 const editingStaffId = ref('');
 const staffForm = ref({ fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' });
+const staffWorkspace = ref('team');
+const payrollPayments = ref([]);
+const showPayrollForm = ref(false);
+const payrollForm = ref(defaultPayrollForm());
+const payingPayrollId = ref('');
+const payrollPayForm = ref({ paymentMethod: 'TRANSFER', paidAt: todayInputDate(), referenceCode: '', notes: '' });
 const cashDate = ref(todayInputDate());
 const cashMovements = ref([]);
 const pendingCharges = ref([]);
@@ -350,7 +356,7 @@ async function loadData() {
   adminLoading.value = true;
   error.value = '';
   try {
-    const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes, followUpsRes] = await Promise.allSettled([
+    const [summaryRes, inventoryRes, clientsRes, appointmentsRes, petsRes, servicesRes, staffRes, followUpsRes, payrollRes] = await Promise.allSettled([
       api.get('/reports/summary'),
       api.get('/inventory'),
       api.get('/clients'),
@@ -359,6 +365,7 @@ async function loadData() {
       api.get('/services'),
       api.get('/users'),
       api.get('/preventive-care/follow-ups'),
+      api.get('/payroll'),
     ]);
   preventiveFollowUps.value = followUpsRes.status === 'fulfilled' ? followUpsRes.value.data : [];
 
@@ -368,6 +375,7 @@ async function loadData() {
   if (petsRes.status === 'fulfilled') pets.value = petsRes.value.data;
   if (servicesRes.status === 'fulfilled') services.value = servicesRes.value.data;
   if (staffRes.status === 'fulfilled') staff.value = staffRes.value.data.filter(user => user.role !== 'CLIENT');
+  if (payrollRes.status === 'fulfilled') payrollPayments.value = payrollRes.value.data;
 
   if (summaryRes.status === 'fulfilled') {
     summary.value = summaryRes.value.data;
@@ -865,6 +873,81 @@ function resetStaffForm() {
   staffForm.value = { fullName:'', email:'', password:'', role:'RECEPTIONIST', workSchedule:'', bankAccount:'', monthlySalary:null, payDay:'Fin de mes', payrollReminder:'' };
 }
 
+function defaultPayrollForm() {
+  return { staffId: '', period: todayInputDate().slice(0, 7), amount: null, notes: '' };
+}
+
+function formatPayrollPeriod(value) {
+  if (!/^\d{4}-\d{2}$/.test(String(value || ''))) return value || '—';
+  const [year, month] = value.split('-');
+  return new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(`${year}-${month}-01T12:00:00Z`));
+}
+
+function openPayrollForm(member = null) {
+  payrollForm.value = defaultPayrollForm();
+  if (member) {
+    payrollForm.value.staffId = member.id;
+    payrollForm.value.amount = member.monthlySalary == null ? null : Number(member.monthlySalary);
+  }
+  showPayrollForm.value = true;
+}
+
+function syncPayrollAmount() {
+  const member = staff.value.find(item => item.id === payrollForm.value.staffId);
+  payrollForm.value.amount = member?.monthlySalary == null ? null : Number(member.monthlySalary);
+}
+
+async function savePayroll() {
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    await api.post('/payroll', {
+      staffId: payrollForm.value.staffId,
+      period: payrollForm.value.period,
+      amount: Number(payrollForm.value.amount),
+      notes: payrollForm.value.notes || undefined,
+    });
+    success.value = 'Pago mensual registrado como pendiente.';
+    showPayrollForm.value = false;
+    payrollForm.value = defaultPayrollForm();
+    const { data } = await api.get('/payroll');
+    payrollPayments.value = data;
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo registrar el pago mensual.'; }
+  finally { saving.value = false; }
+}
+
+function startPayrollPayment(payment) {
+  payingPayrollId.value = payment.id;
+  payrollPayForm.value = { paymentMethod: 'TRANSFER', paidAt: todayInputDate(), referenceCode: '', notes: payment.notes || '' };
+}
+
+async function confirmPayrollPayment(payment) {
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    await api.patch(`/payroll/${payment.id}/pay`, {
+      ...payrollPayForm.value,
+      paidAt: `${payrollPayForm.value.paidAt}T12:00:00-05:00`,
+    });
+    success.value = 'Pago confirmado y egreso creado automáticamente en Caja.';
+    payingPayrollId.value = '';
+    const { data } = await api.get('/payroll');
+    payrollPayments.value = data;
+    if (cashDate.value === payrollPayForm.value.paidAt) await loadCash();
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo confirmar el pago.'; }
+  finally { saving.value = false; }
+}
+
+async function cancelPayroll(payment) {
+  saving.value = true; error.value = ''; success.value = '';
+  try {
+    await api.patch(`/payroll/${payment.id}/cancel`);
+    success.value = 'Pago pendiente cancelado.';
+    const { data } = await api.get('/payroll');
+    payrollPayments.value = data;
+  } catch (e) { error.value = e.response?.data?.message || 'No se pudo cancelar el pago.'; }
+  finally { saving.value = false; }
+}
+
 function editStaff(member) {
   editingStaffId.value = member.id;
   staffForm.value = { fullName:member.fullName || '', email:member.email || '', password:'', role:member.role || 'RECEPTIONIST', workSchedule:member.workSchedule || '', bankAccount:member.bankAccount || '', monthlySalary:member.monthlySalary == null ? null : Number(member.monthlySalary), payDay:member.payDay || '', payrollReminder:member.payrollReminder || '' };
@@ -1130,22 +1213,52 @@ onMounted(async () => {
       </table>
     </section>
 
-    <div v-else-if="active==='personal'" class="panel-grid" :class="{ single: !showStaffForm }">
+    <div v-else-if="active==='personal'" class="panel-grid" :class="{ single: !showStaffForm && !showPayrollForm }">
       <section class="glass-card staff-panel">
         <div class="section-title">
-          <div><span class="badge">Solo administración</span><h2>Personal</h2><p class="muted-text">Accesos, horarios y datos de pago del equipo.</p></div>
-          <button class="secondary small" type="button" @click="editingStaffId=''; resetStaffForm(); showStaffForm=true">Agregar trabajador</button>
+          <div><span class="badge">Solo administración</span><h2>{{ staffWorkspace === 'team' ? 'Personal' : 'Pagos del personal' }}</h2><p class="muted-text">{{ staffWorkspace === 'team' ? 'Accesos, horarios y datos de pago del equipo.' : 'Control mensual conectado automáticamente con Caja.' }}</p></div>
+          <button v-if="staffWorkspace === 'team'" class="secondary small" type="button" @click="editingStaffId=''; resetStaffForm(); showPayrollForm=false; showStaffForm=true">Agregar trabajador</button>
+          <button v-else class="secondary small" type="button" @click="showStaffForm=false; openPayrollForm()">Registrar mes</button>
         </div>
-        <div v-if="staff.length" class="staff-list">
-          <article v-for="member in staff" :key="member.id" class="staff-card" :class="{ inactive: !member.active }">
-            <div class="staff-identity"><div class="pet-initial">{{ member.fullName?.charAt(0) || 'P' }}</div><div><strong>{{ member.fullName }}</strong><span>{{ staffRoleLabel(member.role) }}</span><small>{{ member.email }}</small></div></div>
-            <div class="staff-detail"><span>Horario</span><strong>{{ member.workSchedule || 'Sin horario' }}</strong></div>
-            <div class="staff-detail"><span>Sueldo</span><strong>{{ member.monthlySalary != null ? 'S/ ' + formatPrice(member.monthlySalary) : 'Sin registrar' }}</strong><small>{{ member.payDay || '' }}</small></div>
-            <div class="staff-detail"><span>Cuenta</span><strong>{{ maskedAccount(member.bankAccount) }}</strong></div>
-            <div class="table-actions"><button class="ghost small" type="button" @click="editStaff(member)">Editar</button><button class="secondary small" type="button" @click="toggleStaff(member)">{{ member.active ? 'Desactivar' : 'Activar' }}</button></div>
-          </article>
-        </div>
-        <div v-else class="calm-empty"><strong>Sin personal registrado</strong><span>Agrega únicamente a quienes necesitan acceso al sistema.</span></div>
+        <nav class="staff-subnav" aria-label="Secciones de personal">
+          <button type="button" :class="{ active: staffWorkspace === 'team' }" @click="staffWorkspace='team'; showPayrollForm=false">Equipo</button>
+          <button type="button" :class="{ active: staffWorkspace === 'payroll' }" @click="staffWorkspace='payroll'; showStaffForm=false">Pagos mensuales</button>
+        </nav>
+        <template v-if="staffWorkspace === 'team'">
+          <div v-if="staff.length" class="staff-list">
+            <article v-for="member in staff" :key="member.id" class="staff-card" :class="{ inactive: !member.active }">
+              <div class="staff-identity"><div class="pet-initial">{{ member.fullName?.charAt(0) || 'P' }}</div><div><strong>{{ member.fullName }}</strong><span>{{ staffRoleLabel(member.role) }}</span><small>{{ member.email }}</small></div></div>
+              <div class="staff-detail"><span>Horario</span><strong>{{ member.workSchedule || 'Sin horario' }}</strong></div>
+              <div class="staff-detail"><span>Sueldo</span><strong>{{ member.monthlySalary != null ? 'S/ ' + formatPrice(member.monthlySalary) : 'Sin registrar' }}</strong><small>{{ member.payDay || '' }}</small></div>
+              <div class="staff-detail"><span>Cuenta</span><strong>{{ maskedAccount(member.bankAccount) }}</strong></div>
+              <div class="table-actions"><button class="ghost small" type="button" @click="editStaff(member)">Editar</button><button class="ghost small" type="button" @click="staffWorkspace='payroll'; showStaffForm=false; openPayrollForm(member)">Registrar pago</button><button class="secondary small" type="button" @click="toggleStaff(member)">{{ member.active ? 'Desactivar' : 'Activar' }}</button></div>
+            </article>
+          </div>
+          <div v-else class="calm-empty"><strong>Sin personal registrado</strong><span>Agrega únicamente a quienes necesitan acceso al sistema.</span></div>
+        </template>
+        <template v-else>
+          <div class="payroll-summary">
+            <article><span>PENDIENTES</span><strong>{{ payrollPayments.filter(item => item.status === 'PENDING').length }}</strong></article>
+            <article><span>PAGADO ESTE MES</span><strong>S/ {{ formatPrice(payrollPayments.filter(item => item.status === 'PAID' && item.period === todayInputDate().slice(0, 7)).reduce((sum, item) => sum + Number(item.amount || 0), 0)) }}</strong></article>
+          </div>
+          <div v-if="payrollPayments.length" class="payroll-list">
+            <article v-for="payment in payrollPayments" :key="payment.id" class="payroll-card">
+              <div><span class="badge">{{ formatPayrollPeriod(payment.period) }}</span><h3>{{ payment.staff?.fullName }}</h3><small>{{ staffRoleLabel(payment.staff?.role) }} · {{ payment.staff?.payDay || 'Día no indicado' }}</small></div>
+              <div class="staff-detail"><span>Monto</span><strong>S/ {{ formatPrice(payment.amount) }}</strong><small>{{ maskedAccount(payment.staff?.bankAccount) }}</small></div>
+              <div class="staff-detail"><span>Estado</span><strong>{{ payment.status === 'PAID' ? 'Pagado' : payment.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente' }}</strong><small>{{ payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('es-PE') : 'Aún no afecta Caja' }}</small></div>
+              <div v-if="payment.status === 'PENDING'" class="table-actions"><button class="secondary small" type="button" @click="startPayrollPayment(payment)">Marcar pagado</button><button class="ghost small" type="button" @click="cancelPayroll(payment)">Cancelar</button></div>
+              <div v-else class="payroll-reference"><small>{{ payment.referenceCode || 'Sin referencia' }}</small></div>
+              <form v-if="payingPayrollId === payment.id" class="payroll-payment-form" @submit.prevent="confirmPayrollPayment(payment)">
+                <label>Fecha<input v-model="payrollPayForm.paidAt" type="date" required></label>
+                <label>Método<select v-model="payrollPayForm.paymentMethod"><option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+                <label>Referencia<input v-model="payrollPayForm.referenceCode" placeholder="Operación o comprobante"></label>
+                <button :disabled="saving">{{ saving ? 'Procesando...' : 'Confirmar y enviar a Caja' }}</button>
+                <button class="ghost" type="button" @click="payingPayrollId=''">Cerrar</button>
+              </form>
+            </article>
+          </div>
+          <div v-else class="calm-empty"><strong>Sin pagos mensuales</strong><span>Registra el mes cuando corresponda; Caja solo cambia al confirmar el pago.</span></div>
+        </template>
       </section>
       <section v-if="showStaffForm" class="glass-card staff-editor">
         <div class="section-title"><div><span class="badge">{{ editingStaffId ? 'Editar' : 'Nuevo acceso' }}</span><h2>{{ editingStaffId ? 'Datos del trabajador' : 'Agregar trabajador' }}</h2></div><button class="ghost small" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cerrar</button></div>
@@ -1161,6 +1274,17 @@ onMounted(async () => {
           <label>Recordatorio<textarea v-model="staffForm.payrollReminder" rows="2" placeholder="Observación administrativa"></textarea></label>
           <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar trabajador' }}</button>
           <button class="secondary" type="button" @click="showStaffForm=false; editingStaffId=''; resetStaffForm()">Cancelar</button>
+        </form>
+      </section>
+      <section v-if="showPayrollForm" class="glass-card staff-editor">
+        <div class="section-title"><div><span class="badge">Nuevo periodo</span><h2>Registrar pago mensual</h2><p class="muted-text">Primero quedará pendiente; todavía no afectará Caja.</p></div><button class="ghost small" type="button" @click="showPayrollForm=false; payrollForm=defaultPayrollForm()">Cerrar</button></div>
+        <form class="stack" @submit.prevent="savePayroll">
+          <label>Trabajador<select v-model="payrollForm.staffId" required @change="syncPayrollAmount"><option value="" disabled>Seleccionar</option><option v-for="member in staff" :key="member.id" :value="member.id">{{ member.fullName }} · {{ staffRoleLabel(member.role) }}</option></select></label>
+          <label>Mes<input v-model="payrollForm.period" type="month" required></label>
+          <label>Monto<input v-model.number="payrollForm.amount" type="number" min="0.01" step="0.01" required></label>
+          <label>Nota interna<textarea v-model="payrollForm.notes" rows="2" placeholder="Bonificación, descuento acordado u observación"></textarea></label>
+          <button :disabled="saving">{{ saving ? 'Guardando...' : 'Registrar como pendiente' }}</button>
+          <button class="secondary" type="button" @click="showPayrollForm=false; payrollForm=defaultPayrollForm()">Cancelar</button>
         </form>
       </section>
       <section v-if="inventoryDetail" class="glass-card inventory-detail-card">
@@ -1551,6 +1675,20 @@ onMounted(async () => {
 .staff-identity > div:last-child,.staff-detail { display: grid; gap: 2px; }
 .staff-identity span,.staff-identity small,.staff-detail span,.staff-detail small { color: #687a75; font-size: .78rem; }
 .staff-detail > span { font-weight: 800; text-transform: uppercase; }
+.staff-subnav { display: flex; gap: 6px; width: fit-content; margin-top: 16px; padding: 5px; border: 1px solid rgba(13,95,96,.12); border-radius: 16px; background: rgba(229,242,239,.72); }
+.staff-subnav button { padding: 9px 15px; border: 0; background: transparent; color: #5d716d; box-shadow: none; }
+.staff-subnav button.active { background: #fff; color: #155f66; box-shadow: 0 8px 20px rgba(15,74,76,.1); }
+.payroll-summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 16px; }
+.payroll-summary article { padding: 16px; border: 1px solid rgba(13,95,96,.12); border-radius: 17px; background: linear-gradient(145deg,rgba(255,255,255,.96),rgba(231,248,243,.72)); }
+.payroll-summary span { display: block; color: #687a75; font-size: .76rem; font-weight: 900; }
+.payroll-summary strong { display: block; margin-top: 5px; color: #12302b; font-size: 1.45rem; }
+.payroll-list { display: grid; gap: 10px; margin-top: 12px; }
+.payroll-card { display: grid; grid-template-columns: minmax(220px,1.25fr) .7fr .75fr auto; align-items: center; gap: 15px; padding: 16px; border: 1px solid rgba(13,95,96,.13); border-radius: 19px; background: rgba(255,255,255,.84); }
+.payroll-card h3 { margin: 7px 0 2px; }
+.payroll-card > div > small,.payroll-reference { color: #687a75; }
+.payroll-payment-form { display: grid; grid-template-columns: 130px 150px minmax(180px,1fr) auto auto; grid-column: 1 / -1; align-items: end; gap: 8px; padding-top: 14px; border-top: 1px solid rgba(13,95,96,.1); }
+.payroll-payment-form label { display: grid; gap: 5px; font-weight: 800; }
+.payroll-payment-form input,.payroll-payment-form select { padding: 9px; }
 .service-price-note {
   margin: 0;
   padding: 12px 14px;
@@ -1890,6 +2028,7 @@ onMounted(async () => {
 @media (max-width: 980px) {
   .cash-category-summary { grid-template-columns: 1fr; }
   .staff-card { grid-template-columns: 1fr; align-items: stretch; }
+  .payroll-card,.payroll-payment-form,.payroll-summary { grid-template-columns: 1fr; }
   .receivable-metrics,.receivable-form-grid,.receivable-card,.receivable-payment { grid-template-columns: 1fr; }
   .receivable-form-grid .wide { grid-column: auto; }
   .cash-subnav { width: 100%; }

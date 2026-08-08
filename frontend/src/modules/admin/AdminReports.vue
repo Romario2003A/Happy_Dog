@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { api } from '../../services/api';
+import { useAuthStore } from '../../stores/auth';
 import {
   filterReportRows,
   isCampaignReportAppointment,
@@ -17,6 +18,7 @@ const today = dateKey(new Date());
 const fromDate = ref(`${today.slice(0, 8)}01`);
 const toDate = ref(today);
 const report = ref(emptyReport());
+const auth = useAuthStore();
 
 const groups = [
   { value: 'overview', label: 'Resumen' },
@@ -38,6 +40,7 @@ const views = [
   { value: 'clinical', label: 'Fichas clínicas', group: 'clinical' },
   { value: 'followups', label: 'Seguimientos', group: 'clinical' },
   { value: 'staff', label: 'Personal', group: 'team' },
+  { value: 'payroll', label: 'Pagos del personal', group: 'team', adminOnly: true },
 ];
 
 const paymentLabels = {
@@ -47,7 +50,7 @@ const categoryLabels = {
   CONSULTATION: 'Consultas', VACCINE: 'Vacunas', DEWORMING: 'Desparasitación', SURGERY: 'Cirugías',
   GROOMING: 'Baño y corte', TREATMENT: 'Tratamientos', PRODUCT: 'Productos', PHARMACY: 'Farmacia',
   LABORATORY: 'Laboratorio', IMAGING: 'Imágenes', SEDATION: 'Sedación', BOARDING: 'Hospedaje', FOOD: 'Comida',
-  PET_SHOP: 'Pet shop', EUTHANASIA: 'Eutanasia', CAMPAIGN: 'Campañas', DEBT: 'Deudas', OTHER: 'Otros',
+  PET_SHOP: 'Pet shop', EUTHANASIA: 'Eutanasia', CAMPAIGN: 'Campañas', DEBT: 'Deudas', PAYROLL: 'Pago de personal', OTHER: 'Otros',
 };
 const statusLabels = {
   PENDING: 'Pendiente', CONFIRMED: 'Confirmada', WAITING: 'En espera', IN_CONSULTATION: 'En atención',
@@ -56,7 +59,7 @@ const statusLabels = {
 const roleLabels = { ADMIN: 'Administración', RECEPTIONIST: 'Recepción', VETERINARIAN: 'Veterinaria/o' };
 const sexLabels = { MALE: 'Macho', FEMALE: 'Hembra', UNKNOWN: 'No indicado' };
 
-const activeViews = computed(() => views.filter(view => view.group === reportGroup.value));
+const activeViews = computed(() => views.filter(view => view.group === reportGroup.value && (!view.adminOnly || auth.role === 'ADMIN')));
 const groomingRows = computed(() => report.value.appointments.filter(isGroomingReportAppointment));
 const campaignRows = computed(() => report.value.appointments.filter(isCampaignReportAppointment));
 const surgeryRows = computed(() => report.value.appointments.filter(item => isSurgeryReportAppointment(item) && !isCampaignReportAppointment(item)));
@@ -85,6 +88,7 @@ const filteredClinical = computed(() => filterReportRows(clinicalRows.value, sea
 const filteredFollowups = computed(() => filterReportRows(followupRows.value, search.value));
 const filteredTariff = computed(() => filterReportRows(report.value.services, search.value));
 const filteredStaff = computed(() => filterReportRows(report.value.staff, search.value));
+const filteredPayroll = computed(() => filterReportRows(report.value.payrollPayments, search.value));
 const sortedCategories = computed(() => report.value.byCategory.slice().sort((a, b) => Math.abs(Number(b.net)) - Math.abs(Number(a.net))));
 const periodLabel = computed(() => fromDate.value === toDate.value
   ? formatDate(fromDate.value)
@@ -93,8 +97,8 @@ const periodLabel = computed(() => fromDate.value === toDate.value
 function emptyReport() {
   return {
     range: {},
-    summary: { income: 0, expenses: 0, adjustments: 0, net: 0, movements: 0, appointments: 0, attended: 0, preventive: 0, services: 0, staff: 0 },
-    byCategory: [], byPaymentMethod: [], cashMovements: [], appointments: [], preventiveRecords: [], services: [], staff: [],
+    summary: { income: 0, expenses: 0, adjustments: 0, net: 0, movements: 0, appointments: 0, attended: 0, preventive: 0, services: 0, staff: 0, payrollPaid: 0, payrollPending: 0 },
+    byCategory: [], byPaymentMethod: [], cashMovements: [], appointments: [], preventiveRecords: [], services: [], staff: [], payrollPayments: [],
   };
 }
 
@@ -303,6 +307,12 @@ onMounted(loadReport);
           <table><thead><tr><th>NOMBRE</th><th>CORREO</th><th>ROL</th><th>HORARIO DE TRABAJO</th><th>ESTADO</th></tr></thead>
           <tbody><tr v-if="!filteredStaff.length"><td colspan="5" class="report-empty-cell">No hay personal registrado con este criterio.</td></tr>
           <tr v-for="row in filteredStaff" :key="row.id"><td><strong>{{ row.fullName }}</strong></td><td>{{ row.email }}</td><td>{{ roleLabels[row.role] || row.role }}</td><td>{{ row.workSchedule || 'No especificado' }}</td><td><span class="report-status" :data-status="row.active ? 'ATTENDED' : 'CANCELLED'">{{ row.active ? 'Activo' : 'Inactivo' }}</span></td></tr></tbody></table>
+        </div>
+
+        <div v-else-if="reportView === 'payroll'" class="report-table-scroll">
+          <table><thead><tr><th>MES</th><th>TRABAJADOR</th><th>ROL</th><th>ESTADO</th><th>FECHA DE PAGO</th><th>MÉTODO</th><th>REFERENCIA</th><th>MONTO</th></tr></thead>
+          <tbody><tr v-if="!filteredPayroll.length"><td colspan="8" class="report-empty-cell">No hay pagos del personal en este periodo.</td></tr>
+          <tr v-for="row in filteredPayroll" :key="row.id"><td><strong>{{ row.period }}</strong></td><td>{{ row.staffName }}</td><td>{{ roleLabels[row.staffRole] || row.staffRole }}</td><td><span class="report-status" :data-status="row.status === 'PAID' ? 'ATTENDED' : row.status">{{ row.status === 'PAID' ? 'Pagado' : row.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente' }}</span></td><td>{{ formatDateTime(row.paidAt) }}</td><td>{{ paymentLabels[row.paymentMethod] || '—' }}</td><td>{{ row.referenceCode || '—' }}</td><td class="total-cell">S/ {{ money(row.amount) }}</td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'preventive'" class="report-table-scroll">

@@ -77,7 +77,14 @@ enum CashMovementCategory {
   EUTHANASIA
   CAMPAIGN
   DEBT
+  PAYROLL
   OTHER
+}
+
+enum PayrollPaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
 }
 
 enum MovementType {
@@ -111,6 +118,8 @@ model User {
   sales                 Sale[]
   cashMovements         CashMovement[]
   cashClosings          CashClosing[]
+  payrollPayments       PayrollPayment[]       @relation("StaffPayrollPayments")
+  registeredPayrolls    PayrollPayment[]       @relation("RegisteredPayrollPayments")
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 }
@@ -366,6 +375,7 @@ model CashMovement {
   appointment    Appointment?         @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   product        Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   registeredBy   User?                @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  payrollPayment PayrollPayment?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
@@ -376,6 +386,29 @@ model CashMovement {
   @@index([clientId])
   @@index([petId])
   @@index([productId])
+}
+
+model PayrollPayment {
+  id             String               @id @default(uuid())
+  period         String
+  amount         Decimal              @db.Decimal(10, 2)
+  status         PayrollPaymentStatus @default(PENDING)
+  paidAt         DateTime?
+  paymentMethod  PaymentMethod?
+  referenceCode  String?
+  notes          String?
+  staffId        String
+  registeredById String?
+  cashMovementId String?              @unique
+  staff          User                 @relation("StaffPayrollPayments", fields: [staffId], references: [id], onDelete: Restrict)
+  registeredBy   User?                @relation("RegisteredPayrollPayments", fields: [registeredById], references: [id], onDelete: SetNull)
+  cashMovement   CashMovement?        @relation(fields: [cashMovementId], references: [id], onDelete: SetNull)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([staffId, period])
+  @@index([period, status])
+  @@index([staffId])
 }
 
 model CashClosing {

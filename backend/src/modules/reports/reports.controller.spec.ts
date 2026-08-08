@@ -1,14 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { ReportsController } from './reports.controller';
 
 describe('ReportsController classic view', () => {
-  function controllerWith(data: { cash?: any[]; appointments?: any[]; preventive?: any[]; services?: any[]; staff?: any[] } = {}) {
+  function controllerWith(data: { cash?: any[]; appointments?: any[]; preventive?: any[]; services?: any[]; staff?: any[]; payroll?: any[] } = {}) {
     const prisma = {
       cashMovement: { findMany: jest.fn().mockResolvedValue(data.cash || []) },
       appointment: { findMany: jest.fn().mockResolvedValue(data.appointments || []) },
       preventiveCareRecord: { findMany: jest.fn().mockResolvedValue(data.preventive || []) },
       service: { findMany: jest.fn().mockResolvedValue(data.services || []) },
       user: { findMany: jest.fn().mockResolvedValue(data.staff || []) },
+      payrollPayment: { findMany: jest.fn().mockResolvedValue(data.payroll || []) },
     };
     return { controller: new ReportsController(prisma as any), prisma };
   }
@@ -51,5 +53,14 @@ describe('ReportsController classic view', () => {
     const { controller } = controllerWith();
     await expect(controller.classic('2026-08-31', '2026-08-01')).rejects.toBeInstanceOf(BadRequestException);
     await expect(controller.classic('2025-01-01', '2026-08-01')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('keeps payroll details restricted to administrators', async () => {
+    const { controller, prisma } = controllerWith({ payroll: [{ id: 'p1', period: '2026-08', amount: 1500, status: 'PAID', staff: { fullName: 'Trabajador' } }] });
+
+    const receptionistReport = await controller.classic('2026-08-01', '2026-08-31', Role.RECEPTIONIST);
+
+    expect(receptionistReport.payrollPayments).toEqual([]);
+    expect(prisma.payrollPayment.findMany).not.toHaveBeenCalled();
   });
 });

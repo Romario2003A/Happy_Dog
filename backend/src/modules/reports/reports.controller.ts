@@ -1,6 +1,7 @@
 import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { PrismaService } from '../../database/prisma.service';
@@ -50,9 +51,9 @@ export class ReportsController {
   }
 
   @Get('classic')
-  async classic(@Query('from') from?: string, @Query('to') to?: string) {
+  async classic(@Query('from') from?: string, @Query('to') to?: string, @CurrentUser('role') role: Role = Role.ADMIN) {
     const range = this.reportRange(from, to);
-    const [cashMovements, appointments, preventiveRecords, services, staff] = await Promise.all([
+    const [cashMovements, appointments, preventiveRecords, services, staff, payrollPayments] = await Promise.all([
       (this.prisma as any).cashMovement.findMany({
         where: { occurredAt: { gte: range.start, lte: range.end } },
         orderBy: { occurredAt: 'desc' },
@@ -95,6 +96,16 @@ export class ReportsController {
         orderBy: [{ active: 'desc' }, { fullName: 'asc' }],
         select: { id: true, fullName: true, email: true, role: true, active: true, workSchedule: true },
       }),
+      role === Role.ADMIN
+        ? this.prisma.payrollPayment.findMany({
+          where: { period: { gte: range.from.slice(0, 7), lte: range.to.slice(0, 7) } },
+          orderBy: [{ period: 'desc' }, { createdAt: 'desc' }],
+          include: {
+            staff: { select: { fullName: true, role: true } },
+            registeredBy: { select: { fullName: true } },
+          },
+        })
+        : Promise.resolve([]),
     ]);
 
     const categoryTotals = new Map<string, { income: number; expenses: number }>();
@@ -203,6 +214,20 @@ export class ReportsController {
       socialPrice: service.socialPrice == null ? null : Number(service.socialPrice),
     }));
 
+    const payroll = payrollPayments.map((payment: any) => ({
+      id: payment.id,
+      period: payment.period,
+      amount: Number(payment.amount || 0),
+      status: payment.status,
+      paidAt: payment.paidAt,
+      paymentMethod: payment.paymentMethod,
+      referenceCode: payment.referenceCode || '',
+      notes: payment.notes || '',
+      staffName: payment.staff?.fullName || '',
+      staffRole: payment.staff?.role || '',
+      responsible: payment.registeredBy?.fullName || '',
+    }));
+
     return {
       range: { from: range.from, to: range.to },
       summary: {
@@ -216,6 +241,8 @@ export class ReportsController {
         preventive: preventive.length,
         services: tariff.length,
         staff: staff.length,
+        payrollPaid: payroll.filter((row: any) => row.status === 'PAID').reduce((sum: number, row: any) => sum + row.amount, 0),
+        payrollPending: payroll.filter((row: any) => row.status === 'PENDING').length,
       },
       byCategory: Array.from(categoryTotals.entries()).map(([key, values]) => ({
         key,
@@ -229,6 +256,7 @@ export class ReportsController {
       preventiveRecords: preventive,
       services: tariff,
       staff,
+      payrollPayments: payroll,
     };
   }
 }

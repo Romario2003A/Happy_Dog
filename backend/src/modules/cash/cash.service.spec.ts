@@ -2,6 +2,15 @@ import { BadRequestException } from '@nestjs/common';
 import { CashService } from './cash.service';
 
 describe('CashService daily closing', () => {
+  it('keeps payroll movements under the Personal workflow', async () => {
+    const service = new CashService({} as any);
+
+    await expect(service.createMovement({
+      type: 'EXPENSE', category: 'PAYROLL', description: 'Pago manual', amount: 100,
+      paymentMethod: 'CASH',
+    } as any)).rejects.toThrow('se registran desde el módulo Personal');
+  });
+
   it('calculates physical cash separately from card and Yape', async () => {
     const prisma = {
       cashMovement: {
