@@ -148,9 +148,9 @@ onMounted(loadReport);
   <section class="reports-workspace">
     <header class="reports-heading glass-card">
       <div>
-        <span class="badge">Vista clásica · Solo lectura</span>
-        <h2>Reportes del negocio</h2>
-        <p>La información se organiza automáticamente desde citas, atenciones y caja. Aquí no se modifica ningún registro.</p>
+        <span class="badge">Libro de control · Solo lectura</span>
+        <h2>Registro general de Happy Dog</h2>
+        <p>La misma lectura ordenada del archivo anterior, ahora completada automáticamente por el sistema.</p>
       </div>
       <button type="button" class="secondary report-print" @click="printReport">Imprimir reporte</button>
     </header>
@@ -174,62 +174,72 @@ onMounted(loadReport);
     </div>
 
     <template v-else>
-      <div class="report-period-line"><span>Periodo consultado</span><strong>{{ periodLabel }}</strong></div>
+      <section class="workbook-frame">
+        <div class="workbook-titlebar">
+          <div>
+            <span>HAPPY DOG</span>
+            <strong>{{ views.find(view => view.value === reportView)?.label }}</strong>
+          </div>
+          <div class="workbook-period"><small>PERIODO CONSULTADO</small><strong>{{ periodLabel }}</strong></div>
+        </div>
 
-      <div class="report-metrics">
-        <article><span>Ingresos</span><strong>S/ {{ money(report.summary.income) }}</strong><small>{{ report.summary.movements }} movimientos</small></article>
-        <article><span>Gastos</span><strong>S/ {{ money(report.summary.expenses) }}</strong><small>Egresos registrados</small></article>
-        <article class="primary"><span>Resultado</span><strong>S/ {{ money(report.summary.net) }}</strong><small>Ingresos menos gastos</small></article>
-        <article><span>Atenciones</span><strong>{{ report.summary.attended }} / {{ report.summary.appointments }}</strong><small>Atendidas / registradas</small></article>
-      </div>
+        <div class="report-metrics" aria-label="Resumen del periodo">
+          <div><span>INGRESOS</span><strong>S/ {{ money(report.summary.income) }}</strong><small>{{ report.summary.movements }} movimientos</small></div>
+          <div><span>EGRESOS</span><strong>S/ {{ money(report.summary.expenses) }}</strong><small>Gastos registrados</small></div>
+          <div class="primary"><span>RESULTADO</span><strong>S/ {{ money(report.summary.net) }}</strong><small>Ingresos menos gastos</small></div>
+          <div><span>ATENCIONES</span><strong>{{ report.summary.attended }} / {{ report.summary.appointments }}</strong><small>Atendidas / registradas</small></div>
+        </div>
 
-      <nav class="report-view-tabs" aria-label="Vistas del reporte">
-        <button v-for="view in views" :key="view.value" type="button" :class="{ active: reportView === view.value }" @click="reportView = view.value; search = ''">{{ view.label }}</button>
-      </nav>
+        <nav class="report-view-tabs" aria-label="Vistas del reporte">
+          <button v-for="view in views" :key="view.value" type="button" :class="{ active: reportView === view.value }" @click="reportView = view.value; search = ''">{{ view.label }}</button>
+        </nav>
 
-      <section v-if="reportView === 'overview'" class="report-overview-grid">
-        <article class="glass-card report-summary-block">
-          <div class="report-block-title"><div><span class="badge">Actividad</span><h3>Resultado por categoría</h3></div><small>{{ sortedCategories.length }} categorías con movimiento</small></div>
-          <div v-if="sortedCategories.length" class="report-category-list">
-            <div v-for="category in sortedCategories" :key="category.key">
-              <span>{{ categoryLabels[category.key] || category.key }}</span>
-              <strong>S/ {{ money(category.net) }}</strong>
-              <small>Ingresos S/ {{ money(category.income) }} · Gastos S/ {{ money(category.expenses) }}</small>
+        <section v-if="reportView === 'overview'" class="report-overview-grid">
+          <article class="report-summary-block">
+            <div class="sheet-section-title"><strong>RESUMEN POR CATEGORÍA</strong><span>{{ sortedCategories.length }} categorías con movimiento</span></div>
+            <div class="report-table-scroll overview-table">
+              <table>
+                <thead><tr><th>CATEGORÍA</th><th>INGRESOS</th><th>EGRESOS</th><th>RESULTADO</th></tr></thead>
+                <tbody>
+                  <tr v-if="!sortedCategories.length"><td colspan="4" class="report-empty-cell">Sin actividad en este periodo.</td></tr>
+                  <tr v-for="category in sortedCategories" :key="category.key"><td><strong>{{ categoryLabels[category.key] || category.key }}</strong></td><td>S/ {{ money(category.income) }}</td><td>S/ {{ money(category.expenses) }}</td><td class="total-cell">S/ {{ money(category.net) }}</td></tr>
+                </tbody>
+                <tfoot><tr><th>TOTAL DEL PERIODO</th><td>S/ {{ money(report.summary.income) }}</td><td>S/ {{ money(report.summary.expenses) }}</td><td>S/ {{ money(report.summary.net) }}</td></tr></tfoot>
+              </table>
             </div>
-          </div>
-          <div v-else class="report-empty"><strong>Sin actividad en este periodo</strong><span>Los resultados aparecerán cuando se registren cobros o gastos.</span></div>
-        </article>
+          </article>
 
-        <article class="glass-card report-summary-block compact">
-          <div class="report-block-title"><div><span class="badge">Cobros</span><h3>Métodos de pago</h3></div></div>
-          <div v-if="report.byPaymentMethod.length" class="report-payment-list">
-            <div v-for="method in report.byPaymentMethod" :key="method.key"><span>{{ paymentLabels[method.key] || method.key }}</span><strong>S/ {{ money(method.total) }}</strong></div>
-          </div>
-          <div v-else class="report-empty"><strong>Sin cobros registrados</strong><span>El desglose aparecerá automáticamente.</span></div>
-          <div class="report-followup-note"><span>Preventivo registrado</span><strong>{{ report.summary.preventive }}</strong><small>Vacunas o desparasitaciones aplicadas</small></div>
-        </article>
-      </section>
+          <article class="report-summary-block compact">
+            <div class="sheet-section-title"><strong>MÉTODOS DE PAGO</strong><span>Distribución de cobros</span></div>
+            <div class="report-table-scroll payment-table">
+              <table><thead><tr><th>MÉTODO</th><th>TOTAL</th></tr></thead><tbody>
+                <tr v-if="!report.byPaymentMethod.length"><td colspan="2" class="report-empty-cell">Sin cobros registrados.</td></tr>
+                <tr v-for="method in report.byPaymentMethod" :key="method.key"><td>{{ paymentLabels[method.key] || method.key }}</td><td class="total-cell">S/ {{ money(method.total) }}</td></tr>
+              </tbody><tfoot><tr><th>PREVENTIVOS</th><td>{{ report.summary.preventive }} registros</td></tr></tfoot></table>
+            </div>
+          </article>
+        </section>
 
-      <section v-else class="glass-card report-table-card">
+        <section v-else class="report-table-card">
         <div class="report-table-heading">
-          <div><span class="badge">Consulta visual</span><h3>{{ views.find(view => view.value === reportView)?.label }}</h3></div>
+          <div><span>HOJA ACTIVA</span><h3>{{ views.find(view => view.value === reportView)?.label }}</h3></div>
           <input v-model="search" placeholder="Buscar dueño, mascota, servicio o responsable">
         </div>
 
         <div v-if="reportView === 'cash'" class="report-table-scroll">
-          <table><thead><tr><th>Fecha</th><th>Cliente / paciente</th><th>Concepto</th><th>Categoría</th><th>Método</th><th>Ingreso</th><th>Gasto</th></tr></thead>
+          <table><thead><tr><th>FECHA</th><th>CLIENTE / PACIENTE</th><th>CONCEPTO</th><th>CATEGORÍA</th><th>MÉTODO</th><th>INGRESO</th><th>EGRESO</th></tr></thead>
           <tbody><tr v-if="!filteredCash.length"><td colspan="7" class="report-empty-cell">No hay movimientos con este criterio.</td></tr>
           <tr v-for="row in filteredCash" :key="row.id"><td>{{ formatDateTime(row.occurredAt) }}</td><td><strong>{{ row.petName || row.counterparty || '—' }}</strong><small>{{ row.clientName }}</small></td><td>{{ row.description }}</td><td>{{ categoryLabels[row.category] || row.category }}</td><td>{{ paymentLabels[row.paymentMethod] || '—' }}</td><td class="money-positive">{{ row.type === 'EXPENSE' ? '—' : `S/ ${money(row.amount)}` }}</td><td class="money-negative">{{ row.type === 'EXPENSE' ? `S/ ${money(row.amount)}` : '—' }}</td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'preventive'" class="report-table-scroll">
-          <table><thead><tr><th>Fecha</th><th>Paciente</th><th>Dueño</th><th>Aplicación</th><th>Peso</th><th>Costo</th><th>Próxima fecha</th><th>Médico</th></tr></thead>
+          <table><thead><tr><th>FECHA</th><th>PACIENTE</th><th>DUEÑO</th><th>VACUNA / DESPARASITACIÓN</th><th>PESO</th><th>COSTO</th><th>PRÓXIMA FECHA</th><th>MÉDICO</th></tr></thead>
           <tbody><tr v-if="!filteredPreventive.length"><td colspan="8" class="report-empty-cell">No hay vacunas o desparasitaciones con este criterio.</td></tr>
           <tr v-for="row in filteredPreventive" :key="row.id"><td>{{ formatDate(row.appliedAt) }}</td><td><strong>{{ row.petName }}</strong><small>{{ row.species }} · {{ row.breed || 'Sin raza' }}</small></td><td>{{ row.clientName }}<small>{{ row.phone }}</small></td><td>{{ row.productName }}<small>{{ row.type === 'DEWORMING' ? 'Desparasitación' : 'Vacuna' }}</small></td><td>{{ row.weightKg == null ? '—' : `${row.weightKg} kg` }}</td><td>S/ {{ money(row.amountCharged) }}</td><td>{{ formatDate(row.nextAppointmentAt) }}</td><td>{{ row.veterinarianName || '—' }}</td></tr></tbody></table>
         </div>
 
         <div v-else class="report-table-scroll">
-          <table><thead><tr><th>Fecha</th><th>Dueño</th><th>Paciente</th><th>Atención</th><th>Estado</th><th>Precio</th><th>Pago</th><th>Responsable</th></tr></thead>
+          <table><thead><tr><th>FECHA</th><th>DUEÑO</th><th>PACIENTE</th><th>ATENCIÓN</th><th>ESTADO</th><th>PRECIO</th><th>PAGO</th><th>RESPONSABLE</th></tr></thead>
           <tbody>
             <tr v-if="!(reportView === 'grooming' ? filteredGrooming : reportView === 'surgery' ? filteredSurgery : filteredAttentions).length"><td colspan="8" class="report-empty-cell">No hay atenciones con este criterio.</td></tr>
             <tr v-for="row in (reportView === 'grooming' ? filteredGrooming : reportView === 'surgery' ? filteredSurgery : filteredAttentions)" :key="row.id">
@@ -238,38 +248,41 @@ onMounted(loadReport);
           </tbody></table>
         </div>
       </section>
+      </section>
     </template>
   </section>
 </template>
 
 <style scoped>
-.reports-workspace { display: grid; gap: 17px; }
-.reports-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 24px; }
-.reports-heading h2,.report-block-title h3,.report-table-heading h3 { margin: 7px 0 4px; }
-.reports-heading p { max-width: 720px; margin: 0; color: #687a75; line-height: 1.5; }
-.report-controls { display: grid; grid-template-columns: 1fr 155px 155px auto; align-items: end; gap: 10px; padding: 14px; }
+.reports-workspace { display: grid; gap: 14px; }
+.reports-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 21px 23px; }
+.reports-heading h2,.report-table-heading h3 { margin: 7px 0 4px; }
+.reports-heading p { max-width: 760px; margin: 0; color: #687a75; line-height: 1.5; }
+.report-controls { display: grid; grid-template-columns: 1fr 155px 155px auto; align-items: end; gap: 10px; padding: 12px 14px; }
 .report-controls label { display: grid; gap: 5px; color: #435b56; font-size: .78rem; font-weight: 900; }
 .report-controls input { padding: 9px 10px; }
 .report-presets { display: flex; gap: 6px; flex-wrap: wrap; }
-.report-period-line { display: flex; align-items: center; justify-content: center; gap: 9px; color: #60736e; font-size: .86rem; }
-.report-period-line strong { color: #173c38; }
 .report-loading { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 150px; color: #42625d; }
 .report-loading > span { width: 15px; height: 15px; border: 3px solid #cce5df; border-top-color: #147a72; border-radius: 50%; animation: report-spin .8s linear infinite; }
 .report-loading div { display: grid; gap: 3px; }.report-loading small { color: #71837f; } @keyframes report-spin { to { transform: rotate(360deg); } }
-.report-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 11px; }
-.report-metrics article { padding: 17px; border: 1px solid rgba(13,95,96,.13); border-radius: 20px; background: linear-gradient(145deg,rgba(255,255,255,.94),rgba(231,248,243,.66)); box-shadow: 0 14px 35px rgba(17,78,77,.07); }
-.report-metrics span,.report-metrics small { display: block; color: #687a75; }.report-metrics span { font-size: .76rem; font-weight: 900; text-transform: uppercase; }.report-metrics strong { display: block; margin: 7px 0 3px; color: #15312c; font-size: 1.55rem; }
-.report-metrics .primary { background: linear-gradient(135deg,#176c72,#149882); }.report-metrics .primary span,.report-metrics .primary strong,.report-metrics .primary small { color: #fff; }
-.report-view-tabs { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 5px; padding: 5px; border: 1px solid rgba(13,95,96,.12); border-radius: 17px; background: rgba(225,241,238,.72); }
-.report-view-tabs button { border: 0; background: transparent; color: #5e7470; box-shadow: none; }.report-view-tabs button.active { background: #fff; color: #155f66; box-shadow: 0 8px 20px rgba(15,74,76,.1); }
-.report-overview-grid { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(280px,.75fr); gap: 13px; }.report-summary-block { padding: 20px; }.report-summary-block.compact { align-self: start; }
-.report-block-title,.report-table-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; }.report-block-title small { color: #71817d; }
-.report-category-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(185px,1fr)); gap: 8px; margin-top: 15px; }.report-category-list > div,.report-payment-list > div { padding: 12px; border-radius: 15px; background: #edf7f4; }.report-category-list span,.report-category-list small,.report-payment-list span { display: block; color: #657873; }.report-category-list strong { display: block; margin: 4px 0; color: #155f5f; }
-.report-payment-list { display: grid; gap: 8px; margin-top: 15px; }.report-payment-list > div { display: flex; justify-content: space-between; gap: 12px; }.report-followup-note { display: grid; gap: 3px; margin-top: 12px; padding: 14px; border: 1px solid rgba(13,95,96,.12); border-radius: 16px; }.report-followup-note span,.report-followup-note small { color: #667873; }.report-followup-note strong { color: #155f66; font-size: 1.45rem; }
-.report-empty { display: grid; gap: 4px; margin-top: 14px; padding: 23px; border: 1px dashed rgba(13,95,96,.2); border-radius: 17px; text-align: center; color: #657873; }
-.report-table-card { padding: 20px; overflow: hidden; }.report-table-heading { align-items: end; margin-bottom: 14px; }.report-table-heading input { width: min(390px,100%); }.report-table-scroll { overflow-x: auto; border: 1px solid rgba(13,95,96,.1); border-radius: 16px; }.report-table-scroll table { width: 100%; min-width: 920px; border-collapse: collapse; }.report-table-scroll th { background: #edf6f4; color: #496660; font-size: .72rem; text-transform: uppercase; }.report-table-scroll th,.report-table-scroll td { padding: 12px; border-bottom: 1px solid rgba(13,95,96,.1); text-align: left; vertical-align: top; }.report-table-scroll td { color: #243d38; font-size: .84rem; }.report-table-scroll td small { display: block; margin-top: 3px; color: #75847f; }.report-table-scroll tbody tr:last-child td { border-bottom: 0; }
-.report-empty-cell { padding: 28px !important; text-align: center !important; color: #74837f !important; }.money-positive { color: #087f5b !important; font-weight: 900; }.money-negative { color: #b42318 !important; font-weight: 900; }.report-status { display: inline-flex; padding: 5px 8px; border-radius: 999px; background: #e7f2ef; color: #42615b; font-size: .72rem; font-weight: 900; }.report-status[data-status="ATTENDED"],.report-status[data-status="COMPLETED"] { background: #dcf4e9; color: #087255; }.report-status[data-status="CANCELLED"],.report-status[data-status="NO_SHOW"] { background: #f5eceb; color: #9f3e37; }
-@media (max-width: 1050px) { .report-controls { grid-template-columns: 1fr 1fr; }.report-presets { grid-column: 1 / -1; }.report-metrics { grid-template-columns: repeat(2,1fr); }.report-view-tabs { grid-template-columns: repeat(3,1fr); }.report-overview-grid { grid-template-columns: 1fr; } }
-@media (max-width: 650px) { .reports-heading,.report-table-heading { display: grid; }.report-print { width: 100%; }.report-controls,.report-metrics { grid-template-columns: 1fr; }.report-presets { grid-column: auto; }.report-controls > button { width: 100%; }.report-view-tabs { grid-template-columns: repeat(2,1fr); }.report-metrics strong { font-size: 1.3rem; }.report-table-heading input { width: 100%; } }
-@media print { .report-controls,.report-view-tabs,.report-print { display: none !important; }.reports-workspace { gap: 10px; }.glass-card { box-shadow: none !important; }.report-table-card { overflow: visible; }.report-table-scroll { overflow: visible; }.report-table-scroll table { min-width: 0; font-size: 9px; } }
+.workbook-frame { overflow: hidden; border: 1px solid #9cafb0; border-radius: 15px; background: #fff; box-shadow: 0 18px 42px rgba(28,67,68,.1); }
+.workbook-titlebar { display: flex; align-items: stretch; justify-content: space-between; min-height: 68px; color: #fff; background: #073763; border-bottom: 4px solid #da9694; }
+.workbook-titlebar > div:first-child { display: grid; align-content: center; gap: 2px; padding: 12px 20px; }.workbook-titlebar span,.workbook-titlebar small { font-size: .69rem; font-weight: 900; letter-spacing: .08em; }.workbook-titlebar > div:first-child strong { font-size: 1.25rem; }
+.workbook-period { display: grid; align-content: center; gap: 4px; min-width: 290px; padding: 11px 20px; color: #183a3b; background: #f1e6dc; border-left: 1px solid #fff; }.workbook-period strong { font-size: .9rem; }
+.report-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border-bottom: 1px solid #8fa2a3; }
+.report-metrics > div { min-height: 86px; padding: 13px 16px; background: #fff; border-right: 1px solid #aab7b8; }.report-metrics > div:nth-child(odd) { background: #d5e2fb; }.report-metrics > div:last-child { border-right: 0; }
+.report-metrics span,.report-metrics small { display: block; color: #3f5556; }.report-metrics span { font-size: .7rem; font-weight: 900; }.report-metrics strong { display: block; margin: 5px 0 2px; color: #102f31; font-size: 1.35rem; }.report-metrics .primary { background: #fff2cc; }.report-metrics .primary strong { color: #073763; }
+.report-view-tabs { display: flex; gap: 2px; padding: 7px 10px 0; overflow-x: auto; background: #e8eeee; border-bottom: 1px solid #8fa2a3; }
+.report-view-tabs button { min-width: 126px; padding: 9px 14px; border: 1px solid #a8b5b6; border-bottom: 0; border-radius: 8px 8px 0 0; background: #f7f9f9; color: #486062; box-shadow: none; }.report-view-tabs button.active { position: relative; color: #fff; background: #0d5f60; border-color: #0d5f60; }.report-view-tabs button.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; background: #da9694; content: ''; }
+.report-overview-grid { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(290px,.65fr); gap: 18px; padding: 18px; background: #f7f9f9; }.report-summary-block { min-width: 0; }.report-summary-block.compact { align-self: start; }
+.sheet-section-title { display: flex; align-items: center; justify-content: space-between; min-height: 39px; padding: 8px 12px; color: #fff; background: #073763; border: 1px solid #073763; }.sheet-section-title span { font-size: .75rem; color: #d9e5ef; }
+.report-table-card { padding: 18px; overflow: hidden; background: #f7f9f9; }.report-table-heading { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 10px; }.report-table-heading span { color: #6c7c7c; font-size: .68rem; font-weight: 900; letter-spacing: .08em; }.report-table-heading input { width: min(390px,100%); background: #fff; }
+.report-table-scroll { overflow-x: auto; border: 1px solid #8fa2a3; background: #fff; }.report-table-scroll table { width: 100%; min-width: 920px; border-collapse: collapse; }.overview-table table,.payment-table table { min-width: 0; }
+.report-table-scroll th { padding: 10px 11px; color: #fff; background: #073763; border-right: 1px solid rgba(255,255,255,.35); font-size: .7rem; text-align: center; vertical-align: middle; }.report-table-scroll th:last-child { border-right: 0; }
+.report-table-scroll td { height: 42px; padding: 9px 11px; color: #263d3e; border-right: 1px solid #b8c3c4; border-bottom: 1px solid #b8c3c4; font-size: .82rem; text-align: left; vertical-align: top; }.report-table-scroll td:last-child { border-right: 0; }.report-table-scroll tbody tr:nth-child(even) td { background: #f1e6dc; }.report-table-scroll tbody tr:hover td { background: #fff2cc; }.report-table-scroll td small { display: block; margin-top: 3px; color: #6f7d7e; }.report-table-scroll tbody tr:last-child td { border-bottom: 0; }
+.report-table-scroll tfoot th,.report-table-scroll tfoot td { height: 42px; padding: 9px 11px; color: #173738; background: #d5e2fb; border-top: 2px solid #073763; font-weight: 900; }.report-table-scroll tfoot th { text-align: left; }.total-cell { color: #073763 !important; background: #d5e2fb !important; font-weight: 900; }
+.report-empty-cell { height: 92px !important; padding: 26px !important; text-align: center !important; color: #687879 !important; background: repeating-linear-gradient(0deg,#fff 0,#fff 40px,#edf1f1 41px) !important; }.money-positive { color: #08745b !important; font-weight: 900; }.money-negative { color: #a43f3a !important; font-weight: 900; }.report-status { display: inline-flex; padding: 4px 7px; border-radius: 4px; background: #d5e2fb; color: #314d50; font-size: .69rem; font-weight: 900; }.report-status[data-status="ATTENDED"],.report-status[data-status="COMPLETED"] { background: #d9ead3; color: #286342; }.report-status[data-status="CANCELLED"],.report-status[data-status="NO_SHOW"] { background: #f4cccc; color: #8c3530; }
+@media (max-width: 1050px) { .report-controls { grid-template-columns: 1fr 1fr; }.report-presets { grid-column: 1 / -1; }.report-metrics { grid-template-columns: repeat(2,1fr); }.report-metrics > div:nth-child(2) { border-right: 0; }.report-overview-grid { grid-template-columns: 1fr; } }
+@media (max-width: 650px) { .reports-heading,.report-table-heading,.workbook-titlebar { display: grid; }.report-print { width: 100%; }.report-controls { grid-template-columns: 1fr; }.report-presets { grid-column: auto; }.report-controls > button { width: 100%; }.workbook-period { min-width: 0; border-top: 1px solid rgba(255,255,255,.6); border-left: 0; }.report-metrics { grid-template-columns: 1fr 1fr; }.report-metrics > div { min-height: 78px; padding: 11px; }.report-metrics strong { font-size: 1.08rem; }.report-view-tabs button { min-width: 112px; }.report-overview-grid,.report-table-card { padding: 10px; }.sheet-section-title { align-items: flex-start; gap: 4px; }.sheet-section-title span { text-align: right; }.report-table-heading input { width: 100%; } }
+@media print { .reports-heading,.report-controls,.report-view-tabs,.report-print { display: none !important; }.reports-workspace { gap: 0; }.workbook-frame { border-radius: 0; box-shadow: none; }.report-overview-grid,.report-table-card { padding: 8px 0; }.report-table-scroll { overflow: visible; }.report-table-scroll table { min-width: 0; font-size: 8px; }.report-table-scroll th,.report-table-scroll td { padding: 5px; } }
 </style>
