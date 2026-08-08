@@ -2,11 +2,13 @@ import { BadRequestException } from '@nestjs/common';
 import { ReportsController } from './reports.controller';
 
 describe('ReportsController classic view', () => {
-  function controllerWith(data: { cash?: any[]; appointments?: any[]; preventive?: any[] } = {}) {
+  function controllerWith(data: { cash?: any[]; appointments?: any[]; preventive?: any[]; services?: any[]; staff?: any[] } = {}) {
     const prisma = {
       cashMovement: { findMany: jest.fn().mockResolvedValue(data.cash || []) },
       appointment: { findMany: jest.fn().mockResolvedValue(data.appointments || []) },
       preventiveCareRecord: { findMany: jest.fn().mockResolvedValue(data.preventive || []) },
+      service: { findMany: jest.fn().mockResolvedValue(data.services || []) },
+      user: { findMany: jest.fn().mockResolvedValue(data.staff || []) },
     };
     return { controller: new ReportsController(prisma as any), prisma };
   }
@@ -21,20 +23,28 @@ describe('ReportsController classic view', () => {
         id: 'a1', scheduledAt: new Date(), status: 'ATTENDED', reason: 'Baño', quotedPrice: 35,
         client: { fullName: 'Ana', phone: '999999999' }, pet: { name: 'Luna', species: 'Canino' },
         service: { name: 'SOLO BAÑO', category: 'PELUQUERIA', condition: 'MENOR A 10 KG', price: 35 },
-        veterinarian: null, medicalRecord: null, cashMovements: [{ type: 'INCOME', amount: 35 }],
+        veterinarian: null,
+        medicalRecord: { visitDate: new Date(), reason: 'Control', diagnosis: 'Dermatitis', treatment: 'Baño medicado', nextControlAt: new Date() },
+        cashMovements: [{ type: 'INCOME', amount: 35 }],
       }],
       preventive: [{
         id: 'p1', appliedAt: new Date(), type: 'VACCINE', productName: 'Quíntuple', amountCharged: 50,
         pet: { name: 'Luna', species: 'Canino', client: { fullName: 'Ana', phone: '999999999' } },
         veterinarian: { fullName: 'Doctora' },
       }],
+      services: [{ id: 's1', name: 'Consulta', category: 'CONSULTAS', price: 30, active: true }],
+      staff: [{ id: 'u1', fullName: 'Doctora', email: 'doctor@happydog.com', role: 'VETERINARIAN', active: true }],
     });
 
     const report = await controller.classic('2026-08-01', '2026-08-31');
 
     expect(report.summary).toMatchObject({ income: 35, expenses: 5, net: 30, appointments: 1, attended: 1, preventive: 1 });
     expect(report.appointments[0]).toMatchObject({ clientName: 'Ana', petName: 'Luna', paidAmount: 35 });
+    expect(report.appointments[0]).toMatchObject({ diagnosis: 'Dermatitis', treatment: 'Baño medicado' });
     expect(report.preventiveRecords[0]).toMatchObject({ productName: 'Quíntuple', veterinarianName: 'Doctora' });
+    expect(report.services[0]).toMatchObject({ name: 'Consulta', price: 30 });
+    expect(report.staff[0]).toMatchObject({ fullName: 'Doctora', role: 'VETERINARIAN' });
+    expect(report.summary).toMatchObject({ services: 1, staff: 1 });
   });
 
   it('rejects inverted or excessively long ranges', async () => {

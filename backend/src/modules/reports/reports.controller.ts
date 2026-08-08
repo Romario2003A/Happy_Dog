@@ -52,7 +52,7 @@ export class ReportsController {
   @Get('classic')
   async classic(@Query('from') from?: string, @Query('to') to?: string) {
     const range = this.reportRange(from, to);
-    const [cashMovements, appointments, preventiveRecords] = await Promise.all([
+    const [cashMovements, appointments, preventiveRecords, services, staff] = await Promise.all([
       (this.prisma as any).cashMovement.findMany({
         where: { occurredAt: { gte: range.start, lte: range.end } },
         orderBy: { occurredAt: 'desc' },
@@ -67,10 +67,10 @@ export class ReportsController {
         orderBy: { scheduledAt: 'desc' },
         include: {
           client: { select: { fullName: true, phone: true } },
-          pet: { select: { name: true, species: true, breed: true, age: true, weightKg: true } },
+          pet: { select: { name: true, species: true, breed: true, sex: true, color: true, age: true, weightKg: true } },
           veterinarian: { select: { fullName: true } },
           service: { select: { name: true, category: true, condition: true, price: true } },
-          medicalRecord: { select: { diagnosis: true, nextControlAt: true } },
+          medicalRecord: { select: { visitDate: true, reason: true, weightKg: true, temperatureC: true, diagnosis: true, treatment: true, observations: true, nextControlAt: true } },
           cashMovements: { select: { type: true, amount: true } },
         },
       }),
@@ -78,9 +78,22 @@ export class ReportsController {
         where: { appliedAt: { gte: range.start, lte: range.end } },
         orderBy: { appliedAt: 'desc' },
         include: {
-          pet: { select: { name: true, species: true, breed: true, client: { select: { fullName: true, phone: true } } } },
+          pet: { select: { name: true, species: true, breed: true, sex: true, age: true, client: { select: { fullName: true, phone: true } } } },
           veterinarian: { select: { fullName: true } },
         },
+      }),
+      this.prisma.service.findMany({
+        orderBy: [{ active: 'desc' }, { category: 'asc' }, { name: 'asc' }],
+        select: {
+          id: true, name: true, category: true, species: true, condition: true, description: true,
+          price: true, maxPrice: true, socialPrice: true, priceLabel: true, requiresQuote: true,
+          durationMinutes: true, active: true,
+        },
+      }),
+      this.prisma.user.findMany({
+        where: { role: { not: Role.CLIENT } },
+        orderBy: [{ active: 'desc' }, { fullName: 'asc' }],
+        select: { id: true, fullName: true, email: true, role: true, active: true, workSchedule: true },
       }),
     ]);
 
@@ -140,13 +153,21 @@ export class ReportsController {
         petName: appointment.pet?.name || '',
         species: appointment.pet?.species || '',
         breed: appointment.pet?.breed || '',
+        sex: appointment.pet?.sex || 'UNKNOWN',
+        color: appointment.pet?.color || '',
         age: appointment.pet?.age || '',
         weightKg: appointment.pet?.weightKg ?? null,
         serviceName: appointment.service?.name || '',
         serviceCategory: appointment.service?.category || '',
         serviceCondition: appointment.service?.condition || '',
         veterinarianName: appointment.veterinarian?.fullName || '',
+        medicalVisitDate: appointment.medicalRecord?.visitDate || null,
+        medicalReason: appointment.medicalRecord?.reason || '',
+        medicalWeightKg: appointment.medicalRecord?.weightKg ?? null,
+        temperatureC: appointment.medicalRecord?.temperatureC ?? null,
         diagnosis: appointment.medicalRecord?.diagnosis || '',
+        treatment: appointment.medicalRecord?.treatment || '',
+        observations: appointment.medicalRecord?.observations || '',
         nextControlAt: appointment.medicalRecord?.nextControlAt || null,
       };
     });
@@ -170,7 +191,16 @@ export class ReportsController {
       petName: record.pet?.name || '',
       species: record.pet?.species || '',
       breed: record.pet?.breed || '',
+      sex: record.pet?.sex || 'UNKNOWN',
+      age: record.pet?.age || '',
       veterinarianName: record.veterinarian?.fullName || '',
+    }));
+
+    const tariff = services.map((service: any) => ({
+      ...service,
+      price: Number(service.price || 0),
+      maxPrice: service.maxPrice == null ? null : Number(service.maxPrice),
+      socialPrice: service.socialPrice == null ? null : Number(service.socialPrice),
     }));
 
     return {
@@ -184,6 +214,8 @@ export class ReportsController {
         appointments: attentionRows.length,
         attended: attentionRows.filter((row: any) => row.status === 'ATTENDED').length,
         preventive: preventive.length,
+        services: tariff.length,
+        staff: staff.length,
       },
       byCategory: Array.from(categoryTotals.entries()).map(([key, values]) => ({
         key,
@@ -195,6 +227,8 @@ export class ReportsController {
       cashMovements: cash,
       appointments: attentionRows,
       preventiveRecords: preventive,
+      services: tariff,
+      staff,
     };
   }
 }
