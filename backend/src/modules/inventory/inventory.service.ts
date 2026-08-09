@@ -47,5 +47,19 @@ export class InventoryService {
       return tx.inventoryMovement.create({data:{productId,type:dto.type,quantity,reason:dto.reason,referenceId:dto.referenceId}});
     });
   }
-  remove(id:string){ return (this.prisma as any).product.delete({ where:{id} }); }
+  remove(id:string){
+    return (this.prisma as any).$transaction(async (tx:any) => {
+      const product = await tx.product.findUnique({
+        where:{id},
+        include:{
+          _count:{select:{cashMovements:true,saleItems:true,prescriptionItems:true}},
+        },
+      });
+      if(!product) throw new BadRequestException('Producto no encontrado.');
+      const linkedRecords = product._count.cashMovements + product._count.saleItems + product._count.prescriptionItems;
+      if(linkedRecords>0) throw new BadRequestException('El producto tiene historial comercial o clinico y solo puede retirarse.');
+      await tx.inventoryMovement.deleteMany({where:{productId:id}});
+      return tx.product.delete({where:{id}});
+    });
+  }
 }
