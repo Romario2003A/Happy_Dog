@@ -71,7 +71,13 @@ export class ReportsController {
           pet: { select: { name: true, species: true, breed: true, sex: true, color: true, age: true, weightKg: true } },
           veterinarian: { select: { fullName: true } },
           service: { select: { name: true, category: true, condition: true, price: true } },
-          medicalRecord: { select: { visitDate: true, reason: true, weightKg: true, temperatureC: true, diagnosis: true, treatment: true, observations: true, nextControlAt: true } },
+          medicalRecord: {
+            select: {
+              visitDate: true, reason: true, weightKg: true, temperatureC: true, diagnosis: true,
+              treatment: true, observations: true, nextControlAt: true,
+              veterinarian: { select: { fullName: true } },
+            },
+          },
           cashMovements: { select: { type: true, amount: true } },
         },
       }),
@@ -173,7 +179,7 @@ export class ReportsController {
         serviceName: appointment.service?.name || '',
         serviceCategory: appointment.service?.category || '',
         serviceCondition: appointment.service?.condition || '',
-        veterinarianName: appointment.veterinarian?.fullName || '',
+        veterinarianName: appointment.medicalRecord?.veterinarian?.fullName || appointment.veterinarian?.fullName || '',
         medicalVisitDate: appointment.medicalRecord?.visitDate || null,
         medicalReason: appointment.medicalRecord?.reason || '',
         medicalWeightKg: appointment.medicalRecord?.weightKg ?? null,

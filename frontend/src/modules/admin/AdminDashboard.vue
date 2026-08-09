@@ -660,6 +660,13 @@ async function saveCashMovement() {
       loadCash(),
       payload.productId ? refreshInventory() : Promise.resolve(),
     ]);
+    // El pool de producciÃ³n puede tardar unos milisegundos en reflejar una
+    // transacciÃ³n compuesta (caja + stock). La segunda lectura evita mostrar
+    // temporalmente los totales anteriores.
+    if (payload.productId) {
+      await new Promise(resolve => setTimeout(resolve, 650));
+      await loadCash();
+    }
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo registrar el movimiento.';
   } finally {

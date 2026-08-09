@@ -26,7 +26,10 @@ describe('ReportsController classic view', () => {
         client: { fullName: 'Ana', phone: '999999999' }, pet: { name: 'Luna', species: 'Canino' },
         service: { name: 'SOLO BAÑO', category: 'PELUQUERIA', condition: 'MENOR A 10 KG', price: 35 },
         veterinarian: null,
-        medicalRecord: { visitDate: new Date(), reason: 'Control', diagnosis: 'Dermatitis', treatment: 'Baño medicado', nextControlAt: new Date() },
+        medicalRecord: {
+          visitDate: new Date(), reason: 'Control', diagnosis: 'Dermatitis', treatment: 'Baño medicado', nextControlAt: new Date(),
+          veterinarian: { fullName: 'Doctora de turno' },
+        },
         cashMovements: [{ type: 'INCOME', amount: 35 }],
       }],
       preventive: [{
@@ -43,6 +46,7 @@ describe('ReportsController classic view', () => {
     expect(report.summary).toMatchObject({ income: 35, expenses: 5, net: 30, appointments: 1, attended: 1, preventive: 1 });
     expect(report.appointments[0]).toMatchObject({ clientName: 'Ana', petName: 'Luna', paidAmount: 35 });
     expect(report.appointments[0]).toMatchObject({ diagnosis: 'Dermatitis', treatment: 'Baño medicado' });
+    expect(report.appointments[0]).toMatchObject({ veterinarianName: 'Doctora de turno' });
     expect(report.preventiveRecords[0]).toMatchObject({ productName: 'Quíntuple', veterinarianName: 'Doctora' });
     expect(report.services[0]).toMatchObject({ name: 'Consulta', price: 30 });
     expect(report.staff[0]).toMatchObject({ fullName: 'Doctora', jobTitle: 'Veterinaria' });
