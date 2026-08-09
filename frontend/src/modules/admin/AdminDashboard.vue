@@ -1085,10 +1085,10 @@ onMounted(async () => {
       <button
         class="secondary top-action-button"
         type="button"
-        aria-label="Volver a la agenda diaria de recepción"
+        aria-label="Ir a Recepción"
         @click="$router.push('/recepcion')"
       >
-        Volver a agenda diaria
+        Ir a Recepción
       </button>
     </template>
 

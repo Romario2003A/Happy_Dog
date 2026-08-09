@@ -73,7 +73,7 @@ async function changeAccountPassword() {
             class="secondary role-switch-trigger"
             @click="$router.push(accountPath === '/recepcion/cuenta' ? '/admin' : '/recepcion')"
           >
-            {{ accountPath === '/recepcion/cuenta' ? 'Administración' : 'Recepción' }}
+            {{ accountPath === '/recepcion/cuenta' ? 'Ir a Administración' : 'Ir a Recepción' }}
           </button>
           <button v-if="!hideUserPill && accountPath" type="button" class="user-pill account-pill" :aria-expanded="accountOpen" @click="accountOpen = true">
             <span>{{ (auth.user?.fullName || 'U').slice(0, 1).toUpperCase() }}</span>

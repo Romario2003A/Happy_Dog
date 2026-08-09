@@ -775,10 +775,10 @@ onMounted(loadData);
       <button
         class="secondary top-action-button"
         type="button"
-        aria-label="Abrir el panel administrativo"
+        aria-label="Ir a Administración"
         @click="$router.push('/admin')"
       >
-        Panel administrativo
+        Ir a Administración
       </button>
     </template>
 
