@@ -35,7 +35,6 @@ const inventoryMovements = ref([]);
 const inventoryMovementForm = ref({ type: 'IN', quantity: 1, reason: '', referenceId: '' });
 const showInventoryMovement = ref(false);
 const serviceSearch = ref('');
-const showServiceCatalog = ref(false);
 const showServiceForm = ref(false);
 const editingServiceId = ref('');
 const serviceForm = ref({ name: '', category: '', species: '', condition: '', description: '', price: 0, maxPrice: null, socialPrice: null, priceLabel: '', requiresQuote: false, durationMinutes: 30 });
@@ -1134,26 +1133,19 @@ onMounted(async () => {
             <h2>Servicios y precios</h2>
             <p class="muted-text">La lista central que usará Recepción al agendar y Caja al cobrar.</p>
           </div>
-          <div class="table-actions">
-            <button class="secondary small" type="button" @click="showServiceCatalog = !showServiceCatalog">{{ showServiceCatalog ? 'Ocultar tarifario' : 'Ver tarifario' }}</button>
-          </div>
         </div>
-        <div v-if="!showServiceCatalog" class="service-calm-summary">
-          <div><strong>Tarifario configurado</strong><span>Citas y Caja completan servicios y precios automáticamente.</span></div>
-          <p>La lista permanece protegida y solo se muestra cuando presionas “Ver tarifario”.</p>
-        </div>
-        <div v-if="showServiceCatalog" class="service-catalog-actions">
+        <div class="service-catalog-actions">
           <button class="ghost small" type="button" :disabled="saving" @click="importTariff">Sincronizar hoja</button>
           <button class="secondary small" type="button" @click="openServiceCreator">Agregar servicio</button>
         </div>
-        <div v-if="showServiceCatalog" class="inventory-toolbar">
+        <div class="inventory-toolbar">
           <input v-model="serviceSearch" placeholder="Buscar consulta, vacuna, cirugía o baño">
           <div class="inventory-mini-stats">
             <span><strong>{{ serviceStats.active }}</strong> disponibles</span>
             <span><strong>{{ serviceStats.inactive }}</strong> retirados</span>
           </div>
         </div>
-        <table v-if="showServiceCatalog">
+        <table>
           <thead><tr><th>Servicio</th><th>Condición</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>
             <tr v-if="!filteredServices.length"><td colspan="5" class="empty">Agrega aquí los servicios del tarifario de Happy Dog.</td></tr>
@@ -1754,11 +1746,6 @@ onMounted(async () => {
   flex-wrap: nowrap;
 }
 
-.service-calm-summary { display: grid; gap: 18px; padding: 26px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface-soft); }
-.service-calm-summary > div:first-child { display: grid; gap: 5px; }
-.service-calm-summary > div:first-child strong { color: var(--brand-800); font-size: 1.15rem; }
-.service-calm-summary > div:first-child span,.service-calm-summary p { color: var(--muted); }
-.service-calm-summary p { margin: 0; font-size: .88rem; }
 .service-catalog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
 .service-editor { align-self: start; }
 .staff-editor { align-self: start; }
