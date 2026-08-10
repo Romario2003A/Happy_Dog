@@ -7,7 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { petPhotoUploadOptions, uploadedFileDataUrl } from '../../common/upload/pet-photo-upload';
 import { PrismaService } from '../../database/prisma.service';
 import { AppointmentsService } from '../appointments/appointments.service';
-import { suggestClientAppointmentService } from './client-appointment-service';
+import { clientServiceOptions, suggestClientAppointmentService } from './client-appointment-service';
 
 @UseGuards(JwtAuthGuard, ClientAccountGuard)
 @Controller('client-portal')
@@ -81,6 +81,15 @@ export class ClientPortalController {
     });
   }
 
+  @Get('service-options')
+  async serviceOptions() {
+    const services = await this.prisma.service.findMany({
+      where: { active: true },
+      select: { id: true, name: true, category: true, condition: true },
+    });
+    return clientServiceOptions(services);
+  }
+
   @Post('appointments')
   async createAppointment(@CurrentUser('id') clientId: string, @Body() body: any) {
     const petId = String(body.petId || '').trim();
@@ -89,7 +98,8 @@ export class ClientPortalController {
     const serviceId = String(body.serviceId || '').trim();
     const requestType = String(body.requestType || '').trim().toUpperCase();
     const requestSubtype = String(body.requestSubtype || '').trim().toUpperCase();
-    const allowedRequestTypes = new Set(['MEDICAL', 'VACCINE', 'GROOMING', 'SURGERY', 'OTHER']);
+    const requestedServiceName = String(body.serviceName || '').trim().slice(0, 160);
+    const allowedRequestTypes = new Set(['MEDICAL', 'VACCINE', 'GROOMING', 'SURGERY', 'LABORATORY', 'IMAGING', 'TREATMENT', 'OTHER']);
     const weightEstimate = Number(body.weightEstimate);
 
     if (!petId || !reason || Number.isNaN(scheduledAt.getTime()) || (!serviceId && !allowedRequestTypes.has(requestType))) {
@@ -107,13 +117,14 @@ export class ClientPortalController {
       : Number.isFinite(weightEstimate) && weightEstimate > 0 ? weightEstimate : undefined;
     if (!service && requestType !== 'OTHER') {
       const activeServices = await this.prisma.service.findMany({ where: { active: true } });
-      service = suggestClientAppointmentService(activeServices, requestType, requestSubtype, effectiveWeight);
+      service = suggestClientAppointmentService(activeServices, requestType, requestSubtype, effectiveWeight, requestedServiceName);
     }
 
     const notes = [
       'CLIENT_REQUESTED_DATE_ONLY',
       requestType ? `CLIENT_REQUEST_TYPE:${requestType}` : '',
       requestSubtype ? `CLIENT_REQUEST_SUBTYPE:${requestSubtype}` : '',
+      requestedServiceName ? `CLIENT_REQUESTED_SERVICE:${requestedServiceName}` : '',
       Number.isFinite(weightEstimate) && weightEstimate > 0 ? `CLIENT_WEIGHT_ESTIMATE:${weightEstimate}` : '',
       service && !serviceId ? 'CLIENT_SERVICE_AUTO_ASSIGNED' : '',
       !service ? 'CLIENT_SERVICE_REVIEW_REQUIRED' : '',

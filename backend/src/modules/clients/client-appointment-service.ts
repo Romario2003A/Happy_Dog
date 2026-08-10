@@ -23,15 +23,67 @@ function matchesWeight(service: ServiceCandidate, weightKg?: number) {
   return /MAYOR A 10/.test(text);
 }
 
+export function clientServiceBaseName(service: ServiceCandidate) {
+  const name = String(service.name || '').trim();
+  const condition = String(service.condition || '').trim();
+  if (!condition) return name;
+  const suffix = ` - ${condition}`;
+  return normalized(name).endsWith(normalized(suffix))
+    ? name.slice(0, -suffix.length).trim()
+    : name;
+}
+
+export function clientRequestTypeForService(service: ServiceCandidate) {
+  const category = normalized(service.category);
+  if (category === 'CONSULTAS') return 'MEDICAL';
+  if (category === 'VACUNACIONES') return 'VACCINE';
+  if (category === 'PELUQUERIA') return 'GROOMING';
+  if (category === 'CIRUGIAS') return 'SURGERY';
+  if (category === 'LABORATORIO') return 'LABORATORY';
+  if (category === 'IMAGENES') return 'IMAGING';
+  return 'TREATMENT';
+}
+
+export function clientServiceOptions(services: ServiceCandidate[]) {
+  const unique = new Map<string, { requestType: string; name: string; requiresWeight: boolean }>();
+  for (const service of services) {
+    const requestType = clientRequestTypeForService(service);
+    const name = clientServiceBaseName(service);
+    const key = `${requestType}:${normalized(name)}`;
+    const requiresWeight = /\bKG\b/.test(normalized(`${service.name || ''} ${service.condition || ''}`));
+    if (name && !unique.has(key)) unique.set(key, { requestType, name, requiresWeight });
+    else if (unique.has(key) && requiresWeight) unique.get(key)!.requiresWeight = true;
+  }
+  return [...unique.values()].sort((a, b) => (
+    a.requestType.localeCompare(b.requestType) || a.name.localeCompare(b.name, 'es')
+  ));
+}
+
 export function suggestClientAppointmentService<T extends ServiceCandidate>(
   services: T[],
   requestType: string,
   requestSubtype: string,
   weightKg?: number,
+  requestedServiceName?: string,
 ): T | null {
   const type = normalized(requestType);
   const subtype = normalized(requestSubtype);
   const exactName = (name: string) => services.find(service => normalized(service.name) === normalized(name));
+
+  if (requestedServiceName) {
+    const requested = normalized(requestedServiceName);
+    const candidates = services.filter(service => (
+      clientRequestTypeForService(service) === type && normalized(clientServiceBaseName(service)) === requested
+    ));
+    if (candidates.length === 1) {
+      const onlyCandidate = candidates[0];
+      const weightSpecific = /\bKG\b/.test(normalized(`${onlyCandidate.name || ''} ${onlyCandidate.condition || ''}`));
+      return !weightSpecific || matchesWeight(onlyCandidate, weightKg) ? onlyCandidate : null;
+    }
+    const weightMatch = candidates.find(service => matchesWeight(service, weightKg));
+    if (weightMatch) return weightMatch;
+    return candidates.find(service => /TODO TAMANO/.test(normalized(`${service.name} ${service.condition}`))) || null;
+  }
 
   if (type === 'MEDICAL' || type === 'SURGERY') return exactName('CONSULTA GENERAL') || null;
 

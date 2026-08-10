@@ -12,6 +12,8 @@ const auth=useAuthStore();
 const profile=ref(null);
 const appointments=ref([]);
 const pets=ref([]);
+const serviceOptions=ref([]);
+const serviceSearch=ref('');
 const error=ref('');
 const success=ref('');
 const photoInputs=ref({});
@@ -28,7 +30,7 @@ const contactPhone=ref('');
 const appointmentForm=ref({
   petId:'',
   requestType:'',
-  requestSubtype:'',
+  serviceName:'',
   weightEstimate:'',
   scheduledAt:'',
   reason:'',
@@ -37,26 +39,12 @@ const clientRequestOptions=[
   {value:'MEDICAL',label:'Consulta veterinaria',help:'Revisión, malestar, control o diagnóstico.'},
   {value:'VACCINE',label:'Vacuna o desparasitación',help:'Aplicación preventiva o próxima dosis.'},
   {value:'GROOMING',label:'Baño, corte o peluquería',help:'Limpieza, corte de pelo o cuidado estético.'},
-  {value:'SURGERY',label:'Evaluación para cirugía',help:'Primero se agendará una consulta para que el doctor indique el procedimiento adecuado.'},
+  {value:'SURGERY',label:'Evaluación o cirugía',help:'Elige el procedimiento si ya lo conoces, o solicita una evaluación.'},
+  {value:'LABORATORY',label:'Análisis de laboratorio',help:'Pruebas, análisis y controles de laboratorio.'},
+  {value:'IMAGING',label:'Radiografía o imágenes',help:'Estudios de imagen indicados para tu mascota.'},
+  {value:'TREATMENT',label:'Tratamiento o procedimiento',help:'Curaciones, internamiento y otros procedimientos.'},
   {value:'OTHER',label:'Otra atención',help:'Cuéntanos brevemente qué necesita tu mascota.'},
 ];
-const requestSubtypeOptions={
-  VACCINE:[
-    {value:'UNKNOWN',label:'No sé cuál necesita'},
-    {value:'DEWORMING',label:'Desparasitación'},
-    {value:'RABIES',label:'Vacuna contra la rabia'},
-    {value:'QUADRUPLE',label:'Vacuna cuádruple'},
-    {value:'QUINTUPLE',label:'Vacuna quíntuple'},
-    {value:'FELINE_TRIPLE',label:'Triple felina'},
-    {value:'FELINE_LEUKEMIA',label:'Leucemia felina'},
-  ],
-  GROOMING:[
-    {value:'BATH',label:'Solo baño'},
-    {value:'BATH_CUT',label:'Baño y corte o rapado'},
-    {value:'MEDICATED',label:'Baño medicado'},
-    {value:'NAILS',label:'Corte de uñas'},
-  ],
-};
 let refreshTimer;
 const newPet=ref({
   name:'',
@@ -82,26 +70,34 @@ const petsWithPrintableCard=computed(()=>pets.value.filter(p=>displayPetPhoto(p)
 const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
 const selectedPet=computed(()=>pets.value.find(pet=>pet.id===appointmentForm.value.petId));
 const selectedRequest=computed(()=>clientRequestOptions.find(option=>option.value===appointmentForm.value.requestType));
-const availableRequestSubtypes=computed(()=>requestSubtypeOptions[appointmentForm.value.requestType] || []);
-const selectedRequestSubtype=computed(()=>availableRequestSubtypes.value.find(option=>option.value===appointmentForm.value.requestSubtype));
+const categoryServiceOptions=computed(()=>serviceOptions.value.filter(option=>option.requestType===appointmentForm.value.requestType));
+const filteredServiceOptions=computed(()=>{
+  const query=serviceSearch.value.trim().toLocaleLowerCase('es');
+  return query
+    ? categoryServiceOptions.value.filter(option=>option.name.toLocaleLowerCase('es').includes(query))
+    : categoryServiceOptions.value;
+});
+const selectedServiceOption=computed(()=>categoryServiceOptions.value.find(option=>option.name===appointmentForm.value.serviceName));
 const requestAutomationMessage=computed(()=>{
-  if(appointmentForm.value.requestType==='OTHER' || appointmentForm.value.requestSubtype==='UNKNOWN') return 'Recepción revisará el detalle y te confirmará la opción adecuada.';
-  if(appointmentForm.value.requestType==='GROOMING' && appointmentForm.value.requestSubtype!=='NAILS' && !selectedPet.value?.weightKg && !appointmentForm.value.weightEstimate) return 'Si agregas un peso aproximado, el sistema podrá preparar el servicio automáticamente.';
+  if(appointmentForm.value.requestType==='OTHER' || appointmentForm.value.serviceName==='UNSURE') return 'Recepción revisará el detalle y te confirmará la opción adecuada.';
+  if(selectedServiceOption.value?.requiresWeight && !selectedPet.value?.weightKg && !appointmentForm.value.weightEstimate) return 'Si agregas un peso aproximado, el sistema podrá escoger la variante correcta automáticamente.';
   return 'El sistema preparará el servicio automáticamente; recepción solo revisará y confirmará.';
 });
 
 async function loadData(){
   try{
-    const [profileResponse,petsResponse,appointmentsResponse]=await Promise.all([
+    const [profileResponse,petsResponse,appointmentsResponse,serviceOptionsResponse]=await Promise.all([
       api.get('/client-portal/me'),
       api.get('/client-portal/pets'),
       api.get('/client-portal/appointments'),
+      api.get('/client-portal/service-options'),
     ]);
     if(!profileResponse.data) throw new Error('CLIENT_PROFILE_NOT_FOUND');
     profile.value=profileResponse.data;
     if(!editingContact.value) contactPhone.value=profileResponse.data.phone || '';
     pets.value=petsResponse.data;
     appointments.value=appointmentsResponse.data;
+    serviceOptions.value=serviceOptionsResponse.data;
   }catch(e){
     if(e.response?.status===401){
       auth.logout();
@@ -141,7 +137,8 @@ function selectAppointmentPet(){
 }
 
 function selectRequestType(){
-  appointmentForm.value.requestSubtype='';
+  appointmentForm.value.serviceName='';
+  serviceSearch.value='';
 }
 
 function requestedDateToIso(value){
@@ -275,24 +272,26 @@ async function createAppointment(){
     error.value='Primero registra una mascota para pedir una cita.';
     return;
   }
-  if(!appointmentForm.value.petId || !appointmentForm.value.requestType || !appointmentForm.value.scheduledAt || (availableRequestSubtypes.value.length && !appointmentForm.value.requestSubtype)){
+  if(!appointmentForm.value.petId || !appointmentForm.value.requestType || !appointmentForm.value.scheduledAt || (categoryServiceOptions.value.length && !appointmentForm.value.serviceName)){
     error.value='Selecciona tu mascota, qué necesita y el día que prefieres.';
     return;
   }
-  const requestLabel=selectedRequest.value?.label || 'Otra atención';
+  const requestLabel=appointmentForm.value.serviceName && appointmentForm.value.serviceName!=='UNSURE'
+    ? appointmentForm.value.serviceName
+    : selectedRequest.value?.label || 'Otra atención';
   const detail=appointmentForm.value.reason.trim();
   savingAppointment.value=true;
   try{
     await api.post('/client-portal/appointments',{
       petId:appointmentForm.value.petId,
       requestType:appointmentForm.value.requestType,
-      requestSubtype:appointmentForm.value.requestSubtype || undefined,
+      serviceName:appointmentForm.value.serviceName && appointmentForm.value.serviceName!=='UNSURE' ? appointmentForm.value.serviceName : undefined,
       weightEstimate:appointmentForm.value.weightEstimate === '' ? undefined : Number(appointmentForm.value.weightEstimate),
       scheduledAt:requestedDateToIso(appointmentForm.value.scheduledAt),
       reason:`CLIENT_DATE_REQUEST::${requestLabel}${detail ? `: ${detail}` : ''}`,
     });
     success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
-    appointmentForm.value={petId:'',requestType:'',requestSubtype:'',weightEstimate:'',scheduledAt:'',reason:''};
+    appointmentForm.value={petId:'',requestType:'',serviceName:'',weightEstimate:'',scheduledAt:'',reason:''};
     showAppointmentForm.value=false;
     await loadData();
   }catch(e){
@@ -415,19 +414,21 @@ onUnmounted(()=>clearInterval(refreshTimer));
             <option value="" disabled>¿Qué necesita tu mascota?</option>
             <option v-for="option in clientRequestOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
-          <select v-if="availableRequestSubtypes.length" v-model="appointmentForm.requestSubtype" required>
-            <option value="" disabled>Elige una opción sencilla</option>
-            <option v-for="option in availableRequestSubtypes" :key="option.value" :value="option.value">{{ option.label }}</option>
+          <input v-if="categoryServiceOptions.length > 8" v-model="serviceSearch" type="search" placeholder="Buscar dentro de esta categoría">
+          <select v-if="categoryServiceOptions.length" v-model="appointmentForm.serviceName" required>
+            <option value="" disabled>Elige el servicio específico</option>
+            <option value="UNSURE">No estoy seguro, necesito orientación</option>
+            <option v-for="option in filteredServiceOptions" :key="`${option.requestType}-${option.name}`" :value="option.name">{{ option.name }}</option>
           </select>
           <div v-if="selectedRequest" class="appointment-price-note client-request-help">
-            <strong>{{ selectedRequestSubtype?.label || selectedRequest.label }}</strong>
+            <strong>{{ selectedServiceOption?.name || selectedRequest.label }}</strong>
             <span>{{ selectedRequest.help }} {{ requestAutomationMessage }}</span>
           </div>
-          <label v-if="selectedPet?.weightKg" class="appointment-day-field">Peso registrado
+          <label v-if="selectedServiceOption?.requiresWeight && selectedPet?.weightKg" class="appointment-day-field">Peso registrado
             <input :value="`${selectedPet.weightKg} kg`" type="text" disabled>
-            <small>No necesitas buscar un rango; recepción usará este dato para asignar la tarifa correcta.</small>
+            <small>No necesitas elegir un rango; el sistema escogerá la variante correcta.</small>
           </label>
-          <label v-else-if="appointmentForm.petId" class="appointment-day-field">Peso aproximado (opcional)
+          <label v-else-if="selectedServiceOption?.requiresWeight && appointmentForm.petId" class="appointment-day-field">Peso aproximado (opcional)
             <input v-model.number="appointmentForm.weightEstimate" type="number" min="0.1" step="0.1" placeholder="Ej. 8.5">
             <small>Si no lo sabes, déjalo vacío. Lo confirmarán en el local.</small>
           </label>
