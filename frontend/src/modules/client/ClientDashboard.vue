@@ -28,6 +28,7 @@ const contactPhone=ref('');
 const appointmentForm=ref({
   petId:'',
   requestType:'',
+  requestSubtype:'',
   weightEstimate:'',
   scheduledAt:'',
   reason:'',
@@ -36,9 +37,26 @@ const clientRequestOptions=[
   {value:'MEDICAL',label:'Consulta veterinaria',help:'Revisión, malestar, control o diagnóstico.'},
   {value:'VACCINE',label:'Vacuna o desparasitación',help:'Aplicación preventiva o próxima dosis.'},
   {value:'GROOMING',label:'Baño, corte o peluquería',help:'Limpieza, corte de pelo o cuidado estético.'},
-  {value:'SURGERY',label:'Evaluación para cirugía',help:'La clínica confirmará el procedimiento adecuado.'},
+  {value:'SURGERY',label:'Evaluación para cirugía',help:'Primero se agendará una consulta para que el doctor indique el procedimiento adecuado.'},
   {value:'OTHER',label:'Otra atención',help:'Cuéntanos brevemente qué necesita tu mascota.'},
 ];
+const requestSubtypeOptions={
+  VACCINE:[
+    {value:'UNKNOWN',label:'No sé cuál necesita'},
+    {value:'DEWORMING',label:'Desparasitación'},
+    {value:'RABIES',label:'Vacuna contra la rabia'},
+    {value:'QUADRUPLE',label:'Vacuna cuádruple'},
+    {value:'QUINTUPLE',label:'Vacuna quíntuple'},
+    {value:'FELINE_TRIPLE',label:'Triple felina'},
+    {value:'FELINE_LEUKEMIA',label:'Leucemia felina'},
+  ],
+  GROOMING:[
+    {value:'BATH',label:'Solo baño'},
+    {value:'BATH_CUT',label:'Baño y corte o rapado'},
+    {value:'MEDICATED',label:'Baño medicado'},
+    {value:'NAILS',label:'Corte de uñas'},
+  ],
+};
 let refreshTimer;
 const newPet=ref({
   name:'',
@@ -64,6 +82,13 @@ const petsWithPrintableCard=computed(()=>pets.value.filter(p=>displayPetPhoto(p)
 const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
 const selectedPet=computed(()=>pets.value.find(pet=>pet.id===appointmentForm.value.petId));
 const selectedRequest=computed(()=>clientRequestOptions.find(option=>option.value===appointmentForm.value.requestType));
+const availableRequestSubtypes=computed(()=>requestSubtypeOptions[appointmentForm.value.requestType] || []);
+const selectedRequestSubtype=computed(()=>availableRequestSubtypes.value.find(option=>option.value===appointmentForm.value.requestSubtype));
+const requestAutomationMessage=computed(()=>{
+  if(appointmentForm.value.requestType==='OTHER' || appointmentForm.value.requestSubtype==='UNKNOWN') return 'Recepción revisará el detalle y te confirmará la opción adecuada.';
+  if(appointmentForm.value.requestType==='GROOMING' && appointmentForm.value.requestSubtype!=='NAILS' && !selectedPet.value?.weightKg && !appointmentForm.value.weightEstimate) return 'Si agregas un peso aproximado, el sistema podrá preparar el servicio automáticamente.';
+  return 'El sistema preparará el servicio automáticamente; recepción solo revisará y confirmará.';
+});
 
 async function loadData(){
   try{
@@ -113,6 +138,10 @@ function selectAppointmentPet(){
   appointmentForm.value.weightEstimate=selectedPet.value?.weightKg
     ? String(selectedPet.value.weightKg)
     : '';
+}
+
+function selectRequestType(){
+  appointmentForm.value.requestSubtype='';
 }
 
 function requestedDateToIso(value){
@@ -246,7 +275,7 @@ async function createAppointment(){
     error.value='Primero registra una mascota para pedir una cita.';
     return;
   }
-  if(!appointmentForm.value.petId || !appointmentForm.value.requestType || !appointmentForm.value.scheduledAt){
+  if(!appointmentForm.value.petId || !appointmentForm.value.requestType || !appointmentForm.value.scheduledAt || (availableRequestSubtypes.value.length && !appointmentForm.value.requestSubtype)){
     error.value='Selecciona tu mascota, qué necesita y el día que prefieres.';
     return;
   }
@@ -257,12 +286,13 @@ async function createAppointment(){
     await api.post('/client-portal/appointments',{
       petId:appointmentForm.value.petId,
       requestType:appointmentForm.value.requestType,
+      requestSubtype:appointmentForm.value.requestSubtype || undefined,
       weightEstimate:appointmentForm.value.weightEstimate === '' ? undefined : Number(appointmentForm.value.weightEstimate),
       scheduledAt:requestedDateToIso(appointmentForm.value.scheduledAt),
       reason:`CLIENT_DATE_REQUEST::${requestLabel}${detail ? `: ${detail}` : ''}`,
     });
     success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
-    appointmentForm.value={petId:'',requestType:'',weightEstimate:'',scheduledAt:'',reason:''};
+    appointmentForm.value={petId:'',requestType:'',requestSubtype:'',weightEstimate:'',scheduledAt:'',reason:''};
     showAppointmentForm.value=false;
     await loadData();
   }catch(e){
@@ -381,13 +411,17 @@ onUnmounted(()=>clearInterval(refreshTimer));
             <option value="" disabled>Selecciona tu mascota</option>
             <option v-for="pet in pets" :key="pet.id" :value="pet.id">{{ pet.name }}</option>
           </select>
-          <select v-model="appointmentForm.requestType" required>
+          <select v-model="appointmentForm.requestType" required @change="selectRequestType">
             <option value="" disabled>¿Qué necesita tu mascota?</option>
             <option v-for="option in clientRequestOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
+          <select v-if="availableRequestSubtypes.length" v-model="appointmentForm.requestSubtype" required>
+            <option value="" disabled>Elige una opción sencilla</option>
+            <option v-for="option in availableRequestSubtypes" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
           <div v-if="selectedRequest" class="appointment-price-note client-request-help">
-            <strong>{{ selectedRequest.label }}</strong>
-            <span>{{ selectedRequest.help }} Recepción elegirá contigo el servicio exacto.</span>
+            <strong>{{ selectedRequestSubtype?.label || selectedRequest.label }}</strong>
+            <span>{{ selectedRequest.help }} {{ requestAutomationMessage }}</span>
           </div>
           <label v-if="selectedPet?.weightKg" class="appointment-day-field">Peso registrado
             <input :value="`${selectedPet.weightKg} kg`" type="text" disabled>

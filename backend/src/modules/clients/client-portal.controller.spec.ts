@@ -55,6 +55,7 @@ describe('ClientPortalController', () => {
       },
       service: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
     const appointmentsService = {
@@ -75,8 +76,43 @@ describe('ClientPortalController', () => {
       clientId: 'client-1',
       petId: 'pet-1',
       reason: 'CLIENT_DATE_REQUEST::Baño, corte o peluquería: corte corto',
-      notes: 'CLIENT_REQUESTED_DATE_ONLY;CLIENT_REQUEST_TYPE:GROOMING;CLIENT_WEIGHT_ESTIMATE:8.5',
+      notes: expect.stringContaining('CLIENT_REQUEST_TYPE:GROOMING;CLIENT_WEIGHT_ESTIMATE:8.5'),
     }));
     expect(appointmentsService.create).toHaveBeenCalledWith(expect.not.objectContaining({ serviceId: expect.anything() }));
+  });
+
+  it('prepara automáticamente la consulta general para no cargar trabajo a recepción', async () => {
+    const consultation = {
+      id: 'consult-1', name: 'CONSULTA GENERAL', category: 'CONSULTAS', active: true,
+      price: '20', priceLabel: '20-25', durationMinutes: 30,
+    };
+    const prisma = {
+      pet: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'pet-1', clientId: 'client-1', weightKg: 12 }),
+      },
+      service: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([consultation]),
+      },
+    };
+    const appointmentsService = {
+      create: jest.fn().mockImplementation(async payload => payload),
+    };
+    const controller = new ClientPortalController(prisma as any, appointmentsService as any);
+
+    await controller.createAppointment('client-1', {
+      petId: 'pet-1',
+      requestType: 'MEDICAL',
+      scheduledAt: '2026-08-01T12:00:00.000Z',
+      reason: 'CLIENT_DATE_REQUEST::Consulta veterinaria',
+    });
+
+    expect(appointmentsService.create).toHaveBeenCalledWith(expect.objectContaining({
+      serviceId: 'consult-1',
+      quotedPrice: 20,
+      priceNote: '20-25',
+      durationMinutes: 30,
+      notes: expect.stringContaining('CLIENT_SERVICE_AUTO_ASSIGNED'),
+    }));
   });
 });

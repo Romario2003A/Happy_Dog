@@ -1054,6 +1054,10 @@ onMounted(loadData);
           <p><b>Motivo:</b> {{ cleanAppointmentReason(selectedAppointment.reason) }}</p>
           <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
           <p v-if="selectedAppointment.service"><b>Servicio asignado:</b> {{ serviceDisplayLabel(selectedAppointment.service) }} · {{ selectedAppointment.priceNote || `S/ ${Number(selectedAppointment.quotedPrice || selectedAppointment.service.price || 0).toFixed(2)}` }}</p>
+          <div v-if="selectedAppointment.service && String(selectedAppointment.notes || '').includes('CLIENT_SERVICE_AUTO_ASSIGNED')" class="auto-service-notice">
+            <strong>Servicio preparado automáticamente</strong>
+            <span>Solo revisa los datos y confirma la hora. Puedes corregirlo después desde la cita si el cliente indicó algo distinto.</span>
+          </div>
           <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
           <div v-if="selectedAppointment.status==='PENDING' && !selectedAppointment.service" class="appointment-service-assignment">
             <strong>Completar servicio solicitado</strong>

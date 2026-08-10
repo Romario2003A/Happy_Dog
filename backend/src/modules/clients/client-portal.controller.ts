@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { petPhotoUploadOptions, uploadedFileDataUrl } from '../../common/upload/pet-photo-upload';
 import { PrismaService } from '../../database/prisma.service';
 import { AppointmentsService } from '../appointments/appointments.service';
+import { suggestClientAppointmentService } from './client-appointment-service';
 
 @UseGuards(JwtAuthGuard, ClientAccountGuard)
 @Controller('client-portal')
@@ -87,6 +88,7 @@ export class ClientPortalController {
     const scheduledAt = new Date(body.scheduledAt);
     const serviceId = String(body.serviceId || '').trim();
     const requestType = String(body.requestType || '').trim().toUpperCase();
+    const requestSubtype = String(body.requestSubtype || '').trim().toUpperCase();
     const allowedRequestTypes = new Set(['MEDICAL', 'VACCINE', 'GROOMING', 'SURGERY', 'OTHER']);
     const weightEstimate = Number(body.weightEstimate);
 
@@ -96,21 +98,31 @@ export class ClientPortalController {
 
     const pet = await this.prisma.pet.findFirst({ where: { id: petId, clientId } });
     if (!pet) throw new NotFoundException('Mascota no encontrada.');
-    const service = serviceId
+    let service = serviceId
       ? await this.prisma.service.findFirst({ where: { id: serviceId, active: true } })
       : null;
     if (serviceId && !service) throw new NotFoundException('Servicio no disponible.');
+    const effectiveWeight = Number(pet.weightKg) > 0
+      ? Number(pet.weightKg)
+      : Number.isFinite(weightEstimate) && weightEstimate > 0 ? weightEstimate : undefined;
+    if (!service && requestType !== 'OTHER') {
+      const activeServices = await this.prisma.service.findMany({ where: { active: true } });
+      service = suggestClientAppointmentService(activeServices, requestType, requestSubtype, effectiveWeight);
+    }
 
     const notes = [
       'CLIENT_REQUESTED_DATE_ONLY',
       requestType ? `CLIENT_REQUEST_TYPE:${requestType}` : '',
+      requestSubtype ? `CLIENT_REQUEST_SUBTYPE:${requestSubtype}` : '',
       Number.isFinite(weightEstimate) && weightEstimate > 0 ? `CLIENT_WEIGHT_ESTIMATE:${weightEstimate}` : '',
+      service && !serviceId ? 'CLIENT_SERVICE_AUTO_ASSIGNED' : '',
+      !service ? 'CLIENT_SERVICE_REVIEW_REQUIRED' : '',
     ].filter(Boolean).join(';');
 
     return this.appointmentsService.create({
       clientId,
       petId,
-      ...(service ? { serviceId } : {}),
+      ...(service ? { serviceId: service.id } : {}),
       reason,
       scheduledAt: scheduledAt.toISOString(),
       ...(service ? {
