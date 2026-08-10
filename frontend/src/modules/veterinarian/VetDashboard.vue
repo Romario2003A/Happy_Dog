@@ -1589,14 +1589,14 @@ onUnmounted(() => {
           <section v-if="activeTask === 'history' || activeTask === 'preventive'" class="clinical-document-editor">
             <template v-if="activeTask === 'history'">
             <div class="document-editor-head">
-              <div><span class="badge">Documento Happy Dog</span><h3>Historia clínica Happy Dog</h3><p>Genera un historial profesional con los datos automáticos del paciente y una página ordenada por cada consulta.</p></div>
+          <div><span class="badge">Documento Happy Dog</span><h3>Historia clínica Happy Dog</h3><p>Genera un historial profesional con la ficha del paciente y una página ordenada por cada consulta.</p></div>
               <div class="document-head-actions">
                 <button class="secondary" type="button" @click="generateClinicalHistoryPdf">Generar historial Happy Dog</button>
                 <button type="button" :disabled="saving" @click="saveRecord">{{ saving ? 'Guardando...' : 'Guardar en historial' }}</button>
               </div>
             </div>
             <div class="document-auto-section">
-              <div class="document-section-label"><strong>Datos automáticos</strong><small>Tomados de la ficha del paciente</small></div>
+            <div class="document-section-label"><strong>Datos del paciente</strong><small>Tomados de su ficha</small></div>
               <div class="document-auto-grid">
                 <div><span>N.º historia</span><strong>{{ selectedPet.id?.slice(0, 8).toUpperCase() }}</strong></div>
                 <div><span>Propietario</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
@@ -1686,7 +1686,7 @@ onUnmounted(() => {
             <input v-model.number="prescription.quantity" type="number" min="1" :max="selectedProduct?.stock || undefined" step="1" placeholder="Cantidad">
             <input v-model="prescription.dosage" placeholder="Dosis">
             <input v-model="prescription.instructions" placeholder="Indicaciones">
-            <p v-if="selectedProduct" class="prescription-stock-note">Disponible: <strong>{{ selectedProduct.stock }}</strong> unidades. Al guardar, el inventario se actualiza automáticamente.</p>
+          <p v-if="selectedProduct" class="prescription-stock-note">Disponible: <strong>{{ selectedProduct.stock }}</strong> unidades. Al guardar se actualizará el inventario.</p>
             <p v-else-if="prescription.productId === '__manual__'" class="prescription-stock-note">Medicamento externo: se guardará en el historial sin modificar inventario.</p>
             <button type="button" :disabled="saving || !selectedMedicationName" @click="savePrescriptionRecord">{{ saving ? 'Guardando...' : 'Guardar receta en historial' }}</button>
           </section>

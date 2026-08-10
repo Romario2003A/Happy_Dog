@@ -208,7 +208,7 @@ export async function generateOriginalConsultationPdf(data) {
   const footer = (page) => {
     page.drawLine({ start: { x: margin, y: 25 }, end: { x: margin + contentWidth, y: 25 }, color: colors.line, thickness: 0.7 });
     draw(page, font, 'Historia clínica veterinaria - Happy Dog', margin, 12, { size: 6.3, maxWidth: 250 });
-    draw(page, font, 'Documento generado desde el sistema médico', 370, 12, { size: 6.3, maxWidth: 189 });
+  draw(page, font, 'Happy Dog · Historia clínica', 370, 12, { size: 6.3, maxWidth: 189 });
   };
 
   header(page1, 'HISTORIA CLÍNICA - CONSULTA MÉDICA', 1);
@@ -392,7 +392,7 @@ export async function generateOriginalPrescriptionPdf(data) {
   draw(page, font, 'Siga únicamente las indicaciones del médico veterinario. Ante una reacción adversa, comuníquese con Happy Dog.', margin + 12, 67, { size: 7, maxWidth: contentWidth - 24, color: colors.muted });
   page.drawLine({ start: { x: margin, y: 31 }, end: { x: margin + contentWidth, y: 31 }, color: colors.line, thickness: 0.7 });
   draw(page, font, 'Receta veterinaria - Happy Dog', margin, 17, { size: 6.5, maxWidth: 220 });
-  draw(page, font, 'Documento generado desde el sistema médico', 362, 17, { size: 6.5, maxWidth: 191 });
+  draw(page, font, 'Happy Dog · Receta veterinaria', 362, 17, { size: 6.5, maxWidth: 191 });
 
   const bytes = await pdf.save();
   if (data.returnBytes) return bytes;
@@ -427,7 +427,7 @@ export async function generateOriginalHistoryPdf(data) {
   const footer = page => {
     page.drawLine({start:{x:margin,y:25},end:{x:margin+contentWidth,y:25},color:colors.line,thickness:.7});
     draw(page,font,'Historia clínica acumulativa - Happy Dog',margin,12,{size:6.3,maxWidth:250});
-    draw(page,font,'Documento generado desde el sistema médico',370,12,{size:6.3,maxWidth:189});
+  draw(page,font,'Happy Dog · Historia clínica',370,12,{size:6.3,maxWidth:189});
   };
   const section = (page,title,y) => {
     page.drawRectangle({x:margin,y,width:contentWidth,height:20,color:colors.pale});
@@ -492,7 +492,7 @@ export async function generateOriginalHistoryPdf(data) {
   field(summary,'Registros preventivos',String(preventive.length),margin+third*2,543,third);
   table(summary,'Desparasitaciones recientes',preventive.filter(item=>item.type==='DEWORMING'),510,'Producto');
   table(summary,'Vacunas recientes',preventive.filter(item=>item.type==='VACCINE'),256,'Vacuna');
-  draw(summary,font,'Se muestran hasta seis registros recientes por tabla. El sistema conserva el historial completo.',margin,38,{size:7,maxWidth:contentWidth});
+  draw(summary,font,'Se muestran hasta seis registros recientes por tabla. El historial completo permanece disponible.',margin,38,{size:7,maxWidth:contentWidth});
   footer(summary);
 
   const consultationRows = consultations.length ? consultations : [null];
@@ -503,7 +503,7 @@ export async function generateOriginalHistoryPdf(data) {
       section(page,'Consultas registradas',700);
       page.drawRectangle({x:margin,y:530,width:contentWidth,height:150,color:colors.paleBlue,borderColor:colors.line,borderWidth:.7});
       draw(page,bold,'Aún no hay consultas clínicas guardadas para este paciente.',82,600,{size:13,maxWidth:430,color:colors.teal});
-      draw(page,font,'Cuando el doctor finalice una atención, aparecerá automáticamente en este documento.',82,580,{size:8.5,maxWidth:430,color:colors.muted});
+  draw(page,font,'Las atenciones finalizadas se incorporan a este documento.',82,580,{size:8.5,maxWidth:430,color:colors.muted});
       footer(page);
       return;
     }

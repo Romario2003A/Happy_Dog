@@ -997,7 +997,7 @@ async function confirmPayrollPayment(payment) {
       ...payrollPayForm.value,
       paidAt: `${payrollPayForm.value.paidAt}T12:00:00-05:00`,
     });
-    success.value = 'Pago confirmado y egreso creado automáticamente en Caja.';
+    success.value = 'Pago confirmado. El egreso ya figura en Caja.';
     payingPayrollId.value = '';
     const { data } = await api.get('/payroll');
     payrollPayments.value = data;
@@ -1278,7 +1278,7 @@ onMounted(async () => {
     <div v-else-if="active==='personal'" class="panel-grid" :class="{ single: !showStaffForm && !showPayrollForm && !showEmployeeForm }">
       <section class="glass-card staff-panel">
         <div class="section-title">
-          <div><span class="badge">Solo administración</span><h2>{{ staffWorkspace === 'team' ? 'Personal' : staffWorkspace === 'access' ? 'Cuentas de acceso' : 'Pagos del personal' }}</h2><p class="muted-text">{{ staffWorkspace === 'team' ? 'Trabajadores, cargos y condiciones laborales, tengan acceso o no.' : staffWorkspace === 'access' ? 'Usuarios autorizados para entrar al sistema.' : 'Control mensual conectado automáticamente con Caja.' }}</p></div>
+          <div><span class="badge">Solo administración</span><h2>{{ staffWorkspace === 'team' ? 'Personal' : staffWorkspace === 'access' ? 'Cuentas de acceso' : 'Pagos del personal' }}</h2><p class="muted-text">{{ staffWorkspace === 'team' ? 'Trabajadores, cargos y condiciones laborales, tengan acceso o no.' : staffWorkspace === 'access' ? 'Usuarios autorizados para entrar al sistema.' : 'Control mensual vinculado con Caja.' }}</p></div>
           <button v-if="staffWorkspace === 'team'" class="secondary small" type="button" @click="editingEmployeeId=''; employeeForm=defaultEmployeeForm(); showStaffForm=false; showPayrollForm=false; showEmployeeForm=true">Agregar personal</button>
           <button v-else-if="staffWorkspace === 'access'" class="secondary small" type="button" @click="editingStaffId=''; resetStaffForm(); showEmployeeForm=false; showPayrollForm=false; showStaffForm=true">Crear acceso</button>
           <button v-else class="secondary small" type="button" @click="showStaffForm=false; showEmployeeForm=false; openPayrollForm()">Registrar mes</button>
@@ -1335,7 +1335,7 @@ onMounted(async () => {
         </template>
       </section>
       <section v-if="showEmployeeForm" class="glass-card staff-editor">
-        <div class="section-title"><div><span class="badge">Ficha laboral</span><h2>{{ editingEmployeeId ? 'Editar personal' : 'Agregar personal' }}</h2><p class="muted-text">No se creará ninguna contraseña automáticamente.</p></div><button class="ghost small" type="button" @click="showEmployeeForm=false; editingEmployeeId=''; employeeForm=defaultEmployeeForm()">Cerrar</button></div>
+          <div class="section-title"><div><span class="badge">Ficha laboral</span><h2>{{ editingEmployeeId ? 'Editar personal' : 'Agregar personal' }}</h2><p class="muted-text">La cuenta de acceso se crea por separado.</p></div><button class="ghost small" type="button" @click="showEmployeeForm=false; editingEmployeeId=''; employeeForm=defaultEmployeeForm()">Cerrar</button></div>
         <form class="stack" @submit.prevent="saveEmployee">
           <label>Nombre completo<input v-model="employeeForm.fullName" required></label>
           <label>Cargo<input v-model="employeeForm.jobTitle" list="job-title-options" required placeholder="Ej. Baño y corte"><datalist id="job-title-options"><option value="Veterinaria/o"></option><option value="Recepción"></option><option value="Baño y corte"></option><option value="Peluquería canina"></option><option value="Limpieza"></option><option value="Asistente veterinario"></option><option value="Administración"></option></datalist></label>
@@ -1499,7 +1499,7 @@ onMounted(async () => {
               {{ service.name }}{{ service.species ? ` · ${service.species}` : '' }}{{ service.condition ? ` · ${service.condition}` : '' }} — {{ service.priceLabel || `S/ ${formatPrice(service.price)}${service.maxPrice ? ` a S/ ${formatPrice(service.maxPrice)}` : ''}` }}
             </option>
           </select>
-          <small v-if="selectedCashService">{{ selectedCashService.requiresQuote || selectedCashService.maxPrice ? 'Confirma el monto acordado antes de guardar.' : 'Precio completado automáticamente.' }}</small>
+          <small v-if="selectedCashService">{{ selectedCashService.requiresQuote || selectedCashService.maxPrice ? 'Confirma el monto acordado antes de guardar.' : 'Precio del tarifario.' }}</small>
         </label>
         <label>Tipo
           <select v-model="cashForm.type">
@@ -1516,7 +1516,7 @@ onMounted(async () => {
             <option value="">Seleccionar producto</option>
             <option v-for="product in availableCashProducts" :key="product.id" :value="product.id">{{ product.name }}{{ product.presentation ? ` · ${product.presentation}` : '' }} — S/ {{ formatPrice(product.unitPrice) }} · Stock {{ product.stock }}</option>
           </select>
-          <small v-if="selectedCashProduct">El stock se descontará automáticamente al guardar el cobro.</small>
+          <small v-if="selectedCashProduct">Al guardar el cobro se descontará el stock.</small>
           <small v-else-if="!availableCashProducts.length">No hay productos con stock disponible.</small>
         </label>
         <label v-if="selectedCashProduct">Cantidad
@@ -1559,7 +1559,7 @@ onMounted(async () => {
       </form>
 
       <section v-if="cashSummary.byCategory?.length" class="cash-category-summary">
-        <div><span class="badge">Resumen automático</span><h3>Resultado por categoría</h3><p class="muted-text">Los ingresos y gastos aparecen separados para evitar totales engañosos.</p></div>
+            <div><span class="badge">Resumen</span><h3>Resultado por categoría</h3><p class="muted-text">Los ingresos y gastos aparecen separados para evitar totales engañosos.</p></div>
         <div class="cash-category-grid"><span v-for="item in cashSummary.byCategory" :key="item.key"><small>{{ cashCategoryLabels[item.key] || item.key }}</small><strong>S/ {{ formatMoney(item.net) }}</strong><em>Ingresos S/ {{ formatMoney(item.income) }} · Gastos S/ {{ formatMoney(item.expenses) }}</em></span></div>
       </section>
 
@@ -1592,7 +1592,7 @@ onMounted(async () => {
               <input v-model.number="closingForm.countedAmount" type="number" min="0" step="0.01" placeholder="Ej. 230.00">
             </label>
             <div :class="['cash-total', closingStatus.tone]">
-              <span>Resultado automatico</span>
+                  <span>Saldo calculado</span>
               <small>Debe quedar en S/ 0.00.</small>
               <strong>{{ hasClosingCount ? `S/ ${formatMoney(closingDifference)}` : 'Ingresa el conteo' }}</strong>
             </div>

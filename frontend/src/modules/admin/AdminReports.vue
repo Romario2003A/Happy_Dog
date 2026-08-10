@@ -205,7 +205,7 @@ onMounted(loadReport);
       <div>
         <span class="badge">Libro de control · Solo lectura</span>
         <h2>Registro general de Happy Dog</h2>
-        <p>La misma lectura ordenada del archivo anterior, ahora completada automáticamente por el sistema.</p>
+          <p>Una vista ordenada de los registros de la clínica.</p>
       </div>
       <button type="button" class="secondary report-print" @click="printReport">Imprimir reporte</button>
     </header>

@@ -973,7 +973,7 @@ onMounted(loadData);
           </label>
           <label v-if="selectedService">Precio acordado
             <input v-model.number="quick.quotedPrice" type="number" min="0" step="0.01" required>
-            <small>{{ selectedService.requiresQuote || selectedService.maxPrice ? 'Confirma el importe dentro del rango antes de guardar.' : 'Precio tomado automáticamente del tarifario.' }}</small>
+          <small>{{ selectedService.requiresQuote || selectedService.maxPrice ? 'Confirma el importe dentro del rango antes de guardar.' : 'Precio del tarifario.' }}</small>
           </label>
           <label v-if="selectedService">Duración estimada
             <input v-model.number="quick.durationMinutes" type="number" min="5" step="5" required>
@@ -1036,7 +1036,7 @@ onMounted(loadData);
             <button class="small secondary" type="button" :disabled="saving" @click="saveIgnoringDuplicate">Crear de todos modos</button>
           </div>
           <button :disabled="saving">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Guardar cliente, mascota y cita' : 'Guardar nueva cita' }}</button>
-          <small v-if="savingSlow" class="saving-note">El servidor está iniciando. No cierres esta pantalla: tus datos siguen guardados y el proceso continuará automáticamente.</small>
+          <small v-if="savingSlow" class="saving-note">El servidor está iniciando. No cierres esta pantalla; tus datos se conservarán.</small>
         </form>
 
         <div v-if="selectedAppointment" class="detail-box">
@@ -1055,8 +1055,8 @@ onMounted(loadData);
           <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
           <p v-if="selectedAppointment.service"><b>Servicio asignado:</b> {{ serviceDisplayLabel(selectedAppointment.service) }} · {{ selectedAppointment.priceNote || `S/ ${Number(selectedAppointment.quotedPrice || selectedAppointment.service.price || 0).toFixed(2)}` }}</p>
           <div v-if="selectedAppointment.service && String(selectedAppointment.notes || '').includes('CLIENT_SERVICE_AUTO_ASSIGNED')" class="auto-service-notice">
-            <strong>Servicio preparado automáticamente</strong>
-            <span>Solo revisa los datos y confirma la hora. Puedes corregirlo después desde la cita si el cliente indicó algo distinto.</span>
+            <strong>Servicio asignado</strong>
+            <span>Revisa los datos y confirma la hora. Si el cliente indicó algo distinto, corrige el servicio antes de continuar.</span>
           </div>
           <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
           <div v-if="selectedAppointment.status==='PENDING' && !selectedAppointment.service" class="appointment-service-assignment">

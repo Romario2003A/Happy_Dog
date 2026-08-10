@@ -39,7 +39,7 @@ const clientRequestOptions=[
   {value:'MEDICAL',label:'Consulta veterinaria',help:'Revisión, malestar, control o diagnóstico.'},
   {value:'VACCINE',label:'Vacuna o desparasitación',help:'Aplicación preventiva o próxima dosis.'},
   {value:'GROOMING',label:'Baño, corte o peluquería',help:'Limpieza, corte de pelo o cuidado estético.'},
-  {value:'SURGERY',label:'Evaluación o cirugía',help:'Elige el procedimiento si ya lo conoces, o solicita una evaluación.'},
+  {value:'SURGERY',label:'Evaluación o cirugía',help:'Selecciona el procedimiento o pide una evaluación previa.'},
   {value:'LABORATORY',label:'Análisis de laboratorio',help:'Pruebas, análisis y controles de laboratorio.'},
   {value:'IMAGING',label:'Radiografía o imágenes',help:'Estudios de imagen indicados para tu mascota.'},
   {value:'TREATMENT',label:'Tratamiento o procedimiento',help:'Curaciones, internamiento y otros procedimientos.'},
@@ -80,8 +80,8 @@ const filteredServiceOptions=computed(()=>{
 const selectedServiceOption=computed(()=>categoryServiceOptions.value.find(option=>option.name===appointmentForm.value.serviceName));
 const requestAutomationMessage=computed(()=>{
   if(appointmentForm.value.requestType==='OTHER' || appointmentForm.value.serviceName==='UNSURE') return 'Recepción revisará el detalle y te confirmará la opción adecuada.';
-  if(selectedServiceOption.value?.requiresWeight && !selectedPet.value?.weightKg && !appointmentForm.value.weightEstimate) return 'Si agregas un peso aproximado, el sistema podrá escoger la variante correcta automáticamente.';
-  return 'El sistema preparará el servicio automáticamente; recepción solo revisará y confirmará.';
+  if(selectedServiceOption.value?.requiresWeight && !selectedPet.value?.weightKg && !appointmentForm.value.weightEstimate) return 'Agrega un peso aproximado para identificar la variante del servicio.';
+  return 'Solicitud lista para enviar.';
 });
 
 async function loadData(){
@@ -426,7 +426,7 @@ onUnmounted(()=>clearInterval(refreshTimer));
           </div>
           <label v-if="selectedServiceOption?.requiresWeight && selectedPet?.weightKg" class="appointment-day-field">Peso registrado
             <input :value="`${selectedPet.weightKg} kg`" type="text" disabled>
-            <small>No necesitas elegir un rango; el sistema escogerá la variante correcta.</small>
+            <small>Este peso se utilizará para identificar la variante del servicio.</small>
           </label>
           <label v-else-if="selectedServiceOption?.requiresWeight && appointmentForm.petId" class="appointment-day-field">Peso aproximado (opcional)
             <input v-model.number="appointmentForm.weightEstimate" type="number" min="0.1" step="0.1" placeholder="Ej. 8.5">
@@ -482,7 +482,7 @@ onUnmounted(()=>clearInterval(refreshTimer));
           <label class="pet-photo-uploader">
             <input ref="newPetPhotoInput" type="file" accept="image/jpeg,image/png" @change="handleNewPetPhoto">
             <strong>{{ newPet.photo ? 'Foto seleccionada' : 'Subir foto para carnet' }}</strong>
-            <span>JPG o PNG, maximo 4 MB. La imagen se ajusta automaticamente.</span>
+            <span>JPG o PNG, maximo 4 MB. La imagen se ajustará al formato del carnet.</span>
           </label>
           <button :disabled="savingPet">{{ savingPet ? 'Guardando...' : 'Guardar mascota' }}</button>
         </form>
