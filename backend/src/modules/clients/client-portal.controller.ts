@@ -86,26 +86,39 @@ export class ClientPortalController {
     const reason = String(body.reason || '').trim();
     const scheduledAt = new Date(body.scheduledAt);
     const serviceId = String(body.serviceId || '').trim();
+    const requestType = String(body.requestType || '').trim().toUpperCase();
+    const allowedRequestTypes = new Set(['MEDICAL', 'VACCINE', 'GROOMING', 'SURGERY', 'OTHER']);
+    const weightEstimate = Number(body.weightEstimate);
 
-    if (!petId || !serviceId || !reason || Number.isNaN(scheduledAt.getTime())) {
-      throw new BadRequestException('Selecciona mascota, servicio, fecha y motivo de la cita.');
+    if (!petId || !reason || Number.isNaN(scheduledAt.getTime()) || (!serviceId && !allowedRequestTypes.has(requestType))) {
+      throw new BadRequestException('Selecciona mascota, tipo de atención y fecha para solicitar la cita.');
     }
 
     const pet = await this.prisma.pet.findFirst({ where: { id: petId, clientId } });
     if (!pet) throw new NotFoundException('Mascota no encontrada.');
-    const service = await this.prisma.service.findFirst({ where: { id: serviceId, active: true } });
-    if (!service) throw new NotFoundException('Servicio no disponible.');
+    const service = serviceId
+      ? await this.prisma.service.findFirst({ where: { id: serviceId, active: true } })
+      : null;
+    if (serviceId && !service) throw new NotFoundException('Servicio no disponible.');
+
+    const notes = [
+      'CLIENT_REQUESTED_DATE_ONLY',
+      requestType ? `CLIENT_REQUEST_TYPE:${requestType}` : '',
+      Number.isFinite(weightEstimate) && weightEstimate > 0 ? `CLIENT_WEIGHT_ESTIMATE:${weightEstimate}` : '',
+    ].filter(Boolean).join(';');
 
     return this.appointmentsService.create({
       clientId,
       petId,
-      serviceId,
+      ...(service ? { serviceId } : {}),
       reason,
       scheduledAt: scheduledAt.toISOString(),
-      quotedPrice: Number(service.price),
-      priceNote: String(service.priceLabel || '').trim() || undefined,
-      durationMinutes: Number(service.durationMinutes || 30),
-      notes: 'CLIENT_REQUESTED_DATE_ONLY',
+      ...(service ? {
+        quotedPrice: Number(service.price),
+        priceNote: String(service.priceLabel || '').trim() || undefined,
+        durationMinutes: Number(service.durationMinutes || 30),
+      } : {}),
+      notes,
     });
   }
 

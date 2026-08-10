@@ -119,6 +119,9 @@ export class AppointmentsService {
     const current=await (this.prisma as any).appointment.findUnique({where:{id}});
     if(!current) throw new BadRequestException('Cita no encontrada.');
     this.assertValidStatusTransition(current.status,dto.status);
+    if(dto.status==='CONFIRMED' && !(dto.serviceId?.trim() || current.serviceId)){
+      throw new BadRequestException('Asigna un servicio del tarifario antes de confirmar la cita.');
+    }
     const changes=this.toAppointmentData(dto);
     if(dto.status==='PENDING' || dto.status==='CONFIRMED'){
       changes.checkedInAt=null;

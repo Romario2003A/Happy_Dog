@@ -37,6 +37,8 @@ const cardVisibleLimit = ref(25);
 const selectedCardPetIds = ref([]);
 const selectedAppointment = ref(null);
 const confirmationDateTime = ref('');
+const appointmentServiceCategory = ref('');
+const appointmentServiceId = ref('');
 const duplicateOverride = ref(false);
 const reschedulingPastAppointment = ref(false);
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
@@ -78,6 +80,10 @@ const quick = ref({
 const serviceCategories = computed(() => [...new Set(services.value.filter(item => item.active !== false).map(item => item.category || 'Otros'))].sort());
 const availableServices = computed(() => services.value.filter(item => item.active !== false && (item.category || 'Otros') === quick.value.serviceCategory));
 const selectedService = computed(() => services.value.find(item => item.id === quick.value.serviceId));
+const appointmentServiceOptions = computed(() => services.value.filter(item => (
+  item.active !== false && (item.category || 'Otros') === appointmentServiceCategory.value
+)));
+const appointmentAssignedService = computed(() => services.value.find(item => item.id === appointmentServiceId.value));
 
 watch(() => quick.value.serviceId, () => {
   const service = selectedService.value;
@@ -286,6 +292,8 @@ function patchAppointmentInMemory(updated) {
 function selectAppointment(appointment) {
   const current = getAppointmentById(appointment.id);
   selectedAppointment.value = current ? { ...current } : { ...appointment };
+  appointmentServiceCategory.value = selectedAppointment.value.service?.category || '';
+  appointmentServiceId.value = selectedAppointment.value.serviceId || selectedAppointment.value.service?.id || '';
   confirmationDateTime.value = requiresTimeAssignment(selectedAppointment.value)
     ? `${dateKey(selectedAppointment.value.scheduledAt)}T09:00`
     : '';
@@ -310,9 +318,9 @@ function statusLabel(status) {
 
 function appointmentType(appointment) {
   const text = `${appointment?.notes || ''} ${appointment?.service?.category || ''} ${appointment?.service?.name || ''} ${appointment?.reason || ''}`.toLowerCase();
-  if (text.includes('service_type:grooming') || ['baño', 'bano', 'corte', 'grooming', 'peluquer'].some(word => text.includes(word))) return 'GROOMING';
-  if (text.includes('service_type:vaccine') || text.includes('vacun') || text.includes('desparasit')) return 'VACCINE';
-  if (text.includes('service_type:surgery') || ['cirug', 'esteriliz', 'castr'].some(word => text.includes(word))) return 'SURGERY';
+  if (text.includes('service_type:grooming') || text.includes('client_request_type:grooming') || ['baño', 'bano', 'corte', 'grooming', 'peluquer'].some(word => text.includes(word))) return 'GROOMING';
+  if (text.includes('service_type:vaccine') || text.includes('client_request_type:vaccine') || text.includes('vacun') || text.includes('desparasit')) return 'VACCINE';
+  if (text.includes('service_type:surgery') || text.includes('client_request_type:surgery') || ['cirug', 'esteriliz', 'castr'].some(word => text.includes(word))) return 'SURGERY';
   return 'MEDICAL';
 }
 
@@ -337,6 +345,10 @@ function cleanAppointmentReason(reason) {
 }
 
 async function confirmAppointment(appointment) {
+  if (!(appointment.serviceId || appointment.service?.id)) {
+    error.value = 'Selecciona y guarda el servicio exacto antes de confirmar la cita.';
+    return;
+  }
   if (!requiresTimeAssignment(appointment)) {
     await setStatus(appointment, 'CONFIRMED');
     return;
@@ -362,6 +374,38 @@ async function confirmAppointment(appointment) {
     await loadData();
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo asignar el horario de la cita.';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function assignServiceToAppointment() {
+  const appointment = selectedAppointment.value;
+  const service = appointmentAssignedService.value;
+  if (!appointment?.id || !service) {
+    error.value = 'Selecciona la categoría y el servicio exacto del tarifario.';
+    return;
+  }
+  error.value = '';
+  success.value = '';
+  saving.value = true;
+  try {
+    const { data } = await api.patch(`/appointments/${appointment.id}`, {
+      serviceId: service.id,
+      quotedPrice: Number(service.price || 0),
+      priceNote: service.priceLabel || undefined,
+      durationMinutes: Number(service.durationMinutes || 30),
+    });
+    patchAppointmentInMemory(data);
+    selectedAppointment.value = { ...data };
+    appointmentServiceCategory.value = data.service?.category || service.category || '';
+    appointmentServiceId.value = data.serviceId || data.service?.id || service.id;
+    success.value = 'Servicio y precio asignados. Ya puedes confirmar la cita.';
+    await loadData();
+    const refreshed = getAppointmentById(appointment.id);
+    if (refreshed) selectedAppointment.value = { ...refreshed };
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo asignar el servicio a la cita.';
   } finally {
     saving.value = false;
   }
@@ -1009,7 +1053,25 @@ onMounted(loadData);
           <p v-if="selectedAppointment.pickupAt"><b>Recojo estimado:</b> {{ formatDate(selectedAppointment.pickupAt) }} · {{ formatTime(selectedAppointment.pickupAt) }}</p>
           <p><b>Motivo:</b> {{ cleanAppointmentReason(selectedAppointment.reason) }}</p>
           <p><b>Tipo:</b> {{ isGroomingAppointment(selectedAppointment) ? 'Baño o corte' : appointmentType(selectedAppointment) === 'VACCINE' ? 'Vacuna o desparasitación' : appointmentType(selectedAppointment) === 'SURGERY' ? 'Cirugía' : 'Consulta médica' }}</p>
+          <p v-if="selectedAppointment.service"><b>Servicio asignado:</b> {{ serviceDisplayLabel(selectedAppointment.service) }} · {{ selectedAppointment.priceNote || `S/ ${Number(selectedAppointment.quotedPrice || selectedAppointment.service.price || 0).toFixed(2)}` }}</p>
           <p><b>Estado:</b> {{ appointmentStatusLabel(selectedAppointment) }}</p>
+          <div v-if="selectedAppointment.status==='PENDING' && !selectedAppointment.service" class="appointment-service-assignment">
+            <strong>Completar servicio solicitado</strong>
+            <span>El cliente eligió una necesidad general. Aquí recepción asigna la tarifa y condición exactas.</span>
+            <label>Categoría
+              <select v-model="appointmentServiceCategory" @change="appointmentServiceId=''">
+                <option value="">Seleccionar categoría</option>
+                <option v-for="category in serviceCategories" :key="category" :value="category">{{ category }}</option>
+              </select>
+            </label>
+            <label v-if="appointmentServiceCategory">Servicio y condición
+              <select v-model="appointmentServiceId">
+                <option value="">Seleccionar servicio</option>
+                <option v-for="service in appointmentServiceOptions" :key="service.id" :value="service.id">{{ serviceDisplayLabel(service) }} — {{ service.priceLabel || `S/ ${Number(service.price || 0).toFixed(2)}` }}</option>
+              </select>
+            </label>
+            <button class="small" type="button" :disabled="saving || !appointmentServiceId" @click="assignServiceToAppointment">Guardar servicio y precio</button>
+          </div>
           <label v-if="selectedAppointment.status==='PENDING' && requiresTimeAssignment(selectedAppointment)" class="confirmation-time-field">
             Hora que asignará recepción
             <input v-model="confirmationDateTime" type="datetime-local" required>
@@ -1020,7 +1082,7 @@ onMounted(loadData);
             <span>No requiere ninguna acción hasta que el cliente llegue el día de la cita.</span>
           </div>
           <div v-if="!isPastAppointment(selectedAppointment)" class="detail-actions">
-            <button v-if="selectedAppointment.status==='PENDING'" class="small" :disabled="saving" @click="confirmAppointment(selectedAppointment)">{{ requiresTimeAssignment(selectedAppointment) ? 'Asignar hora y confirmar' : 'Confirmar' }}</button>
+            <button v-if="selectedAppointment.status==='PENDING'" class="small" :disabled="saving || !(selectedAppointment.serviceId || selectedAppointment.service?.id)" @click="confirmAppointment(selectedAppointment)">{{ requiresTimeAssignment(selectedAppointment) ? 'Asignar hora y confirmar' : 'Confirmar' }}</button>
             <button v-if="!isFutureAppointment(selectedAppointment) && !isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'WAITING')">Registrar llegada</button>
             <button v-if="!isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='WAITING'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Enviar al doctor</button>
             <button v-if="!isFutureAppointment(selectedAppointment) && isGroomingAppointment(selectedAppointment) && selectedAppointment.status==='CONFIRMED'" class="small secondary" @click="setStatus(selectedAppointment,'IN_CONSULTATION')">Iniciar servicio</button>

@@ -34,6 +34,22 @@ describe('AppointmentsService workflow', () => {
     }));
   });
 
+  it('does not confirm a client request until reception assigns a service', async () => {
+    const prisma = {
+      appointment: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'a1', status: 'PENDING', serviceId: null, scheduledAt: new Date(), petId: 'p1',
+        }),
+        update: jest.fn(),
+      },
+    };
+    const service = new AppointmentsService(prisma as any);
+
+    await expect(service.update('a1', { status: 'CONFIRMED' } as any, Role.RECEPTIONIST))
+      .rejects.toThrow('Asigna un servicio del tarifario antes de confirmar la cita.');
+    expect(prisma.appointment.update).not.toHaveBeenCalled();
+  });
+
   it('does not allow a veterinarian to reschedule or administratively close an appointment', async () => {
     const prisma = { appointment: { findUnique: jest.fn(), update: jest.fn() } };
     const service = new AppointmentsService(prisma as any);

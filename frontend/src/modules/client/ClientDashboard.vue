@@ -5,14 +5,13 @@ import ClientLayout from '../../layouts/ClientLayout.vue';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import happyDogLogo from '../../assets/images/happy-dog-logo.jpeg';
-import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
+import { dedupeServiceParts } from '../../utils/serviceDisplay';
 
 const router=useRouter();
 const auth=useAuthStore();
 const profile=ref(null);
 const appointments=ref([]);
 const pets=ref([]);
-const services=ref([]);
 const error=ref('');
 const success=ref('');
 const photoInputs=ref({});
@@ -28,13 +27,18 @@ const savingContact=ref(false);
 const contactPhone=ref('');
 const appointmentForm=ref({
   petId:'',
-  serviceCategory:'',
-  serviceId:'',
-  quotedPrice:'',
-  priceNote:'',
+  requestType:'',
+  weightEstimate:'',
   scheduledAt:'',
   reason:'',
 });
+const clientRequestOptions=[
+  {value:'MEDICAL',label:'Consulta veterinaria',help:'Revisión, malestar, control o diagnóstico.'},
+  {value:'VACCINE',label:'Vacuna o desparasitación',help:'Aplicación preventiva o próxima dosis.'},
+  {value:'GROOMING',label:'Baño, corte o peluquería',help:'Limpieza, corte de pelo o cuidado estético.'},
+  {value:'SURGERY',label:'Evaluación para cirugía',help:'La clínica confirmará el procedimiento adecuado.'},
+  {value:'OTHER',label:'Otra atención',help:'Cuéntanos brevemente qué necesita tu mascota.'},
+];
 let refreshTimer;
 const newPet=ref({
   name:'',
@@ -58,24 +62,21 @@ const recentAppointments=computed(()=>[...appointments.value]
 const petsPendingPhoto=computed(()=>pets.value.filter(p=>!displayPetPhoto(p)).length);
 const petsWithPrintableCard=computed(()=>pets.value.filter(p=>displayPetPhoto(p) && p.cardStatus!=='PRINTED').length);
 const clientName=computed(()=>profile.value?.fullName?.split(' ')[0] || 'Hola');
-const serviceCategories=computed(()=>[...new Set(services.value.map(service=>service.category || 'Otros'))].sort());
-const availableServices=computed(()=>services.value.filter(service=>(service.category || 'Otros')===appointmentForm.value.serviceCategory));
-const selectedService=computed(()=>services.value.find(service=>service.id===appointmentForm.value.serviceId));
+const selectedPet=computed(()=>pets.value.find(pet=>pet.id===appointmentForm.value.petId));
+const selectedRequest=computed(()=>clientRequestOptions.find(option=>option.value===appointmentForm.value.requestType));
 
 async function loadData(){
   try{
-    const [profileResponse,petsResponse,appointmentsResponse,servicesResponse]=await Promise.all([
+    const [profileResponse,petsResponse,appointmentsResponse]=await Promise.all([
       api.get('/client-portal/me'),
       api.get('/client-portal/pets'),
       api.get('/client-portal/appointments'),
-      api.get('/client-portal/services'),
     ]);
     if(!profileResponse.data) throw new Error('CLIENT_PROFILE_NOT_FOUND');
     profile.value=profileResponse.data;
     if(!editingContact.value) contactPhone.value=profileResponse.data.phone || '';
     pets.value=petsResponse.data;
     appointments.value=appointmentsResponse.data;
-    services.value=servicesResponse.data;
   }catch(e){
     if(e.response?.status===401){
       auth.logout();
@@ -108,12 +109,10 @@ async function saveContact(){
   }
 }
 
-function selectAppointmentService(){
-  const service=selectedService.value;
-  if(!service) return;
-  appointmentForm.value.quotedPrice=Number(service.price || 0);
-  appointmentForm.value.priceNote=service.priceLabel || '';
-  appointmentForm.value.reason=serviceDisplayLabel(service);
+function selectAppointmentPet(){
+  appointmentForm.value.weightEstimate=selectedPet.value?.weightKg
+    ? String(selectedPet.value.weightKg)
+    : '';
 }
 
 function requestedDateToIso(value){
@@ -247,22 +246,23 @@ async function createAppointment(){
     error.value='Primero registra una mascota para pedir una cita.';
     return;
   }
-  if(!appointmentForm.value.petId || !appointmentForm.value.serviceId || !appointmentForm.value.scheduledAt || !appointmentForm.value.reason.trim()){
-    error.value='Selecciona mascota, servicio, fecha y motivo de la cita.';
+  if(!appointmentForm.value.petId || !appointmentForm.value.requestType || !appointmentForm.value.scheduledAt){
+    error.value='Selecciona tu mascota, qué necesita y el día que prefieres.';
     return;
   }
+  const requestLabel=selectedRequest.value?.label || 'Otra atención';
+  const detail=appointmentForm.value.reason.trim();
   savingAppointment.value=true;
   try{
     await api.post('/client-portal/appointments',{
       petId:appointmentForm.value.petId,
-      serviceId:appointmentForm.value.serviceId,
-      quotedPrice:Number(appointmentForm.value.quotedPrice || 0),
-      priceNote:appointmentForm.value.priceNote || undefined,
+      requestType:appointmentForm.value.requestType,
+      weightEstimate:appointmentForm.value.weightEstimate === '' ? undefined : Number(appointmentForm.value.weightEstimate),
       scheduledAt:requestedDateToIso(appointmentForm.value.scheduledAt),
-      reason:`CLIENT_DATE_REQUEST::${appointmentForm.value.reason.trim()}`,
+      reason:`CLIENT_DATE_REQUEST::${requestLabel}${detail ? `: ${detail}` : ''}`,
     });
     success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
-    appointmentForm.value={petId:'',serviceCategory:'',serviceId:'',quotedPrice:'',priceNote:'',scheduledAt:'',reason:''};
+    appointmentForm.value={petId:'',requestType:'',weightEstimate:'',scheduledAt:'',reason:''};
     showAppointmentForm.value=false;
     await loadData();
   }catch(e){
@@ -377,27 +377,31 @@ onUnmounted(()=>clearInterval(refreshTimer));
           </button>
         </div>
         <form v-if="showAppointmentForm" class="client-appointment-form" @submit.prevent="createAppointment">
-          <select v-model="appointmentForm.petId" required>
+          <select v-model="appointmentForm.petId" required @change="selectAppointmentPet">
             <option value="" disabled>Selecciona tu mascota</option>
             <option v-for="pet in pets" :key="pet.id" :value="pet.id">{{ pet.name }}</option>
           </select>
-          <select v-model="appointmentForm.serviceCategory" required @change="appointmentForm.serviceId=''; appointmentForm.quotedPrice=''; appointmentForm.reason=''">
-            <option value="" disabled>¿Qué atención necesita?</option>
-            <option v-for="category in serviceCategories" :key="category" :value="category">{{ category }}</option>
+          <select v-model="appointmentForm.requestType" required>
+            <option value="" disabled>¿Qué necesita tu mascota?</option>
+            <option v-for="option in clientRequestOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
-          <select v-if="appointmentForm.serviceCategory" v-model="appointmentForm.serviceId" required @change="selectAppointmentService">
-            <option value="" disabled>Selecciona servicio y condición</option>
-            <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ serviceDisplayLabel(service) }} — {{ service.priceLabel || `S/ ${Number(service.price).toFixed(2)}` }}</option>
-          </select>
-          <div v-if="selectedService" class="appointment-price-note">
-            <strong>{{ selectedService.priceLabel || `S/ ${Number(selectedService.price).toFixed(2)}` }}</strong>
-            <span>{{ selectedService.requiresQuote || selectedService.maxPrice ? 'Recepción confirmará el precio final.' : 'Precio referencial del tarifario.' }}</span>
+          <div v-if="selectedRequest" class="appointment-price-note client-request-help">
+            <strong>{{ selectedRequest.label }}</strong>
+            <span>{{ selectedRequest.help }} Recepción elegirá contigo el servicio exacto.</span>
           </div>
+          <label v-if="selectedPet?.weightKg" class="appointment-day-field">Peso registrado
+            <input :value="`${selectedPet.weightKg} kg`" type="text" disabled>
+            <small>No necesitas buscar un rango; recepción usará este dato para asignar la tarifa correcta.</small>
+          </label>
+          <label v-else-if="appointmentForm.petId" class="appointment-day-field">Peso aproximado (opcional)
+            <input v-model.number="appointmentForm.weightEstimate" type="number" min="0.1" step="0.1" placeholder="Ej. 8.5">
+            <small>Si no lo sabes, déjalo vacío. Lo confirmarán en el local.</small>
+          </label>
           <label class="appointment-day-field">¿Qué día prefieres?
             <input v-model="appointmentForm.scheduledAt" type="date" required>
             <small>Recepción revisará la agenda, asignará la hora y te confirmará.</small>
           </label>
-          <textarea v-model="appointmentForm.reason" required placeholder="Detalle adicional"></textarea>
+          <textarea v-model="appointmentForm.reason" placeholder="Detalle adicional (opcional)"></textarea>
           <button :disabled="savingAppointment || !pets.length">
             {{ savingAppointment ? 'Enviando...' : 'Enviar solicitud' }}
           </button>

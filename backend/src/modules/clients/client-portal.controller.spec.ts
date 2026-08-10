@@ -47,4 +47,36 @@ describe('ClientPortalController', () => {
       durationMinutes: 30,
     }));
   });
+
+  it('permite solicitar una cita simple y deja el servicio exacto para recepción', async () => {
+    const prisma = {
+      pet: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'pet-1', clientId: 'client-1' }),
+      },
+      service: {
+        findFirst: jest.fn(),
+      },
+    };
+    const appointmentsService = {
+      create: jest.fn().mockImplementation(async payload => payload),
+    };
+    const controller = new ClientPortalController(prisma as any, appointmentsService as any);
+
+    await controller.createAppointment('client-1', {
+      petId: 'pet-1',
+      requestType: 'GROOMING',
+      weightEstimate: 8.5,
+      scheduledAt: '2026-08-01T12:00:00.000Z',
+      reason: 'CLIENT_DATE_REQUEST::Baño, corte o peluquería: corte corto',
+    });
+
+    expect(prisma.service.findFirst).not.toHaveBeenCalled();
+    expect(appointmentsService.create).toHaveBeenCalledWith(expect.objectContaining({
+      clientId: 'client-1',
+      petId: 'pet-1',
+      reason: 'CLIENT_DATE_REQUEST::Baño, corte o peluquería: corte corto',
+      notes: 'CLIENT_REQUESTED_DATE_ONLY;CLIENT_REQUEST_TYPE:GROOMING;CLIENT_WEIGHT_ESTIMATE:8.5',
+    }));
+    expect(appointmentsService.create).toHaveBeenCalledWith(expect.not.objectContaining({ serviceId: expect.anything() }));
+  });
 });
