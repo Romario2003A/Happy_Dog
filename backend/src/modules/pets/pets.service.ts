@@ -108,7 +108,25 @@ export class PetsService {
   }
 
   remove(id: string) {
-    return (this.prisma as any).pet.delete({ where: { id } });
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const pet = await tx.pet.findUnique({
+        where: { id },
+        select: { id: true, appointments: { select: { id: true } } },
+      });
+      if (!pet) throw new NotFoundException('Mascota no encontrada.');
+
+      const appointmentIds = pet.appointments.map((appointment: { id: string }) => appointment.id);
+      await tx.medicalRecord.deleteMany({ where: { petId: id } });
+      await tx.preventiveCareRecord.deleteMany({ where: { petId: id } });
+      await tx.appointment.deleteMany({ where: { petId: id } });
+      await tx.pet.delete({ where: { id } });
+
+      return {
+        deleted: true,
+        petId: id,
+        appointments: appointmentIds.length,
+      };
+    });
   }
 
   async generateIdCard(id: string) {

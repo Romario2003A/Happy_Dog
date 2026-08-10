@@ -248,16 +248,18 @@ async function createPet(){
       sterilized:newPet.value.sterilized,
     });
 
+    let savedPet=pet;
     if(newPet.value.photo){
       const formData=new FormData();
       formData.append('photo',newPet.value.photo);
-      await api.post(`/client-portal/pets/${pet.id}/photo`,formData,{headers:{'Content-Type':'multipart/form-data'}});
+      const { data: petWithPhoto }=await api.post(`/client-portal/pets/${pet.id}/photo`,formData,{headers:{'Content-Type':'multipart/form-data'}});
+      savedPet=petWithPhoto;
     }
 
+    pets.value=[savedPet,...pets.value.filter(item=>item.id!==savedPet.id)];
     success.value='Mascota registrada correctamente.';
     resetPetForm();
     showPetForm.value=false;
-    await loadData();
   }catch(e){
     error.value=e.response?.data?.message || 'No se pudo registrar la mascota.';
   }finally{
@@ -282,7 +284,7 @@ async function createAppointment(){
   const detail=appointmentForm.value.reason.trim();
   savingAppointment.value=true;
   try{
-    await api.post('/client-portal/appointments',{
+    const { data: appointment }=await api.post('/client-portal/appointments',{
       petId:appointmentForm.value.petId,
       requestType:appointmentForm.value.requestType,
       serviceName:appointmentForm.value.serviceName && appointmentForm.value.serviceName!=='UNSURE' ? appointmentForm.value.serviceName : undefined,
@@ -290,10 +292,10 @@ async function createAppointment(){
       scheduledAt:requestedDateToIso(appointmentForm.value.scheduledAt),
       reason:`CLIENT_DATE_REQUEST::${requestLabel}${detail ? `: ${detail}` : ''}`,
     });
+    appointments.value=[appointment,...appointments.value.filter(item=>item.id!==appointment.id)];
     success.value='Solicitud de cita enviada. Recepcion la revisara y confirmara pronto.';
     appointmentForm.value={petId:'',requestType:'',serviceName:'',weightEstimate:'',scheduledAt:'',reason:''};
     showAppointmentForm.value=false;
-    await loadData();
   }catch(e){
     error.value=e.response?.data?.message || 'No se pudo pedir la cita.';
   }finally{

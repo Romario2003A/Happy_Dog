@@ -17,9 +17,10 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().disable('x-powered-by');
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.enableCors({ origin: allowedOrigins, credentials: true });
-  app.use('/api/auth', (_req, res, next) => {
+  app.use('/api', (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     next();
   });
   app.setGlobalPrefix('api');

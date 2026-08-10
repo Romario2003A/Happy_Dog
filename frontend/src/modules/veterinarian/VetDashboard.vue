@@ -9,6 +9,7 @@ import { parseDateOnly } from '../../utils/dateOnly';
 import { limaDateTimeToIso } from '../../utils/dateTime';
 import { attentionTypeForAppointment, clinicalReasonForAppointment, preventiveDefaultsForAppointment, vetTaskForAppointment } from '../../utils/vetAppointment';
 import { isVetDraftCompatible, vetDraftKey } from '../../utils/vetDraft';
+import { inventoryPrescriptionItems } from '../../utils/vetPrescription';
 import {
   generateOriginalConsultationPdf,
   generateOriginalHistoryPdf,
@@ -644,13 +645,7 @@ async function startConsultation() {
 }
 
 function buildPrescriptions() {
-  if (!prescription.value.productId) return [];
-  return [{
-    productId: prescription.value.productId,
-    quantity: Number(prescription.value.quantity || 1),
-    dosage: prescription.value.dosage,
-    instructions: prescription.value.instructions,
-  }];
+  return inventoryPrescriptionItems(prescription.value);
 }
 
 function checkedExams() {
