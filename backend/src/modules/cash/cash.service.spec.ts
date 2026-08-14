@@ -77,6 +77,44 @@ describe('CashService daily closing', () => {
     expect(query.include.service.select).toMatchObject({ category: true, condition: true, priceLabel: true });
   });
 
+  it('checks out an attended service and products as one paid sale', async () => {
+    const tx = {
+      appointment: { findUnique: jest.fn().mockResolvedValue({
+        id: 'a1', status: 'ATTENDED', clientId: 'c1', petId: 'p1', serviceId: 's1',
+        reason: 'Control', notes: null, sale: null, cashMovements: [],
+        client: { id: 'c1', fullName: 'Ana' }, pet: { id: 'p1', name: 'Luna' },
+        service: { id: 's1', name: 'Consulta medica', category: 'CONSULTA', species: 'Perro', condition: null },
+      }) },
+      product: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'pr1', name: 'Shampoo', category: 'Pet shop', description: null, unitPrice: 20, stock: 5, active: true }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      sale: { create: jest.fn().mockResolvedValue({ id: 'sale1' }) },
+      cashMovement: { create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'movement', ...data })) },
+      inventoryMovement: { create: jest.fn().mockResolvedValue({ id: 'im1' }) },
+    };
+    const prisma = {
+      cashClosing: { findUnique: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn().mockImplementation((callback) => callback(tx)),
+    };
+    const service = new CashService(prisma as any);
+
+    const result = await service.checkoutAppointment({
+      appointmentId: 'a1', serviceAmount: 50, paymentMethod: 'YAPE',
+      products: [{ productId: 'pr1', quantity: 2 }],
+    } as any, 'u1');
+
+    expect(result.total).toBe(90);
+    expect(tx.sale.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ appointmentId: 'a1', status: 'PAID', total: 90 }),
+    }));
+    expect(tx.cashMovement.create).toHaveBeenCalledTimes(2);
+    expect(tx.cashMovement.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ saleId: 'sale1', appointmentId: 'a1', category: 'PET_SHOP', amount: 40, productQuantity: 2 }),
+    }));
+    expect(tx.product.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { stock: { decrement: 2 } } }));
+  });
+
   it('rejects collecting an appointment that is not finished', async () => {
     const prisma = {
       cashClosing: { findUnique: jest.fn().mockResolvedValue(null) },

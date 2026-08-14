@@ -3,6 +3,7 @@ import { CashMovementType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateCashClosingDto } from './dto/create-cash-closing.dto';
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto';
+import { CheckoutAppointmentDto } from './dto/checkout-appointment.dto';
 import { CreateReceivableDto } from './dto/create-receivable.dto';
 import { PayReceivableDto } from './dto/pay-receivable.dto';
 
@@ -184,6 +185,109 @@ export class CashService {
     });
   }
 
+  async checkoutAppointment(dto: CheckoutAppointmentDto, userId?: string) {
+    await this.assertDayOpen(new Date());
+    const requestedProducts = new Map<string, number>();
+    for (const item of dto.products || []) {
+      requestedProducts.set(item.productId, (requestedProducts.get(item.productId) || 0) + Number(item.quantity));
+    }
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const appointment = await tx.appointment.findUnique({
+        where: { id: dto.appointmentId },
+        include: {
+          client: { select: { id: true, fullName: true } },
+          pet: { select: { id: true, name: true } },
+          service: true,
+          sale: { select: { id: true } },
+          cashMovements: { where: { type: { in: ['INCOME', 'DEBT_PAYMENT'] } }, select: { id: true } },
+        },
+      });
+      if (!appointment) throw new BadRequestException('La atención seleccionada no existe.');
+      if (appointment.status !== 'ATTENDED') throw new BadRequestException('Solo se puede cobrar una atención terminada.');
+      if (appointment.sale || appointment.cashMovements.length) throw new BadRequestException('Esta atención ya fue cobrada o tiene una cuenta pendiente.');
+
+      const productIds = Array.from(requestedProducts.keys());
+      const products = productIds.length
+        ? await tx.product.findMany({ where: { id: { in: productIds }, active: true } })
+        : [];
+      if (products.length !== productIds.length) throw new BadRequestException('Uno de los productos ya no está disponible.');
+
+      const productLines = products.map((product: any) => {
+        const quantity = requestedProducts.get(product.id) || 0;
+        if (quantity < 1) throw new BadRequestException('Selecciona una cantidad válida para cada producto.');
+        if (Number(product.stock) < quantity) throw new BadRequestException(`Stock insuficiente de ${product.name}. Solo quedan ${product.stock} unidades.`);
+        const unitPrice = Number(product.unitPrice);
+        return { product, quantity, unitPrice, total: unitPrice * quantity };
+      });
+
+      const serviceAmount = Number(dto.serviceAmount || 0);
+      const productTotal = productLines.reduce((sum: number, line: any) => sum + line.total, 0);
+      const total = serviceAmount + productTotal;
+      if (total <= 0) throw new BadRequestException('El total del cobro debe ser mayor a cero.');
+
+      const serviceLabel = this.appointmentServiceLabel(appointment);
+      const sale = await tx.sale.create({
+        data: {
+          clientId: appointment.clientId,
+          appointmentId: appointment.id,
+          cashierId: userId || null,
+          status: 'PAID',
+          paymentMethod: dto.paymentMethod,
+          subtotal: total,
+          total,
+          items: {
+            create: [
+              ...(serviceAmount > 0 ? [{ serviceId: appointment.serviceId || null, description: serviceLabel, quantity: 1, unitPrice: serviceAmount, total: serviceAmount }] : []),
+              ...productLines.map((line: any) => ({ productId: line.product.id, description: line.product.name, quantity: line.quantity, unitPrice: line.unitPrice, total: line.total })),
+            ],
+          },
+        },
+      });
+
+      const common = {
+        type: 'INCOME',
+        paymentMethod: dto.paymentMethod,
+        clientId: appointment.clientId,
+        petId: appointment.petId,
+        clientName: appointment.client.fullName,
+        petName: appointment.pet.name,
+        saleId: sale.id,
+        appointmentId: appointment.id,
+        notes: dto.notes?.trim() || null,
+        registeredById: userId || null,
+      };
+      const movements = [];
+      if (serviceAmount > 0) {
+        movements.push(await tx.cashMovement.create({
+          data: { ...common, category: this.appointmentCategory(appointment), description: serviceLabel, amount: serviceAmount },
+        }));
+      }
+      for (const line of productLines) {
+        const updated = await tx.product.updateMany({
+          where: { id: line.product.id, active: true, stock: { gte: line.quantity } },
+          data: { stock: { decrement: line.quantity } },
+        });
+        if (updated.count !== 1) throw new BadRequestException(`El stock de ${line.product.name} cambió. Revisa la cantidad disponible.`);
+        const movement = await tx.cashMovement.create({
+          data: {
+            ...common,
+            category: this.productCategory(line.product),
+            description: `${line.product.name} × ${line.quantity}`,
+            amount: line.total,
+            productId: line.product.id,
+            productQuantity: line.quantity,
+          },
+        });
+        await tx.inventoryMovement.create({
+          data: { productId: line.product.id, type: 'SALE', quantity: line.quantity, reason: `Venta junto con ${serviceLabel}`, referenceId: sale.id },
+        });
+        movements.push(movement);
+      }
+      return { saleId: sale.id, total, movements };
+    });
+  }
+
   async updateMovement(id: string, dto: Partial<CreateCashMovementDto>) {
     const current=await (this.prisma as any).cashMovement.findUnique({where:{id}});
     if(!current) throw new BadRequestException('Movimiento no encontrado.');
@@ -207,6 +311,19 @@ export class CashService {
       if (!movement) throw new BadRequestException('Movimiento no encontrado.');
       if (movement.category === 'PAYROLL') throw new BadRequestException('Los pagos del personal no se eliminan desde Caja.');
       await this.assertDayOpen(movement.occurredAt,tx);
+      if (movement.saleId && movement.appointmentId && movement.type === CashMovementType.INCOME) {
+        const checkoutMovements = await tx.cashMovement.findMany({ where: { saleId: movement.saleId } });
+        for (const item of checkoutMovements) {
+          if (!item.productId || !item.productQuantity) continue;
+          await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.productQuantity } } });
+          await tx.inventoryMovement.create({
+            data: { productId: item.productId, type: 'IN', quantity: item.productQuantity, reason: 'Cobro completo anulado', referenceId: movement.saleId },
+          });
+        }
+        await tx.cashMovement.deleteMany({ where: { saleId: movement.saleId } });
+        await tx.sale.delete({ where: { id: movement.saleId } });
+        return { ...movement, checkoutCancelled: true };
+      }
       if (movement.productId && movement.productQuantity) {
         await tx.product.update({ where: { id: movement.productId }, data: { stock: { increment: movement.productQuantity } } });
         await tx.inventoryMovement.create({ data: { productId: movement.productId, type: 'IN', quantity: movement.productQuantity, reason: 'Venta anulada', referenceId: movement.id } });
@@ -361,6 +478,37 @@ export class CashService {
       description: sale.items[0]?.description || 'Cuenta pendiente', total, paid,
       balance: Math.max(0, total - paid), payments: sale.cashMovements,
     };
+  }
+
+  private normalizedText(value: string) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  }
+
+  private appointmentServiceLabel(appointment: any) {
+    if (appointment.service?.name) {
+      return [appointment.service.name, appointment.service.species, appointment.service.condition].filter(Boolean).join(' · ');
+    }
+    return appointment.reason || 'Atención';
+  }
+
+  private appointmentCategory(appointment: any) {
+    const text = this.normalizedText(`${appointment.service?.category || ''} ${appointment.service?.name || ''} ${appointment.notes || ''} ${appointment.reason || ''}`);
+    if (text.includes('GROOM') || text.includes('BANO') || text.includes('CORTE') || text.includes('PELUQUER')) return 'GROOMING';
+    if (text.includes('DESPARASIT')) return 'DEWORMING';
+    if (text.includes('VACUN')) return 'VACCINE';
+    if (text.includes('CIRUG') || text.includes('CESAREA') || text.includes('PIOMETRA') || text.includes('ESTERIL') || text.includes('CASTR')) return 'SURGERY';
+    if (text.includes('LABORATOR') || text.includes('HEMOGRAMA') || text.includes('ANALISIS')) return 'LABORATORY';
+    if (text.includes('IMAGEN') || text.includes('ECOGRAF') || text.includes('RADIOGRAF')) return 'IMAGING';
+    if (text.includes('TRATAMIENTO') || text.includes('CURACION')) return 'TREATMENT';
+    return 'CONSULTATION';
+  }
+
+  private productCategory(product: any) {
+    const text = this.normalizedText(`${product.category || ''} ${product.name || ''} ${product.description || ''}`);
+    if (text.includes('ALIMENTO') || text.includes('COMIDA') || text.includes('SNACK')) return 'FOOD';
+    if (text.includes('FARMAC') || text.includes('MEDIC') || text.includes('VACUN') || text.includes('DESPARASIT')) return 'PHARMACY';
+    if (text.includes('PET SHOP') || text.includes('ACCESOR') || text.includes('SHAMPO') || text.includes('CHAMPU') || text.includes('COSMET')) return 'PET_SHOP';
+    return 'PRODUCT';
   }
 
   private rangeFromQuery(from?: string, to?: string) {

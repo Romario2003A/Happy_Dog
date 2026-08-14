@@ -5,7 +5,7 @@ import AdminLayout from '../../layouts/AdminLayout.vue';
 import AdminReports from './AdminReports.vue';
 import { api } from '../../services/api';
 import { daysUntilDateOnly, formatDateOnly } from '../../utils/dateOnly';
-import { appointmentCashCategory, appointmentServiceLabel } from '../../utils/cashAppointment';
+import { appointmentServiceLabel } from '../../utils/cashAppointment';
 
 const route = useRoute();
 const router = useRouter();
@@ -61,7 +61,7 @@ const showClosingForm = ref(false);
 const cashForm = ref(defaultCashForm());
 const cashServiceCategory = ref('');
 const cashServiceId = ref('');
-const chargeForm = ref({ appointmentId: '', amount: 0, paymentMethod: 'CASH' });
+const chargeForm = ref({ appointmentId: '', amount: 0, paymentMethod: 'CASH', showProducts: false, productId: '', productQuantity: 1, products: [] });
 const showReceivableForm = ref(false);
 const receivableForm = ref({ clientId: '', petId: '', description: '', total: 0, initialPayment: 0, paymentMethod: 'CASH', notes: '' });
 const payingReceivableId = ref('');
@@ -153,6 +153,15 @@ const cashServiceCategories = computed(() => [...new Set(activeCashServices.valu
 const availableCashServices = computed(() => activeCashServices.value.filter(service => (service.category || 'Otros') === cashServiceCategory.value));
 const selectedCashService = computed(() => activeCashServices.value.find(service => service.id === cashServiceId.value));
 const availableCashProducts = computed(() => inventory.value.filter(product => product.active !== false && Number(product.stock) > 0));
+const checkoutAvailableProducts = computed(() => availableCashProducts.value.filter(product => !chargeForm.value.products.some(item => item.productId === product.id)));
+const checkoutProductLines = computed(() => chargeForm.value.products.map(item => {
+  const product = inventory.value.find(candidate => candidate.id === item.productId);
+  const quantity = Number(item.quantity || 0);
+  const unitPrice = Number(product?.unitPrice || 0);
+  return { ...item, product, quantity, unitPrice, total: unitPrice * quantity };
+}).filter(line => line.product));
+const checkoutProductsTotal = computed(() => checkoutProductLines.value.reduce((sum, line) => sum + line.total, 0));
+const checkoutTotal = computed(() => Number(chargeForm.value.amount || 0) + checkoutProductsTotal.value);
 const selectedCashProduct = computed(() => cashForm.value.type === 'INCOME' && cashForm.value.category === 'PRODUCT'
   ? availableCashProducts.value.find(product => product.id === cashForm.value.productId)
   : null);
@@ -676,7 +685,10 @@ async function saveCashMovement() {
 }
 
 async function deleteCashMovement(movement) {
-  const ok = window.confirm(`Eliminar el movimiento "${movement.description}"?`);
+  const isCompleteCheckout = movement.saleId && movement.appointmentId && movement.type === 'INCOME';
+  const ok = window.confirm(isCompleteCheckout
+    ? `Anular el cobro completo de "${movement.petName || movement.description}"? Se devolverán al inventario todos los productos incluidos.`
+    : `Eliminar el movimiento "${movement.description}"?`);
   if (!ok) return;
 
   saving.value = true;
@@ -684,10 +696,10 @@ async function deleteCashMovement(movement) {
   success.value = '';
   try {
     await api.delete(`/cash/movements/${movement.id}`);
-    success.value = 'Movimiento eliminado.';
+    success.value = isCompleteCheckout ? 'Cobro completo anulado y stock restaurado.' : 'Movimiento eliminado.';
     await Promise.all([
       loadCash(),
-      movement.productId ? refreshInventory() : Promise.resolve(),
+      movement.productId || isCompleteCheckout ? refreshInventory() : Promise.resolve(),
     ]);
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo eliminar el movimiento.';
@@ -797,11 +809,36 @@ function selectPendingCharge(appointment) {
     appointmentId: appointment.id,
     amount: Number(appointment.suggestedAmount || 0),
     paymentMethod: 'CASH',
+    showProducts: false,
+    productId: '',
+    productQuantity: 1,
+    products: [],
   };
 }
 
+function addCheckoutProduct() {
+  const product = checkoutAvailableProducts.value.find(item => item.id === chargeForm.value.productId);
+  const quantity = Number(chargeForm.value.productQuantity || 0);
+  if (!product || quantity < 1) {
+    error.value = 'Selecciona un producto y una cantidad válida.';
+    return;
+  }
+  if (quantity > Number(product.stock)) {
+    error.value = `Solo quedan ${product.stock} unidades de ${product.name}.`;
+    return;
+  }
+  chargeForm.value.products.push({ productId: product.id, quantity });
+  chargeForm.value.productId = '';
+  chargeForm.value.productQuantity = 1;
+  error.value = '';
+}
+
+function removeCheckoutProduct(productId) {
+  chargeForm.value.products = chargeForm.value.products.filter(item => item.productId !== productId);
+}
+
 async function collectAppointment(appointment) {
-  if (Number(chargeForm.value.amount) <= 0) {
+  if (checkoutTotal.value <= 0) {
     error.value = 'Ingresa el importe que se cobrará por esta atención.';
     return;
   }
@@ -809,21 +846,15 @@ async function collectAppointment(appointment) {
   error.value = '';
   success.value = '';
   try {
-    await api.post('/cash/movements', {
-      type: 'INCOME',
-      category: appointmentCashCategory(appointment),
-      description: appointmentServiceLabel(appointment),
-      amount: Number(chargeForm.value.amount),
+    await api.post('/cash/checkout', {
+      serviceAmount: Number(chargeForm.value.amount),
       paymentMethod: chargeForm.value.paymentMethod,
-      clientId: appointment.clientId,
-      petId: appointment.petId,
-      clientName: appointment.client?.fullName || '',
-      petName: appointment.pet?.name || '',
       appointmentId: appointment.id,
+      products: chargeForm.value.products.map(item => ({ productId: item.productId, quantity: Number(item.quantity) })),
     });
     success.value = `Cobro de ${appointment.pet?.name || 'la atención'} registrado.`;
-    chargeForm.value = { appointmentId: '', amount: 0, paymentMethod: 'CASH' };
-    await loadCash();
+    chargeForm.value = { appointmentId: '', amount: 0, paymentMethod: 'CASH', showProducts: false, productId: '', productQuantity: 1, products: [] };
+    await loadData();
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo registrar el cobro.';
   } finally {
@@ -1477,10 +1508,36 @@ onMounted(async () => {
               <button class="small" type="button" :disabled="isCashDayClosed" @click="selectPendingCharge(appointment)">Cobrar</button>
             </div>
             <form v-else class="quick-charge-form" @submit.prevent="collectAppointment(appointment)">
-              <label>Importe<input v-model.number="chargeForm.amount" type="number" min="0.01" step="0.01" required></label>
-              <label>Método<select v-model="chargeForm.paymentMethod"><option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
-              <button class="small" :disabled="saving">{{ saving ? 'Guardando...' : 'Confirmar cobro' }}</button>
-              <button class="secondary small" type="button" @click="chargeForm.appointmentId = ''">Cancelar</button>
+              <div class="quick-charge-fields">
+                <label>Atención<input v-model.number="chargeForm.amount" type="number" min="0" step="0.01" required></label>
+                <label>Método<select v-model="chargeForm.paymentMethod"><option v-for="option in paymentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+                <button v-if="!chargeForm.showProducts" class="secondary small" type="button" @click="chargeForm.showProducts = true">+ Producto</button>
+              </div>
+              <div v-if="chargeForm.showProducts" class="checkout-products">
+                <div class="checkout-product-picker">
+                  <label>Producto
+                    <select v-model="chargeForm.productId">
+                      <option value="">Seleccionar del inventario</option>
+                      <option v-for="product in checkoutAvailableProducts" :key="product.id" :value="product.id">{{ product.name }} · S/ {{ formatPrice(product.unitPrice) }} · {{ product.stock }} disp.</option>
+                    </select>
+                  </label>
+                  <label>Cant.<input v-model.number="chargeForm.productQuantity" type="number" min="1" :max="inventory.find(item => item.id === chargeForm.productId)?.stock || 1"></label>
+                  <button class="secondary small" type="button" :disabled="!chargeForm.productId" @click="addCheckoutProduct">Agregar</button>
+                </div>
+                <div v-if="checkoutProductLines.length" class="checkout-product-lines">
+                  <div v-for="line in checkoutProductLines" :key="line.productId">
+                    <span>{{ line.product.name }} × {{ line.quantity }}</span>
+                    <strong>S/ {{ formatMoney(line.total) }}</strong>
+                    <button class="icon-button" type="button" aria-label="Quitar producto" @click="removeCheckoutProduct(line.productId)">×</button>
+                  </div>
+                </div>
+                <small v-else>Opcional. El stock se descontará al confirmar este mismo cobro.</small>
+              </div>
+              <div class="quick-charge-total"><span>Total a cobrar</span><strong>S/ {{ formatMoney(checkoutTotal) }}</strong></div>
+              <div class="quick-charge-actions">
+                <button class="small" :disabled="saving || checkoutTotal <= 0">{{ saving ? 'Guardando...' : 'Cobrar todo' }}</button>
+                <button class="secondary small" type="button" @click="chargeForm.appointmentId = ''">Cancelar</button>
+              </div>
             </form>
           </article>
         </div>
@@ -1943,10 +2000,60 @@ onMounted(async () => {
 }
 
 .pending-charge-main,
-.pending-charge-action,
-.quick-charge-form {
+.pending-charge-action {
   gap: 10px;
 }
+
+.quick-charge-form {
+  align-items: stretch;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 680px;
+}
+
+.quick-charge-fields,
+.checkout-product-picker,
+.quick-charge-actions,
+.quick-charge-total,
+.checkout-product-lines > div {
+  display: flex;
+  align-items: end;
+  gap: 9px;
+}
+
+.quick-charge-fields label:first-child { max-width: 130px; }
+.checkout-product-picker label:first-child { flex: 1; }
+.checkout-product-picker label:nth-child(2) { max-width: 84px; }
+
+.checkout-products {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid rgba(13, 95, 96, 0.14);
+  border-radius: 14px;
+  background: rgba(229, 245, 241, 0.45);
+}
+
+.checkout-product-lines { display: grid; gap: 6px; }
+.checkout-product-lines > div {
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: #fff;
+}
+.checkout-product-lines span { flex: 1; }
+.checkout-product-lines .icon-button { width: 28px; height: 28px; }
+
+.quick-charge-total {
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 13px;
+  background: var(--brand-800);
+  color: #fff;
+}
+.quick-charge-total strong { font-size: 1.12rem; }
+.quick-charge-actions { justify-content: flex-end; }
 
 .pending-charge-main > div:last-child {
   display: grid;
@@ -2147,7 +2254,9 @@ onMounted(async () => {
 
   .pending-charge-card,
   .quick-charge-form,
-  .pending-charge-action {
+  .pending-charge-action,
+  .quick-charge-fields,
+  .checkout-product-picker {
     align-items: stretch;
     flex-direction: column;
   }

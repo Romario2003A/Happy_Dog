@@ -7,6 +7,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { CashService } from './cash.service';
 import { CreateCashClosingDto } from './dto/create-cash-closing.dto';
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto';
+import { CheckoutAppointmentDto } from './dto/checkout-appointment.dto';
 import { CreateReceivableDto } from './dto/create-receivable.dto';
 import { PayReceivableDto } from './dto/pay-receivable.dto';
 
@@ -54,6 +55,11 @@ export class CashController {
   @Post('movements')
   createMovement(@Body() dto: CreateCashMovementDto, @CurrentUser('id') userId?: string) {
     return this.service.createMovement(dto, userId);
+  }
+
+  @Post('checkout')
+  checkoutAppointment(@Body() dto: CheckoutAppointmentDto, @CurrentUser('id') userId?: string) {
+    return this.service.checkoutAppointment(dto, userId);
   }
 
   @Patch('movements/:id')
