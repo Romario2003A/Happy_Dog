@@ -28,6 +28,10 @@ export class UpdateAppointmentDto {
 
   @IsOptional()
   @IsString()
+  assignedStaffId?: string;
+
+  @IsOptional()
+  @IsString()
   serviceId?: string;
 
   @IsOptional() @IsNumber() @Min(0) quotedPrice?: number;

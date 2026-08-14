@@ -87,6 +87,11 @@ enum PayrollPaymentStatus {
   CANCELLED
 }
 
+enum ObligationRecurrence {
+  MONTHLY
+  ONE_TIME
+}
+
 enum MovementType {
   IN
   OUT
@@ -125,22 +130,23 @@ model User {
 }
 
 model StaffMember {
-  id              String           @id @default(uuid())
-  fullName        String
-  jobTitle        String
-  documentNumber  String?
-  phone           String?
-  active          Boolean          @default(true)
-  workSchedule    String?
-  bankAccount     String?
-  monthlySalary   Decimal?         @db.Decimal(10, 2)
-  payDay          String?
-  payrollReminder String?
-  userId          String?          @unique
-  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  payrollPayments PayrollPayment[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                   String           @id @default(uuid())
+  fullName             String
+  jobTitle             String
+  documentNumber       String?
+  phone                String?
+  active               Boolean          @default(true)
+  workSchedule         String?
+  bankAccount          String?
+  monthlySalary        Decimal?         @db.Decimal(10, 2)
+  payDay               String?
+  payrollReminder      String?
+  userId               String?          @unique
+  user                 User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payrollPayments      PayrollPayment[]
+  assignedAppointments Appointment[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   @@index([fullName])
   @@index([jobTitle])
@@ -262,11 +268,14 @@ model Appointment {
   quotedPrice     Decimal?          @db.Decimal(10, 2)
   priceNote       String?
   campaignName    String?
+  assignedStaffId String?
+  pickedUpAt      DateTime?
   durationMinutes Int               @default(30)
   client          Client            @relation(fields: [clientId], references: [id])
   pet             Pet               @relation(fields: [petId], references: [id])
   veterinarian    User?             @relation("VetAppointments", fields: [veterinarianId], references: [id])
   service         Service?          @relation(fields: [serviceId], references: [id])
+  assignedStaff   StaffMember?      @relation(fields: [assignedStaffId], references: [id], onDelete: SetNull)
   medicalRecord   MedicalRecord?
   sale            Sale?
   cashMovements   CashMovement[]
@@ -275,30 +284,32 @@ model Appointment {
 
   @@index([scheduledAt])
   @@index([status])
+  @@index([assignedStaffId])
+  @@index([pickupAt])
 }
 
 model MedicalRecord {
-  id             String             @id @default(uuid())
-  appointmentId  String             @unique
-  petId          String
-  veterinarianId String
-  visitDate      DateTime           @default(now())
-  reason         String
-  weightKg       Float?
-  temperatureC   Float?
-  diagnosis      String
-  treatment      String?
-  observations   String?
-  nextControlAt  DateTime?
-  sutureRemovalAt DateTime?
+  id                       String             @id @default(uuid())
+  appointmentId            String             @unique
+  petId                    String
+  veterinarianId           String
+  visitDate                DateTime           @default(now())
+  reason                   String
+  weightKg                 Float?
+  temperatureC             Float?
+  diagnosis                String
+  treatment                String?
+  observations             String?
+  nextControlAt            DateTime?
+  sutureRemovalAt          DateTime?
   sutureRemovalCompletedAt DateTime?
-  appointment    Appointment        @relation(fields: [appointmentId], references: [id])
-  pet            Pet                @relation(fields: [petId], references: [id])
-  veterinarian   User               @relation(fields: [veterinarianId], references: [id])
-  prescriptions  PrescriptionItem[]
-  files          ClinicalFile[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  appointment              Appointment        @relation(fields: [appointmentId], references: [id])
+  pet                      Pet                @relation(fields: [petId], references: [id])
+  veterinarian             User               @relation(fields: [veterinarianId], references: [id])
+  prescriptions            PrescriptionItem[]
+  files                    ClinicalFile[]
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
 
   @@index([petId])
   @@index([visitDate])
@@ -378,35 +389,37 @@ model Sale {
 }
 
 model CashMovement {
-  id             String               @id @default(uuid())
-  type           CashMovementType
-  category       CashMovementCategory @default(OTHER)
-  description    String
-  counterparty   String?
-  referenceCode  String?
-  amount         Decimal              @db.Decimal(10, 2)
-  paymentMethod  PaymentMethod?
-  affectsCash    Boolean              @default(true)
-  occurredAt     DateTime             @default(now())
-  clientName     String?
-  petName        String?
-  clientId       String?
-  petId          String?
-  saleId         String?
-  appointmentId  String?
-  productId      String?
+  id              String               @id @default(uuid())
+  type            CashMovementType
+  category        CashMovementCategory @default(OTHER)
+  description     String
+  counterparty    String?
+  referenceCode   String?
+  amount          Decimal              @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod?
+  affectsCash     Boolean              @default(true)
+  occurredAt      DateTime             @default(now())
+  clientName      String?
+  petName         String?
+  clientId        String?
+  petId           String?
+  saleId          String?
+  appointmentId   String?
+  productId       String?
   productQuantity Int?
-  notes          String?
-  registeredById String?
-  client         Client?              @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  pet            Pet?                 @relation(fields: [petId], references: [id], onDelete: SetNull)
-  sale           Sale?                @relation(fields: [saleId], references: [id], onDelete: SetNull)
-  appointment    Appointment?         @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  product        Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
-  registeredBy   User?                @relation(fields: [registeredById], references: [id], onDelete: SetNull)
-  payrollPayment PayrollPayment?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  obligationId    String?
+  notes           String?
+  registeredById  String?
+  client          Client?              @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  pet             Pet?                 @relation(fields: [petId], references: [id], onDelete: SetNull)
+  sale            Sale?                @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  appointment     Appointment?         @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  product         Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
+  obligation      BusinessObligation?  @relation(fields: [obligationId], references: [id], onDelete: SetNull)
+  registeredBy    User?                @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  payrollPayment  PayrollPayment?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@index([occurredAt])
   @@index([type])
@@ -415,6 +428,26 @@ model CashMovement {
   @@index([clientId])
   @@index([petId])
   @@index([productId])
+  @@index([obligationId])
+}
+
+model BusinessObligation {
+  id            String               @id @default(uuid())
+  name          String
+  payee         String?
+  category      String?
+  amount        Decimal              @db.Decimal(10, 2)
+  nextDueAt     DateTime
+  recurrence    ObligationRecurrence @default(MONTHLY)
+  referenceCode String?
+  notes         String?
+  active        Boolean              @default(true)
+  lastPaidAt    DateTime?
+  cashMovements CashMovement[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([nextDueAt, active])
 }
 
 model PayrollPayment {

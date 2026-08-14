@@ -14,6 +14,7 @@ export class StaffController {
   constructor(private service: StaffService) {}
 
   @Get()
+  @Roles(Role.ADMIN, Role.RECEPTIONIST)
   findAll() { return this.service.findAll(); }
 
   @Post()

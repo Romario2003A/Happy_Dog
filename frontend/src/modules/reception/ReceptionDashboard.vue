@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReceptionLayout from '../../layouts/ReceptionLayout.vue';
+import OperationsCenter from './OperationsCenter.vue';
 import { api } from '../../services/api';
 import {
   clientSearchPrefill,
@@ -12,17 +13,18 @@ import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisp
 
 const route = useRoute();
 const router = useRouter();
-const receptionTabs = ['citas', 'clientes', 'carnets'];
+const receptionTabs = ['pendientes', 'citas', 'clientes', 'carnets'];
 
 function tabFromRoute() {
   const tab = String(route.query.tab || '');
-  return receptionTabs.includes(tab) ? tab : 'citas';
+  return receptionTabs.includes(tab) ? tab : 'pendientes';
 }
 
 const appointments = ref([]);
 const clients = ref([]);
 const users = ref([]);
 const services = ref([]);
+const staff = ref([]);
 const summary = ref({});
 const active = ref(tabFromRoute());
 const showQuick = ref(false);
@@ -71,6 +73,7 @@ const quick = ref({
   serviceType: 'MEDICAL',
   serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30,
   campaignName: '',
+  assignedStaffId: '',
   clientId: '',
   petId: '',
   fullName: '',
@@ -315,6 +318,15 @@ function selectAppointment(appointment) {
     : '';
 }
 
+function openAppointmentFromOperations(appointmentId) {
+  const appointment = getAppointmentById(appointmentId);
+  setActive('citas');
+  if (!appointment) return;
+  selectedDate.value = dateKey(appointment.scheduledAt);
+  agendaView.value = 'day';
+  selectAppointment(appointment);
+}
+
 function hourAppointments(hour) {
   return dayAppointments.value.filter(item => new Date(item.scheduledAt).getHours() === hour);
 }
@@ -519,13 +531,13 @@ function setActive(tab, syncUrl = true) {
   if (!syncUrl) return;
 
   const nextQuery = { ...route.query };
-  if (tab === 'citas') {
+  if (tab === 'pendientes') {
     delete nextQuery.tab;
   } else {
     nextQuery.tab = tab;
   }
 
-  const currentTab = String(route.query.tab || 'citas');
+  const currentTab = String(route.query.tab || 'pendientes');
   if (currentTab !== tab) {
     router.replace({ query: nextQuery });
   }
@@ -549,18 +561,20 @@ async function loadData() {
   loading.value = true;
   error.value = '';
   try {
-    const [appointmentsRes, clientsRes, usersRes, summaryRes, servicesRes] = await Promise.all([
+    const [appointmentsRes, clientsRes, usersRes, summaryRes, servicesRes, staffRes] = await Promise.all([
       api.get('/appointments'),
       api.get('/clients'),
       api.get('/users'),
       api.get('/reports/summary'),
       api.get('/services'),
+      api.get('/staff'),
     ]);
     appointments.value = appointmentsRes.data;
     clients.value = clientsRes.data;
     users.value = usersRes.data;
     summary.value = summaryRes.data;
     services.value = servicesRes.data;
+    staff.value = staffRes.data;
   } catch (e) {
     error.value = 'No se pudo cargar la información de recepción.';
   } finally {
@@ -728,7 +742,7 @@ async function uploadPetPhoto(petId, event) {
 }
 
 function resetQuick() {
-  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, campaignName: '', clientId: '', petId: '', fullName: '', documentNumber: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
+  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, campaignName: '', assignedStaffId: '', clientId: '', petId: '', fullName: '', documentNumber: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
   quickMode.value = 'lookup';
   quickClientSearch.value = '';
   addingPetToExisting.value = false;
@@ -870,6 +884,7 @@ async function saveQuickAppointment() {
       scheduledAt: toIsoDateTime(quick.value.scheduledAt),
       pickupAt: quick.value.serviceType === 'GROOMING' && quick.value.pickupAt ? toIsoDateTime(quick.value.pickupAt) : undefined,
       serviceId: quick.value.serviceId || undefined,
+      assignedStaffId: quick.value.assignedStaffId || undefined,
       quotedPrice: quick.value.quotedPrice === '' ? undefined : Number(quick.value.quotedPrice),
       priceNote: quick.value.priceNote || undefined,
       durationMinutes: Number(quick.value.durationMinutes || 30),
@@ -897,6 +912,7 @@ onMounted(loadData);
 <template>
   <ReceptionLayout title="Recepción" subtitle="Agenda, citas por llamada y coordinación diaria" hide-user-pill>
     <template #nav>
+      <button @click="setActive('pendientes')">Pendientes</button>
       <button @click="setActive('citas')">Citas</button>
       <button @click="setActive('clientes')">Clientes</button>
       <button @click="setActive('carnets')">Carnets</button>
@@ -917,7 +933,14 @@ onMounted(loadData);
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
 
-    <div v-if="active==='citas'" class="reception-grid">
+    <OperationsCenter
+      v-if="active==='pendientes'"
+      @open-appointment="openAppointmentFromOperations"
+      @go-cash="$router.push('/admin?tab=caja')"
+      @updated="loadData"
+    />
+
+    <div v-else-if="active==='citas'" class="reception-grid">
       <section class="glass-card calendar-card">
         <div class="calendar-header">
           <div>
@@ -1070,6 +1093,13 @@ onMounted(loadData);
           <label v-if="selectedService">Duración estimada
             <input v-model.number="quick.durationMinutes" type="number" min="5" step="5" required>
             <small>La agenda reservará este tiempo y avisará si existe un cruce.</small>
+          </label>
+          <label v-if="selectedService">Responsable del servicio
+            <select v-model="quick.assignedStaffId">
+              <option value="">Asignar después</option>
+              <option v-for="person in staff" :key="person.id" :value="person.id">{{ person.fullName }} · {{ person.jobTitle }}</option>
+            </select>
+            <small>Es opcional. Si queda pendiente, aparecerá en el Centro de pendientes.</small>
           </label>
           <section class="client-lookup-panel">
             <template v-if="quickMode === 'lookup'">

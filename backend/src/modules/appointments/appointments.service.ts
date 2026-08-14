@@ -6,8 +6,8 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 @Injectable()
 export class AppointmentsService {
   constructor(private prisma: PrismaService) {}
-  findAll(){ return (this.prisma as any).appointment.findMany({ orderBy:{createdAt:'desc'}, include: { client:true, pet:true, veterinarian:true, service:true } }); }
-  findOne(id:string){ return (this.prisma as any).appointment.findUnique({ where:{id}, include: { client:true, pet:true, veterinarian:true, service:true } }); }
+  findAll(){ return (this.prisma as any).appointment.findMany({ orderBy:{createdAt:'desc'}, include: { client:true, pet:true, veterinarian:true, assignedStaff:true, service:true } }); }
+  findOne(id:string){ return (this.prisma as any).appointment.findUnique({ where:{id}, include: { client:true, pet:true, veterinarian:true, assignedStaff:true, service:true } }); }
 
   private toAppointmentData(dto: UpdateAppointmentDto) {
     const data: any = {};
@@ -32,6 +32,7 @@ export class AppointmentsService {
     if (dto.clientId !== undefined) data.clientId = dto.clientId;
     if (dto.petId !== undefined) data.petId = dto.petId;
     if (dto.veterinarianId?.trim()) data.veterinarianId = dto.veterinarianId.trim();
+    if (dto.assignedStaffId !== undefined) data.assignedStaffId = dto.assignedStaffId?.trim() || null;
     if (dto.serviceId?.trim()) data.serviceId = dto.serviceId.trim();
     if (dto.quotedPrice !== undefined) data.quotedPrice = Number(dto.quotedPrice);
     if (dto.priceNote !== undefined) data.priceNote = dto.priceNote.trim() || null;
@@ -59,14 +60,20 @@ export class AppointmentsService {
       id:excludeId?{not:excludeId}:undefined,
       scheduledAt:{gte:dayStart,lt:dayEnd},
       status:{notIn:['CANCELLED','ATTENDED','NO_SHOW']},
-      OR:[{petId:data.petId},...(data.veterinarianId?[{veterinarianId:data.veterinarianId}]:[])],
-    },select:{scheduledAt:true,durationMinutes:true,petId:true,veterinarianId:true}});
+      OR:[{petId:data.petId},...(data.veterinarianId?[{veterinarianId:data.veterinarianId}]:[]),...(data.assignedStaffId?[{assignedStaffId:data.assignedStaffId}]:[])],
+    },select:{scheduledAt:true,durationMinutes:true,petId:true,veterinarianId:true,assignedStaffId:true}});
     const conflict=candidates.some((item:any)=>{
       const otherStart=new Date(item.scheduledAt);
       const otherEnd=new Date(otherStart.getTime()+Math.max(5,Number(item.durationMinutes || 30))*60000);
       return start<otherEnd && end>otherStart;
     });
     if(conflict) throw new BadRequestException('Ese horario se cruza con otra cita de la mascota o del profesional. Elige una hora disponible.');
+  }
+
+  private async assertStaffAvailable(assignedStaffId?:string|null){
+    if(!assignedStaffId) return;
+    const staff=await (this.prisma as any).staffMember.findUnique({where:{id:assignedStaffId},select:{id:true,active:true}});
+    if(!staff || staff.active===false) throw new BadRequestException('El trabajador seleccionado no estÃ¡ disponible.');
   }
 
   private assertValidStatusTransition(currentStatus:string, nextStatus?:string){
@@ -103,12 +110,13 @@ export class AppointmentsService {
 
   async create(dto:CreateAppointmentDto){
     const data=this.toAppointmentData(dto as any);
+    await this.assertStaffAvailable(data.assignedStaffId);
     if(data.serviceId && dto.durationMinutes === undefined){
       const service=await (this.prisma as any).service.findUnique({where:{id:data.serviceId},select:{durationMinutes:true}});
       data.durationMinutes=service?.durationMinutes || 30;
     }
     await this.assertNoConflict(data);
-    return (this.prisma as any).appointment.create({ data, include: { client:true, pet:true, veterinarian:true, service:true } });
+    return (this.prisma as any).appointment.create({ data, include: { client:true, pet:true, veterinarian:true, assignedStaff:true, service:true } });
   }
   async update(id:string, dto:UpdateAppointmentDto, actorRole:Role = Role.ADMIN){
     if(actorRole===Role.VETERINARIAN){
@@ -124,6 +132,7 @@ export class AppointmentsService {
       throw new BadRequestException('Asigna un servicio del tarifario antes de confirmar la cita.');
     }
     const changes=this.toAppointmentData(dto);
+    if(dto.assignedStaffId !== undefined) await this.assertStaffAvailable(changes.assignedStaffId);
     if(dto.status==='PENDING' || dto.status==='CONFIRMED'){
       changes.checkedInAt=null;
       changes.startedAt=null;
@@ -136,8 +145,8 @@ export class AppointmentsService {
       changes.durationMinutes=service?.durationMinutes || 30;
       data.durationMinutes=changes.durationMinutes;
     }
-    if(dto.scheduledAt !== undefined || dto.serviceId !== undefined || dto.durationMinutes !== undefined || dto.veterinarianId !== undefined || dto.petId !== undefined) await this.assertNoConflict(data,id);
-    return (this.prisma as any).appointment.update({ where:{id}, data:changes, include: { client:true, pet:true, veterinarian:true, service:true } });
+    if(dto.scheduledAt !== undefined || dto.serviceId !== undefined || dto.durationMinutes !== undefined || dto.veterinarianId !== undefined || dto.assignedStaffId !== undefined || dto.petId !== undefined) await this.assertNoConflict(data,id);
+    return (this.prisma as any).appointment.update({ where:{id}, data:changes, include: { client:true, pet:true, veterinarian:true, assignedStaff:true, service:true } });
   }
   remove(id:string){ return (this.prisma as any).appointment.delete({ where:{id} }); }
 }
