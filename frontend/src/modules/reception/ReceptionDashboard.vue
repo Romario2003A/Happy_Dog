@@ -1065,14 +1065,14 @@ onMounted(loadData);
             <template v-if="quickMode === 'lookup'">
               <div>
                 <span class="badge">Primero identifica al cliente</span>
-                <h3>¿Quién solicita la cita?</h3>
-                <p>Busca por teléfono, DNI, nombre, correo o incluso por el nombre de la mascota.</p>
+                <h3>Encuentra la ficha</h3>
+                <p>Escribe el dato que tengas a la mano.</p>
               </div>
-              <label>Buscar cliente
+              <label>Cliente o mascota
                 <input
                   v-model="quickClientSearch"
                   autocomplete="off"
-                  placeholder="Ej. 999 123 456, María López o Max"
+                  placeholder="Empieza a escribir..."
                 >
               </label>
               <div v-if="quickClientMatches.length" class="client-match-list">
@@ -1096,7 +1096,7 @@ onMounted(loadData);
                 <span>Revisa el dato una vez. Si realmente es su primera visita, crea su ficha.</span>
                 <button class="secondary" type="button" @click="startNewQuickClient">Registrar como cliente nuevo</button>
               </div>
-              <small v-else>Escribe al menos dos caracteres para buscar en todos los clientes.</small>
+              <small v-else>Escribe al menos dos caracteres.</small>
             </template>
 
             <template v-else-if="quickMode === 'existing'">
