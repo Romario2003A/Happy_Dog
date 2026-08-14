@@ -154,8 +154,8 @@ defineExpose({ loadCenter });
             <div class="task-body"><span class="task-kind">{{ taskLabels[task.type] }}</span><strong>{{ task.title }}</strong><small>{{ task.detail }}</small><a v-if="task.phone" :href="phoneHref(task.phone)">{{ task.phone }}</a></div>
             <div class="task-action">
               <template v-if="task.type==='UNASSIGNED'">
-                <select v-model="assignment[task.appointmentId]"><option value="">Elegir responsable</option><option v-for="person in center.staff" :key="person.id" :value="person.id">{{ person.fullName }} · {{ person.jobTitle }}</option></select>
-                <button class="small" type="button" :disabled="saving" @click="assignStaff(task)">Asignar</button>
+                <select v-model="assignment[task.appointmentId]" :disabled="!center.staff.length"><option value="">{{ center.staff.length ? 'Elegir responsable' : 'Agrega personal en Administración' }}</option><option v-for="person in center.staff" :key="person.id" :value="person.id">{{ person.fullName }} · {{ person.jobTitle }}</option></select>
+                <button class="small" type="button" :disabled="saving || !center.staff.length" @click="assignStaff(task)">Asignar</button>
               </template>
               <button v-else-if="task.type==='PREVENTIVE_CALL'" class="small" type="button" :disabled="saving" @click="resolveTask(task,'Llamada registrada.')">Marcar llamada</button>
               <button v-else-if="task.type==='STERILIZATION_CALL'" class="small" type="button" :disabled="saving" @click="resolveTask(task,'Contacto registrado.')">Marcar contacto</button>
