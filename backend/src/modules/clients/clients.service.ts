@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 @Injectable()
@@ -6,7 +6,33 @@ export class ClientsService {
   constructor(private prisma: PrismaService) {}
   findAll(){ return (this.prisma as any).client.findMany({ orderBy:{createdAt:'desc'}, include: { pets:true } }); }
   findOne(id:string){ return (this.prisma as any).client.findUnique({ where:{id}, include: { pets:true } }); }
-  async create(dto:CreateClientDto){ return (this.prisma as any).client.create({ data: dto as any }); }
+  async create(dto:CreateClientDto){
+    const phone = String(dto.phone || '').replace(/\D/g, '') || undefined;
+    const documentNumber = String(dto.documentNumber || '').replace(/\s/g, '') || undefined;
+    const email = String(dto.email || '').trim().toLowerCase() || undefined;
+    const identifiers = [
+      ...(phone ? [{ phone }] : []),
+      ...(documentNumber ? [{ documentNumber }] : []),
+      ...(email ? [{ email: { equals: email, mode: 'insensitive' } }] : []),
+    ];
+
+    if (identifiers.length) {
+      const existing = await (this.prisma as any).client.findFirst({ where: { OR: identifiers }, select: { id: true } });
+      if (existing) {
+        throw new ConflictException('Este teléfono, DNI o correo ya pertenece a un cliente registrado.');
+      }
+    }
+
+    return (this.prisma as any).client.create({
+      data: {
+        ...dto,
+        fullName: dto.fullName.trim(),
+        phone,
+        documentNumber,
+        email,
+      } as any,
+    });
+  }
   update(id:string, dto:Partial<CreateClientDto>){ return (this.prisma as any).client.update({ where:{id}, data:dto as any }); }
   remove(id: string) {
     return (this.prisma as any).$transaction(async (tx: any) => {

@@ -515,6 +515,22 @@ td small{display:block;color:var(--muted);margin-top:4px;font-weight:700}
 .use-cases span{padding:8px 10px;border-radius:999px;background:rgba(134,214,173,.18);border:1px solid var(--line);color:var(--blue-dark);font-size:12px;font-weight:800}
 .empty-slot{align-self:center;color:rgba(104,118,114,.55);font-weight:700}
 .quick-form{margin-top:16px}
+.client-lookup-panel{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(235,247,245,.76))}
+.client-lookup-panel h3{margin:8px 0 4px;font-size:1.05rem}
+.client-lookup-panel p{margin:0;color:var(--muted);line-height:1.45}
+.client-match-list{display:grid;gap:8px}
+.client-match{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px;text-align:left;background:white;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+.client-match:hover{background:rgba(15,143,125,.06);border-color:rgba(15,143,125,.32);box-shadow:none}
+.client-match span:nth-child(2){display:grid;gap:3px}
+.client-match small,.selected-client-card small{color:var(--muted);font-weight:600}
+.client-match b{color:var(--blue-dark);font-size:.78rem}
+.client-match-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:var(--blue-dark);color:white;font-weight:800}
+.client-not-found{display:grid;gap:7px;padding:13px;border:1px dashed rgba(15,143,125,.35);border-radius:14px;background:rgba(255,255,255,.72)}
+.client-not-found span,.new-pet-notice span{color:var(--muted);line-height:1.4}
+.selected-client-card{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+.selected-client-card>span:nth-child(2),.new-client-notice>span{display:grid;gap:2px}
+.new-client-notice,.new-pet-notice{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border-radius:14px;background:rgba(15,143,125,.07)}
+.new-pet-notice{align-items:flex-start;flex-direction:column}
 .metric span{color:var(--muted);font-weight:700}
 .metric strong{display:block;font-size:34px;margin-top:8px}
 table{width:100%;border-collapse:collapse}

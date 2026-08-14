@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ClientsService } from './clients.service';
 
 describe('ClientsService', () => {
@@ -10,12 +10,42 @@ describe('ClientsService', () => {
     pet: { deleteMany: jest.fn() },
   };
   const prisma = {
+    client: { findFirst: jest.fn(), create: jest.fn() },
     $transaction: jest.fn((callback: (tx: typeof transactionClient) => unknown) => callback(transactionClient)),
   };
   const service = new ClientsService(prisma as any);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.client.findFirst.mockResolvedValue(null);
+  });
+
+  it('normaliza los identificadores al registrar un cliente', async () => {
+    prisma.client.create.mockResolvedValue({ id: 'client-new' });
+
+    await service.create({
+      fullName: '  María López  ',
+      phone: '993 784 826',
+      documentNumber: '44 556 677',
+      email: 'MARIA@EXAMPLE.COM',
+    });
+
+    expect(prisma.client.create).toHaveBeenCalledWith({
+      data: {
+        fullName: 'María López',
+        phone: '993784826',
+        documentNumber: '44556677',
+        email: 'maria@example.com',
+      },
+    });
+  });
+
+  it('impide registrar dos clientes con el mismo contacto', async () => {
+    prisma.client.findFirst.mockResolvedValue({ id: 'client-existing' });
+
+    await expect(service.create({ fullName: 'Duplicado', phone: '993 784 826' }))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.client.create).not.toHaveBeenCalled();
   });
 
   it('elimina en una transacción los datos vinculados del cliente', async () => {

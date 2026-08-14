@@ -3,6 +3,11 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReceptionLayout from '../../layouts/ReceptionLayout.vue';
 import { api } from '../../services/api';
+import {
+  clientSearchPrefill,
+  findExactReceptionClients,
+  searchReceptionClients,
+} from '../../utils/receptionClientLookup';
 import { dedupeServiceParts, serviceDisplayLabel } from '../../utils/serviceDisplay';
 
 const route = useRoute();
@@ -29,7 +34,9 @@ let savingSlowTimer;
 const error = ref('');
 const success = ref('');
 const search = ref('');
-const quickMode = ref('new');
+const quickMode = ref('lookup');
+const quickClientSearch = ref('');
+const addingPetToExisting = ref(false);
 const agendaView = ref('day');
 const cardFilter = ref('ready');
 const cardSearch = ref('');
@@ -65,6 +72,7 @@ const quick = ref({
   clientId: '',
   petId: '',
   fullName: '',
+  documentNumber: '',
   phone: '',
   email: '',
   petName: '',
@@ -161,6 +169,11 @@ const filteredClients = computed(() => {
 });
 
 const selectedClientPets = computed(() => clients.value.find(client => client.id === quick.value.clientId)?.pets || []);
+const selectedQuickClient = computed(() => clients.value.find(client => client.id === quick.value.clientId) || null);
+const quickClientMatches = computed(() => searchReceptionClients(clients.value, quickClientSearch.value));
+const exactQuickClientMatches = computed(() => quickMode.value === 'new'
+  ? findExactReceptionClients(clients.value, quick.value)
+  : []);
 
 const allPets = computed(() => clients.value.flatMap(client => (client.pets || []).map(pet => ({ ...pet, client }))));
 const cardStats = computed(() => {
@@ -710,7 +723,10 @@ async function uploadPetPhoto(petId, event) {
 }
 
 function resetQuick() {
-  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, clientId: '', petId: '', fullName: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
+  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, clientId: '', petId: '', fullName: '', documentNumber: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
+  quickMode.value = 'lookup';
+  quickClientSearch.value = '';
+  addingPetToExisting.value = false;
   duplicateOverride.value = false;
   reschedulingPastAppointment.value = false;
   createdQuickIds.value = { clientId: '', petId: '' };
@@ -718,7 +734,48 @@ function resetQuick() {
 
 function setQuickMode(mode) {
   quickMode.value = mode;
+  addingPetToExisting.value = false;
   createdQuickIds.value = { clientId: '', petId: '' };
+}
+
+function selectQuickClient(client) {
+  quickMode.value = 'existing';
+  quick.value.clientId = client.id;
+  quick.value.petId = client.pets?.length === 1 ? client.pets[0].id : '';
+  addingPetToExisting.value = !client.pets?.length;
+  createdQuickIds.value = { clientId: '', petId: '' };
+}
+
+function startNewQuickClient() {
+  const prefill = clientSearchPrefill(quickClientSearch.value);
+  quickMode.value = 'new';
+  quick.value.clientId = '';
+  quick.value.petId = '';
+  quick.value.fullName = prefill.fullName || '';
+  quick.value.documentNumber = '';
+  quick.value.phone = prefill.phone || '';
+  quick.value.email = prefill.email || '';
+  addingPetToExisting.value = false;
+  createdQuickIds.value = { clientId: '', petId: '' };
+}
+
+function returnToClientLookup() {
+  quickMode.value = 'lookup';
+  quick.value.clientId = '';
+  quick.value.petId = '';
+  addingPetToExisting.value = false;
+  createdQuickIds.value = { clientId: '', petId: '' };
+}
+
+function startNewPetForExisting() {
+  quick.value.petId = '';
+  quick.value.petName = '';
+  quick.value.species = '';
+  quick.value.breed = '';
+  quick.value.sex = 'UNKNOWN';
+  quick.value.age = '';
+  quick.value.weightKg = '';
+  addingPetToExisting.value = true;
 }
 
 function useExistingAppointment(appointment) {
@@ -743,6 +800,18 @@ async function saveQuickAppointment() {
   error.value = '';
   success.value = '';
   try {
+    if (quickMode.value === 'lookup') {
+      error.value = 'Busca al cliente antes de continuar o regístralo si todavía no existe.';
+      return;
+    }
+
+    if (quickMode.value === 'new' && exactQuickClientMatches.value.length) {
+      quickClientSearch.value = quick.value.phone || quick.value.documentNumber || quick.value.email || quick.value.fullName;
+      quickMode.value = 'lookup';
+      error.value = 'Este teléfono, DNI o correo ya pertenece a un cliente. Selecciona su ficha para evitar duplicarlo.';
+      return;
+    }
+
     if (!duplicateOverride.value && possibleDuplicateAppointments.value.length) {
       selectedAppointment.value = possibleDuplicateAppointments.value[0];
       error.value = 'Ya existe una cita parecida para ese cliente o mascota en la misma fecha. Revisa la cita existente o crea la nueva solo si realmente corresponde.';
@@ -756,6 +825,7 @@ async function saveQuickAppointment() {
       if (!clientId) {
         const { data: client } = await api.post('/clients', {
           fullName: quick.value.fullName,
+          documentNumber: quick.value.documentNumber || undefined,
           phone: quick.value.phone,
           email: quick.value.email || undefined,
         });
@@ -775,6 +845,18 @@ async function saveQuickAppointment() {
         petId = pet.id;
         createdQuickIds.value = { clientId, petId };
       }
+    } else if (addingPetToExisting.value && !petId) {
+      const { data: pet } = await api.post('/pets', {
+        name: quick.value.petName,
+        species: quick.value.species,
+        breed: quick.value.breed || undefined,
+        sex: quick.value.sex || 'UNKNOWN',
+        age: quick.value.age || undefined,
+        weightKg: quick.value.weightKg === '' ? undefined : Number(quick.value.weightKg),
+        clientId,
+      });
+      petId = pet.id;
+      createdQuickIds.value = { clientId, petId };
     }
 
     await api.post('/appointments', {
@@ -979,30 +1061,103 @@ onMounted(loadData);
             <input v-model.number="quick.durationMinutes" type="number" min="5" step="5" required>
             <small>La agenda reservará este tiempo y avisará si existe un cruce.</small>
           </label>
-          <div class="segmented">
-            <button type="button" :class="{active:quickMode==='new'}" @click="setQuickMode('new')">Registrar cliente nuevo</button>
-            <button type="button" :class="{active:quickMode==='existing'}" @click="setQuickMode('existing')">Agendar cliente existente</button>
-          </div>
+          <section class="client-lookup-panel">
+            <template v-if="quickMode === 'lookup'">
+              <div>
+                <span class="badge">Primero identifica al cliente</span>
+                <h3>¿Quién solicita la cita?</h3>
+                <p>Busca por teléfono, DNI, nombre, correo o incluso por el nombre de la mascota.</p>
+              </div>
+              <label>Buscar cliente
+                <input
+                  v-model="quickClientSearch"
+                  autocomplete="off"
+                  placeholder="Ej. 999 123 456, María López o Max"
+                >
+              </label>
+              <div v-if="quickClientMatches.length" class="client-match-list">
+                <button
+                  v-for="client in quickClientMatches"
+                  :key="client.id"
+                  class="client-match"
+                  type="button"
+                  @click="selectQuickClient(client)"
+                >
+                  <span class="client-match-avatar">{{ String(client.fullName || 'C').charAt(0).toUpperCase() }}</span>
+                  <span>
+                    <strong>{{ client.fullName }}</strong>
+                    <small>{{ client.phone || client.documentNumber || client.email || 'Sin contacto' }} · {{ client.pets?.length || 0 }} {{ client.pets?.length === 1 ? 'mascota' : 'mascotas' }}</small>
+                  </span>
+                  <b>Seleccionar</b>
+                </button>
+              </div>
+              <div v-else-if="quickClientSearch.trim().length >= 2" class="client-not-found">
+                <strong>No encontramos a esta persona</strong>
+                <span>Revisa el dato una vez. Si realmente es su primera visita, crea su ficha.</span>
+                <button class="secondary" type="button" @click="startNewQuickClient">Registrar como cliente nuevo</button>
+              </div>
+              <small v-else>Escribe al menos dos caracteres para buscar en todos los clientes.</small>
+            </template>
 
-          <template v-if="quickMode==='existing'">
-            <label>Cliente
-              <select v-model="quick.clientId" required @change="quick.petId=''">
-                <option value="">Seleccionar cliente</option>
-                <option v-for="client in clients" :key="client.id" :value="client.id">{{ client.fullName }} - {{ client.phone || client.email || 'sin contacto' }}</option>
-              </select>
-            </label>
-            <label>Mascota
-              <select v-model="quick.petId" required>
-                <option value="">Seleccionar mascota</option>
-                <option v-for="pet in selectedClientPets" :key="pet.id" :value="pet.id">{{ pet.name }} - {{ pet.species }}</option>
-              </select>
-            </label>
-          </template>
+            <template v-else-if="quickMode === 'existing'">
+              <div class="selected-client-card">
+                <span class="client-match-avatar">{{ String(selectedQuickClient?.fullName || 'C').charAt(0).toUpperCase() }}</span>
+                <span>
+                  <small>Cliente encontrado</small>
+                  <strong>{{ selectedQuickClient?.fullName }}</strong>
+                  <small>{{ selectedQuickClient?.phone || selectedQuickClient?.documentNumber || selectedQuickClient?.email || 'Sin contacto' }}</small>
+                </span>
+                <button class="small secondary" type="button" @click="returnToClientLookup">Buscar otro</button>
+              </div>
+              <template v-if="!addingPetToExisting">
+                <label>Mascota
+                  <select v-model="quick.petId" required>
+                    <option value="">Seleccionar mascota</option>
+                    <option v-for="pet in selectedClientPets" :key="pet.id" :value="pet.id">{{ pet.name }} - {{ pet.species }}</option>
+                  </select>
+                </label>
+                <button class="secondary small" type="button" @click="startNewPetForExisting">+ Registrar otra mascota para este cliente</button>
+              </template>
+              <div v-else class="new-pet-notice">
+                <strong>{{ selectedClientPets.length ? 'Nueva mascota del cliente' : 'Este cliente todavía no tiene mascotas' }}</strong>
+                <span>Completa los datos de la mascota para continuar con la cita.</span>
+                <button v-if="selectedClientPets.length" class="small secondary" type="button" @click="addingPetToExisting=false">Elegir mascota registrada</button>
+              </div>
+            </template>
 
-          <template v-else>
+            <template v-else>
+              <div class="new-client-notice">
+                <span>
+                  <small>Primera visita</small>
+                  <strong>Registrar cliente nuevo</strong>
+                </span>
+                <button class="small secondary" type="button" @click="returnToClientLookup">Volver a buscar</button>
+              </div>
+            </template>
+          </section>
+
+          <template v-if="quickMode==='new'">
             <label>Dueño<input v-model="quick.fullName" required placeholder="Nombre completo"></label>
+            <label>DNI opcional<input v-model="quick.documentNumber" inputmode="numeric" placeholder="Documento de identidad"></label>
             <label>Teléfono / WhatsApp<input v-model="quick.phone" required placeholder="999 999 999"></label>
             <label>Correo opcional<input v-model="quick.email" type="email" placeholder="correo@ejemplo.com"></label>
+            <div v-if="exactQuickClientMatches.length" class="duplicate-alert">
+              <strong>Este cliente ya parece estar registrado</strong>
+              <span>Coincide el teléfono, DNI o correo. Selecciona su ficha para no duplicarla.</span>
+              <button
+                v-for="client in exactQuickClientMatches"
+                :key="client.id"
+                class="summary-appointment"
+                type="button"
+                @click="selectQuickClient(client)"
+              >
+                <strong>{{ client.fullName }}</strong>
+                <span>{{ client.phone || client.documentNumber || client.email }}</span>
+              </button>
+            </div>
+          </template>
+
+          <template v-if="quickMode==='new' || (quickMode==='existing' && addingPetToExisting)">
             <label>Mascota<input v-model="quick.petName" required placeholder="Nombre de la mascota"></label>
             <label>Especie<input v-model="quick.species" required placeholder="Perro, gato, conejo"></label>
             <label>Raza<input v-model="quick.breed" placeholder="Raza o cruce"></label>
@@ -1035,7 +1190,7 @@ onMounted(loadData);
             </button>
             <button class="small secondary" type="button" :disabled="saving" @click="saveIgnoringDuplicate">Crear de todos modos</button>
           </div>
-          <button :disabled="saving">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Guardar cliente, mascota y cita' : 'Guardar nueva cita' }}</button>
+          <button :disabled="saving || quickMode==='lookup'">{{ saving ? 'Guardando...' : quickMode==='new' ? 'Guardar cliente, mascota y cita' : addingPetToExisting ? 'Guardar mascota y cita' : quickMode==='existing' ? 'Guardar nueva cita' : 'Busca un cliente para continuar' }}</button>
           <small v-if="savingSlow" class="saving-note">El servidor está iniciando. No cierres esta pantalla; tus datos se conservarán.</small>
         </form>
 
