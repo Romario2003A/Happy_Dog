@@ -62,7 +62,7 @@ export class CashService {
     const { start, end } = this.dayRange(date);
     const movements = await (this.prisma as any).cashMovement.findMany({
       where: { occurredAt: { gte: start, lte: end } },
-      select: { type: true, category: true, paymentMethod: true, amount: true },
+      select: { type: true, category: true, paymentMethod: true, amount: true, affectsCash: true },
     });
     const closing = await (this.prisma as any).cashClosing.findUnique({ where: { businessDate: start } });
 
@@ -73,6 +73,7 @@ export class CashService {
       adjustments: 0,
       net: 0,
       cashNet: 0,
+      externalExpenses: 0,
       movementCount: movements.length,
       byPaymentMethod: [] as Array<{ key: string; total: number }>,
       byCategory: [] as Array<{ key: string; income: number; expenses: number; net: number }>,
@@ -83,14 +84,17 @@ export class CashService {
 
     for (const movement of movements) {
       const amount = Number(movement.amount || 0);
-      if (movement.type === CashMovementType.EXPENSE) totals.expenses += amount;
+      if (movement.type === CashMovementType.EXPENSE) {
+        totals.expenses += amount;
+        if (movement.affectsCash === false) totals.externalExpenses += amount;
+      }
       else if (movement.type === CashMovementType.DEBT_PAYMENT) totals.debtPayments += amount;
       else if (movement.type === CashMovementType.ADJUSTMENT) totals.adjustments += amount;
       else totals.income += amount;
 
       const signedAmount = movement.type === CashMovementType.EXPENSE ? -amount : amount;
       if (movement.paymentMethod) byPayment.set(movement.paymentMethod, (byPayment.get(movement.paymentMethod) || 0) + signedAmount);
-      if (movement.paymentMethod === 'CASH') totals.cashNet += signedAmount;
+      if (movement.paymentMethod === 'CASH' && movement.affectsCash !== false) totals.cashNet += signedAmount;
       if (movement.category) {
         const category = byCategory.get(movement.category) || { income: 0, expenses: 0 };
         if (movement.type === CashMovementType.EXPENSE) category.expenses += amount;
@@ -113,6 +117,7 @@ export class CashService {
   async createMovement(dto: CreateCashMovementDto, userId?: string) {
     if (Number(dto.amount) <= 0) throw new BadRequestException('El monto debe ser mayor a cero.');
     if (dto.category === 'PAYROLL') throw new BadRequestException('Los pagos del personal se registran desde el módulo Personal.');
+    if (dto.affectsCash === false && dto.type !== CashMovementType.EXPENSE) throw new BadRequestException('Solo un gasto puede marcarse como egreso fuera de caja.');
     await this.assertDayOpen(dto.occurredAt || new Date());
 
     if (dto.appointmentId && dto.type !== CashMovementType.EXPENSE) {
@@ -156,6 +161,7 @@ export class CashService {
         referenceCode: dto.referenceCode || null,
         amount: product ? Number(product.unitPrice) * productQuantity : dto.amount,
         paymentMethod: dto.paymentMethod || null,
+        affectsCash: dto.affectsCash !== false,
         occurredAt: this.parseDateTime(dto.occurredAt),
         clientName: dto.clientName || null,
         petName: dto.petName || null,
@@ -182,6 +188,7 @@ export class CashService {
     const current=await (this.prisma as any).cashMovement.findUnique({where:{id}});
     if(!current) throw new BadRequestException('Movimiento no encontrado.');
     if(current.category === 'PAYROLL') throw new BadRequestException('Los pagos del personal no se editan desde Caja.');
+    if(dto.affectsCash === false && (dto.type || current.type) !== CashMovementType.EXPENSE) throw new BadRequestException('Solo un gasto puede marcarse como egreso fuera de caja.');
     await this.assertDayOpen(current.occurredAt);
     if(dto.occurredAt) await this.assertDayOpen(dto.occurredAt);
     return (this.prisma as any).cashMovement.update({

@@ -169,6 +169,7 @@ model Client {
 
 model Pet {
   id                    String                 @id @default(uuid())
+  recordNumber          Int                    @unique @default(autoincrement())
   name                  String
   species               String
   breed                 String?
@@ -260,6 +261,7 @@ model Appointment {
   serviceId       String?
   quotedPrice     Decimal?          @db.Decimal(10, 2)
   priceNote       String?
+  campaignName    String?
   durationMinutes Int               @default(30)
   client          Client            @relation(fields: [clientId], references: [id])
   pet             Pet               @relation(fields: [petId], references: [id])
@@ -288,6 +290,8 @@ model MedicalRecord {
   treatment      String?
   observations   String?
   nextControlAt  DateTime?
+  sutureRemovalAt DateTime?
+  sutureRemovalCompletedAt DateTime?
   appointment    Appointment        @relation(fields: [appointmentId], references: [id])
   pet            Pet                @relation(fields: [petId], references: [id])
   veterinarian   User               @relation(fields: [veterinarianId], references: [id])
@@ -298,6 +302,7 @@ model MedicalRecord {
 
   @@index([petId])
   @@index([visitDate])
+  @@index([sutureRemovalAt])
 }
 
 model Product {
@@ -381,6 +386,7 @@ model CashMovement {
   referenceCode  String?
   amount         Decimal              @db.Decimal(10, 2)
   paymentMethod  PaymentMethod?
+  affectsCash    Boolean              @default(true)
   occurredAt     DateTime             @default(now())
   clientName     String?
   petName        String?

@@ -56,6 +56,7 @@ const CODE39: Record<string, string> = {
 
 type PetWithClient = {
   id: string;
+  recordNumber?: number | null;
   name: string;
   species: string;
   breed?: string | null;
@@ -233,11 +234,13 @@ export class PetsService {
   }
 
   private petCode(pet: PetWithClient) {
+    if (pet.recordNumber) return `MAS${String(pet.recordNumber).padStart(8, '0')}`;
     const raw = pet.id.replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase().padStart(8, '0');
     return `MAS${raw}`;
   }
 
   private shortCode(pet: PetWithClient) {
+    if (pet.recordNumber) return `HD-${String(pet.recordNumber).padStart(6, '0')}`;
     const raw = pet.id.replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase().padStart(8, '0');
     return `HD-${raw}`;
   }

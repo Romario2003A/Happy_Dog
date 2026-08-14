@@ -97,7 +97,7 @@ const periodLabel = computed(() => fromDate.value === toDate.value
 function emptyReport() {
   return {
     range: {},
-    summary: { income: 0, expenses: 0, adjustments: 0, net: 0, movements: 0, appointments: 0, attended: 0, preventive: 0, services: 0, staff: 0, payrollPaid: 0, payrollPending: 0 },
+    summary: { income: 0, expenses: 0, externalExpenses: 0, adjustments: 0, net: 0, movements: 0, appointments: 0, attended: 0, preventive: 0, services: 0, staff: 0, payrollPaid: 0, payrollPending: 0 },
     byCategory: [], byPaymentMethod: [], cashMovements: [], appointments: [], preventiveRecords: [], services: [], staff: [], payrollPayments: [],
   };
 }
@@ -240,7 +240,7 @@ onMounted(loadReport);
 
         <div class="report-metrics" aria-label="Resumen del periodo">
           <div><span>INGRESOS</span><strong>S/ {{ money(report.summary.income) }}</strong><small>{{ report.summary.movements }} movimientos</small></div>
-          <div><span>EGRESOS</span><strong>S/ {{ money(report.summary.expenses) }}</strong><small>Gastos registrados</small></div>
+          <div><span>EGRESOS</span><strong>S/ {{ money(report.summary.expenses) }}</strong><small>{{ report.summary.externalExpenses ? `S/ ${money(report.summary.externalExpenses)} fuera de caja` : 'Gastos registrados' }}</small></div>
           <div class="primary"><span>RESULTADO</span><strong>S/ {{ money(report.summary.net) }}</strong><small>Ingresos menos gastos</small></div>
           <div><span>ATENCIONES</span><strong>{{ report.summary.attended }} / {{ report.summary.appointments }}</strong><small>Atendidas / registradas</small></div>
         </div>
@@ -288,7 +288,7 @@ onMounted(loadReport);
         <div v-if="reportView === 'cash'" class="report-table-scroll">
           <table><thead><tr><th>FECHA</th><th>CLIENTE / PACIENTE</th><th>CONCEPTO</th><th>CATEGORÍA</th><th>MÉTODO</th><th>INGRESO</th><th>EGRESO</th></tr></thead>
           <tbody><tr v-if="!filteredCash.length"><td colspan="7" class="report-empty-cell">No hay movimientos con este criterio.</td></tr>
-          <tr v-for="row in filteredCash" :key="row.id"><td>{{ formatDateTime(row.occurredAt) }}</td><td><strong>{{ row.petName || row.counterparty || '—' }}</strong><small>{{ row.clientName }}</small></td><td>{{ row.description }}</td><td>{{ categoryLabels[row.category] || row.category }}</td><td>{{ paymentLabels[row.paymentMethod] || '—' }}</td><td class="money-positive">{{ row.type === 'EXPENSE' ? '—' : `S/ ${money(row.amount)}` }}</td><td class="money-negative">{{ row.type === 'EXPENSE' ? `S/ ${money(row.amount)}` : '—' }}</td></tr></tbody></table>
+          <tr v-for="row in filteredCash" :key="row.id"><td>{{ formatDateTime(row.occurredAt) }}</td><td><strong>{{ row.petName || row.counterparty || '—' }}</strong><small>{{ row.clientName }}</small></td><td>{{ row.description }}<small v-if="row.type === 'EXPENSE' && row.affectsCash === false">Egreso fuera de caja</small></td><td>{{ categoryLabels[row.category] || row.category }}</td><td>{{ paymentLabels[row.paymentMethod] || '—' }}</td><td class="money-positive">{{ row.type === 'EXPENSE' ? '—' : `S/ ${money(row.amount)}` }}</td><td class="money-negative">{{ row.type === 'EXPENSE' ? `S/ ${money(row.amount)}` : '—' }}</td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'payments'" class="report-table-scroll">
@@ -304,9 +304,9 @@ onMounted(loadReport);
         </div>
 
         <div v-else-if="reportView === 'staff'" class="report-table-scroll">
-          <table><thead><tr><th>NOMBRE</th><th>CARGO</th><th>HORARIO DE TRABAJO</th><th>CUENTA DE ACCESO</th><th>ESTADO</th></tr></thead>
-          <tbody><tr v-if="!filteredStaff.length"><td colspan="5" class="report-empty-cell">No hay personal registrado con este criterio.</td></tr>
-          <tr v-for="row in filteredStaff" :key="row.id"><td><strong>{{ row.fullName }}</strong></td><td>{{ row.jobTitle }}</td><td>{{ row.workSchedule || 'No especificado' }}</td><td>{{ row.user?.email || 'No necesita acceso' }}<small v-if="row.user">{{ roleLabels[row.user.role] || row.user.role }}</small></td><td><span class="report-status" :data-status="row.active ? 'ATTENDED' : 'CANCELLED'">{{ row.active ? 'Activo' : 'Inactivo' }}</span></td></tr></tbody></table>
+          <table><thead><tr><th>NOMBRE</th><th>CARGO</th><th>HORARIO DE TRABAJO</th><th>CUENTA DE ACCESO</th><th v-if="auth.role === 'ADMIN'">CUENTA BANCARIA</th><th v-if="auth.role === 'ADMIN'">SUELDO</th><th v-if="auth.role === 'ADMIN'">DÍA DE PAGO</th><th v-if="auth.role === 'ADMIN'">RECORDATORIO</th><th>ESTADO</th></tr></thead>
+          <tbody><tr v-if="!filteredStaff.length"><td :colspan="auth.role === 'ADMIN' ? 9 : 5" class="report-empty-cell">No hay personal registrado con este criterio.</td></tr>
+          <tr v-for="row in filteredStaff" :key="row.id"><td><strong>{{ row.fullName }}</strong></td><td>{{ row.jobTitle }}</td><td>{{ row.workSchedule || 'No especificado' }}</td><td>{{ row.user?.email || 'No necesita acceso' }}<small v-if="row.user">{{ roleLabels[row.user.role] || row.user.role }}</small></td><td v-if="auth.role === 'ADMIN'">{{ row.bankAccount || '—' }}</td><td v-if="auth.role === 'ADMIN'">{{ row.monthlySalary == null ? '—' : `S/ ${money(row.monthlySalary)}` }}</td><td v-if="auth.role === 'ADMIN'">{{ row.payDay || '—' }}</td><td v-if="auth.role === 'ADMIN'">{{ row.payrollReminder || '—' }}</td><td><span class="report-status" :data-status="row.active ? 'ATTENDED' : 'CANCELLED'">{{ row.active ? 'Activo' : 'Inactivo' }}</span></td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'payroll'" class="report-table-scroll">
@@ -316,15 +316,15 @@ onMounted(loadReport);
         </div>
 
         <div v-else-if="reportView === 'preventive'" class="report-table-scroll">
-          <table><thead><tr><th>FECHA</th><th>PACIENTE</th><th>DUEÑO</th><th>RAZA / SEXO</th><th>VACUNA / DESPARASITACIÓN</th><th>PESO</th><th>COSTO</th><th>PRÓXIMA FECHA</th><th>MÉDICO</th></tr></thead>
-          <tbody><tr v-if="!filteredPreventive.length"><td colspan="9" class="report-empty-cell">No hay vacunas o desparasitaciones con este criterio.</td></tr>
-          <tr v-for="row in filteredPreventive" :key="row.id"><td>{{ formatDate(row.appliedAt) }}</td><td><strong>{{ row.petName }}</strong><small>{{ row.species }} · {{ row.age || 'Edad no indicada' }}</small></td><td>{{ row.clientName }}<small>{{ row.phone }}</small></td><td>{{ row.breed || 'Sin raza' }}<small>{{ sexLabels[row.sex] || row.sex }}</small></td><td>{{ row.productName }}<small>{{ row.type === 'DEWORMING' ? 'Desparasitación' : 'Vacuna' }}</small></td><td>{{ row.weightKg == null ? '—' : `${row.weightKg} kg` }}</td><td>S/ {{ money(row.amountCharged) }}</td><td>{{ formatDate(row.nextAppointmentAt) }}</td><td>{{ row.veterinarianName || '—' }}</td></tr></tbody></table>
+          <table><thead><tr><th>FECHA</th><th>PACIENTE</th><th>DUEÑO</th><th>RAZA / SEXO</th><th>VACUNA / DESPARASITACIÓN</th><th>PESO</th><th>COSTO</th><th>PRÓXIMA FECHA</th><th>PRÓXIMO PRODUCTO</th><th>DESPARASITADO</th><th>SEGUIMIENTO</th><th>MÉDICO</th></tr></thead>
+          <tbody><tr v-if="!filteredPreventive.length"><td colspan="12" class="report-empty-cell">No hay vacunas o desparasitaciones con este criterio.</td></tr>
+          <tr v-for="row in filteredPreventive" :key="row.id"><td>{{ formatDate(row.appliedAt) }}</td><td><strong>{{ row.petName }}</strong><small>{{ row.species }} · {{ row.age || 'Edad no indicada' }}</small></td><td>{{ row.clientName }}<small>{{ row.phone }}</small></td><td>{{ row.breed || 'Sin raza' }}<small>{{ sexLabels[row.sex] || row.sex }}</small></td><td>{{ row.productName }}<small>{{ row.type === 'DEWORMING' ? 'Desparasitación' : 'Vacuna' }}</small></td><td>{{ row.weightKg == null ? '—' : `${row.weightKg} kg` }}</td><td>S/ {{ money(row.amountCharged) }}</td><td>{{ formatDate(row.nextAppointmentAt) }}</td><td>{{ row.nextProductName || '—' }}</td><td>{{ row.dewormed ? 'Sí' : 'No' }}</td><td>{{ row.followUpCalled ? 'Llamada realizada' : 'Pendiente' }}<small v-if="row.sterilizationRecommended">Esterilización: {{ row.sterilizationCallDone ? 'contactado' : 'por contactar' }}</small></td><td>{{ row.veterinarianName || '—' }}</td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'clinical'" class="report-table-scroll">
-          <table><thead><tr><th>FECHA</th><th>PACIENTE</th><th>DUEÑO</th><th>PESO / T°</th><th>MOTIVO</th><th>DIAGNÓSTICO</th><th>TRATAMIENTO</th><th>PRÓXIMO CONTROL</th><th>MÉDICO</th></tr></thead>
-          <tbody><tr v-if="!filteredClinical.length"><td colspan="9" class="report-empty-cell">No hay fichas clínicas en este periodo.</td></tr>
-          <tr v-for="row in filteredClinical" :key="row.id"><td>{{ formatDateTime(row.medicalVisitDate || row.scheduledAt) }}</td><td><strong>{{ row.petName }}</strong><small>{{ row.species }} · {{ row.breed || 'Sin raza' }}</small></td><td>{{ row.clientName }}<small>{{ row.phone }}</small></td><td>{{ row.medicalWeightKg == null ? (row.weightKg == null ? '—' : `${row.weightKg} kg`) : `${row.medicalWeightKg} kg` }}<small>{{ row.temperatureC == null ? 'Temperatura —' : `${row.temperatureC} °C` }}</small></td><td>{{ row.medicalReason || row.reason }}</td><td>{{ row.diagnosis || '—' }}<small>{{ row.observations }}</small></td><td>{{ row.treatment || '—' }}</td><td>{{ formatDate(row.nextControlAt) }}</td><td>{{ row.veterinarianName || '—' }}</td></tr></tbody></table>
+          <table><thead><tr><th>CÓDIGO</th><th>FECHA</th><th>PACIENTE</th><th>DUEÑO</th><th>PESO / T°</th><th>MOTIVO</th><th>DIAGNÓSTICO</th><th>TRATAMIENTO</th><th>PRÓXIMO CONTROL</th><th>MÉDICO</th></tr></thead>
+          <tbody><tr v-if="!filteredClinical.length"><td colspan="10" class="report-empty-cell">No hay fichas clínicas en este periodo.</td></tr>
+          <tr v-for="row in filteredClinical" :key="row.id"><td><strong>{{ row.petRecordNumber ? `HD-${String(row.petRecordNumber).padStart(6, '0')}` : '—' }}</strong></td><td>{{ formatDateTime(row.medicalVisitDate || row.scheduledAt) }}</td><td><strong>{{ row.petName }}</strong><small>{{ row.species }} · {{ row.breed || 'Sin raza' }}</small></td><td>{{ row.clientName }}<small>{{ row.phone }}</small></td><td>{{ row.medicalWeightKg == null ? (row.weightKg == null ? '—' : `${row.weightKg} kg`) : `${row.medicalWeightKg} kg` }}<small>{{ row.temperatureC == null ? 'Temperatura —' : `${row.temperatureC} °C` }}</small></td><td>{{ row.medicalReason || row.reason }}</td><td>{{ row.diagnosis || '—' }}<small>{{ row.observations }}</small></td><td>{{ row.treatment || '—' }}</td><td>{{ formatDate(row.nextControlAt) }}</td><td>{{ row.veterinarianName || '—' }}</td></tr></tbody></table>
         </div>
 
         <div v-else-if="reportView === 'followups'" class="report-table-scroll">
@@ -334,11 +334,11 @@ onMounted(loadReport);
         </div>
 
         <div v-else class="report-table-scroll">
-          <table><thead><tr><th>FECHA</th><th>DUEÑO</th><th>PACIENTE</th><th>ATENCIÓN</th><th>ESTADO</th><th>PRECIO</th><th>PAGO</th><th>RESPONSABLE</th></tr></thead>
+          <table><thead><tr><th>FECHA</th><th>DUEÑO</th><th>PACIENTE</th><th>ATENCIÓN</th><th v-if="reportView === 'grooming'">N.º BAÑO</th><th v-if="reportView === 'surgery'">RETIRO DE PUNTOS</th><th v-if="reportView === 'surgery'">¿VINO?</th><th v-if="reportView === 'campaigns'">CAMPAÑA</th><th>ESTADO</th><th>PRECIO</th><th>PAGO</th><th>RESPONSABLE</th></tr></thead>
           <tbody>
-            <tr v-if="!(reportView === 'grooming' ? filteredGrooming : reportView === 'surgery' ? filteredSurgery : reportView === 'campaigns' ? filteredCampaigns : filteredAttentions).length"><td colspan="8" class="report-empty-cell">No hay atenciones con este criterio.</td></tr>
+            <tr v-if="!(reportView === 'grooming' ? filteredGrooming : reportView === 'surgery' ? filteredSurgery : reportView === 'campaigns' ? filteredCampaigns : filteredAttentions).length"><td colspan="11" class="report-empty-cell">No hay atenciones con este criterio.</td></tr>
             <tr v-for="row in (reportView === 'grooming' ? filteredGrooming : reportView === 'surgery' ? filteredSurgery : reportView === 'campaigns' ? filteredCampaigns : filteredAttentions)" :key="row.id">
-              <td>{{ formatDateTime(row.scheduledAt) }}<small v-if="row.pickupAt">Recojo {{ formatDateTime(row.pickupAt) }}</small></td><td><strong>{{ row.clientName }}</strong><small>{{ row.phone }}</small></td><td><strong>{{ row.petName }}</strong><small>{{ row.species }} · {{ row.breed || 'Sin raza' }}</small></td><td>{{ serviceLabel(row) }}<small>{{ row.reason }}</small></td><td><span class="report-status" :data-status="row.status">{{ statusLabels[row.status] || row.status }}</span></td><td>S/ {{ money(row.quotedPrice) }}</td><td>{{ paymentStatus(row) }}<small v-if="row.paidAmount">S/ {{ money(row.paidAmount) }}</small></td><td>{{ row.veterinarianName || 'Recepción' }}</td>
+              <td>{{ formatDateTime(row.scheduledAt) }}<small v-if="row.pickupAt">Recojo {{ formatDateTime(row.pickupAt) }}</small></td><td><strong>{{ row.clientName }}</strong><small>{{ row.phone }}</small></td><td><strong>{{ row.petName }}</strong><small>{{ row.species }} · {{ row.breed || 'Sin raza' }}</small></td><td>{{ serviceLabel(row) }}<small>{{ row.reason }}</small></td><td v-if="reportView === 'grooming'">{{ row.groomingVisitNumber || '—' }}</td><td v-if="reportView === 'surgery'">{{ formatDate(row.sutureRemovalAt) }}</td><td v-if="reportView === 'surgery'">{{ row.sutureRemovalCompletedAt ? 'Sí' : row.sutureRemovalAt ? 'Pendiente' : '—' }}</td><td v-if="reportView === 'campaigns'">{{ row.campaignName || 'Sin nombre' }}</td><td><span class="report-status" :data-status="row.status">{{ statusLabels[row.status] || row.status }}</span></td><td>S/ {{ money(row.quotedPrice) }}</td><td>{{ paymentStatus(row) }}<small v-if="row.paidAmount">S/ {{ money(row.paidAmount) }}</small></td><td>{{ row.veterinarianName || 'Recepción' }}</td>
             </tr>
           </tbody></table>
         </div>

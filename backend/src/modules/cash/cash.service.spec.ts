@@ -29,6 +29,25 @@ describe('CashService daily closing', () => {
     expect(summary.cashNet).toBe(40);
   });
 
+  it('records external expenses without reducing physical cash', async () => {
+    const prisma = {
+      cashMovement: {
+        findMany: jest.fn().mockResolvedValue([
+          { type: 'INCOME', category: 'CONSULTATION', paymentMethod: 'CASH', amount: 100, affectsCash: true },
+          { type: 'EXPENSE', category: 'OTHER', paymentMethod: 'TRANSFER', amount: 25, affectsCash: false },
+        ]),
+      },
+      cashClosing: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const service = new CashService(prisma as any);
+
+    const summary = await service.summary('2026-08-13');
+    expect(summary.expenses).toBe(25);
+    expect(summary.externalExpenses).toBe(25);
+    expect(summary.net).toBe(75);
+    expect(summary.cashNet).toBe(100);
+  });
+
   it('blocks new movements after the day was closed', async () => {
     const prisma = {
       cashClosing: { findUnique: jest.fn().mockResolvedValue({ id: 'closed' }) },

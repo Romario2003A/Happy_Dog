@@ -68,13 +68,13 @@ export class ReportsController {
         orderBy: { scheduledAt: 'desc' },
         include: {
           client: { select: { fullName: true, phone: true } },
-          pet: { select: { name: true, species: true, breed: true, sex: true, color: true, age: true, weightKg: true } },
+          pet: { select: { name: true, recordNumber: true, species: true, breed: true, sex: true, color: true, age: true, weightKg: true } },
           veterinarian: { select: { fullName: true } },
           service: { select: { name: true, category: true, condition: true, price: true } },
           medicalRecord: {
             select: {
               visitDate: true, reason: true, weightKg: true, temperatureC: true, diagnosis: true,
-              treatment: true, observations: true, nextControlAt: true,
+              treatment: true, observations: true, nextControlAt: true, sutureRemovalAt: true, sutureRemovalCompletedAt: true,
               veterinarian: { select: { fullName: true } },
             },
           },
@@ -100,7 +100,8 @@ export class ReportsController {
       this.prisma.staffMember.findMany({
         orderBy: [{ active: 'desc' }, { fullName: 'asc' }],
         select: {
-          id: true, fullName: true, jobTitle: true, active: true, workSchedule: true,
+          id: true, fullName: true, jobTitle: true, active: true, workSchedule: true, bankAccount: true,
+          monthlySalary: true, payDay: true, payrollReminder: true,
           user: { select: { email: true, role: true, active: true } },
         },
       }),
@@ -120,12 +121,16 @@ export class ReportsController {
     const paymentTotals = new Map<string, number>();
     let income = 0;
     let expenses = 0;
+    let externalExpenses = 0;
     let adjustments = 0;
 
     const cash = cashMovements.map((movement: any) => {
       const amount = Number(movement.amount || 0);
       const isExpense = movement.type === 'EXPENSE';
-      if (isExpense) expenses += amount;
+      if (isExpense) {
+        expenses += amount;
+        if (movement.affectsCash === false) externalExpenses += amount;
+      }
       else if (movement.type === 'ADJUSTMENT') adjustments += amount;
       else income += amount;
       const category = movement.category || 'OTHER';
@@ -144,6 +149,7 @@ export class ReportsController {
         description: movement.description,
         amount,
         paymentMethod: movement.paymentMethod,
+        affectsCash: movement.affectsCash !== false,
         clientName: movement.clientName || movement.client?.fullName || '',
         petName: movement.petName || movement.pet?.name || '',
         counterparty: movement.counterparty || '',
@@ -151,6 +157,23 @@ export class ReportsController {
         responsible: movement.registeredBy?.fullName || '',
       };
     });
+
+    const reportPetIds = [...new Set(appointments.map((appointment: any) => appointment.petId).filter(Boolean))] as string[];
+    const groomingHistory = reportPetIds.length ? await (this.prisma as any).appointment.findMany({
+      where: { petId: { in: reportPetIds }, status: 'ATTENDED' },
+      orderBy: { scheduledAt: 'asc' },
+      select: { id: true, petId: true, reason: true, notes: true, service: { select: { name: true, category: true } } },
+    }) : [];
+    const groomingVisitByAppointment = new Map<string, number>();
+    const groomingCountByPet = new Map<string, number>();
+    for (const appointment of groomingHistory) {
+      const text = `${appointment.service?.category || ''} ${appointment.service?.name || ''} ${appointment.reason || ''} ${appointment.notes || ''}`
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+      if (!/(PELUQUER|BANO|GROOM)/.test(text)) continue;
+      const nextCount = (groomingCountByPet.get(appointment.petId) || 0) + 1;
+      groomingCountByPet.set(appointment.petId, nextCount);
+      groomingVisitByAppointment.set(appointment.id, nextCount);
+    }
 
     const attentionRows = appointments.map((appointment: any) => {
       const paidAmount = (appointment.cashMovements || [])
@@ -166,10 +189,12 @@ export class ReportsController {
           ? Number(appointment.service?.price || 0)
           : Number(appointment.quotedPrice),
         priceNote: appointment.priceNote || '',
+        campaignName: appointment.campaignName || '',
         paidAmount,
         clientName: appointment.client?.fullName || '',
         phone: appointment.client?.phone || '',
         petName: appointment.pet?.name || '',
+        petRecordNumber: appointment.pet?.recordNumber ?? null,
         species: appointment.pet?.species || '',
         breed: appointment.pet?.breed || '',
         sex: appointment.pet?.sex || 'UNKNOWN',
@@ -188,6 +213,9 @@ export class ReportsController {
         treatment: appointment.medicalRecord?.treatment || '',
         observations: appointment.medicalRecord?.observations || '',
         nextControlAt: appointment.medicalRecord?.nextControlAt || null,
+        sutureRemovalAt: appointment.medicalRecord?.sutureRemovalAt || null,
+        sutureRemovalCompletedAt: appointment.medicalRecord?.sutureRemovalCompletedAt || null,
+        groomingVisitNumber: groomingVisitByAppointment.get(appointment.id) || null,
       };
     });
 
@@ -222,6 +250,18 @@ export class ReportsController {
       socialPrice: service.socialPrice == null ? null : Number(service.socialPrice),
     }));
 
+    const staffRows = staff.map((member: any) => role === Role.ADMIN ? {
+      ...member,
+      monthlySalary: member.monthlySalary == null ? null : Number(member.monthlySalary),
+    } : {
+      id: member.id,
+      fullName: member.fullName,
+      jobTitle: member.jobTitle,
+      active: member.active,
+      workSchedule: member.workSchedule,
+      user: member.user,
+    });
+
     const payroll = payrollPayments.map((payment: any) => ({
       id: payment.id,
       period: payment.period,
@@ -241,6 +281,7 @@ export class ReportsController {
       summary: {
         income,
         expenses,
+        externalExpenses,
         adjustments,
         net: income + adjustments - expenses,
         movements: cash.length,
@@ -248,7 +289,7 @@ export class ReportsController {
         attended: attentionRows.filter((row: any) => row.status === 'ATTENDED').length,
         preventive: preventive.length,
         services: tariff.length,
-        staff: staff.length,
+        staff: staffRows.length,
         payrollPaid: payroll.filter((row: any) => row.status === 'PAID').reduce((sum: number, row: any) => sum + row.amount, 0),
         payrollPending: payroll.filter((row: any) => row.status === 'PENDING').length,
       },
@@ -263,7 +304,7 @@ export class ReportsController {
       appointments: attentionRows,
       preventiveRecords: preventive,
       services: tariff,
-      staff,
+      staff: staffRows,
       payrollPayments: payroll,
     };
   }

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { AppointmentStatus, MovementType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateMedicalRecordDto } from './dto/create-medical-record.dto';
+import { UpdateSutureRemovalDto } from './dto/update-suture-removal.dto';
 
 @Injectable()
 export class MedicalRecordsService {
@@ -9,7 +10,7 @@ export class MedicalRecordsService {
 
   findAll() {
     return this.prisma.medicalRecord.findMany({
-      include: { pet: { include: { client: true } }, veterinarian: true, prescriptions: { include: { product: true } }, files: true },
+      include: { pet: { include: { client: true } }, veterinarian: true, appointment: { include: { service: true } }, prescriptions: { include: { product: true } }, files: true },
       orderBy: { visitDate: 'desc' },
     });
   }
@@ -17,7 +18,7 @@ export class MedicalRecordsService {
   findByPet(petId: string) {
     return this.prisma.medicalRecord.findMany({
       where: { petId },
-      include: { veterinarian: true, prescriptions: { include: { product: true } }, files: true },
+      include: { veterinarian: true, appointment: { include: { service: true } }, prescriptions: { include: { product: true } }, files: true },
       orderBy: { visitDate: 'desc' },
     });
   }
@@ -82,6 +83,8 @@ export class MedicalRecordsService {
           treatment: dto.treatment,
           observations: dto.observations,
           nextControlAt: dto.nextControlAt ? new Date(dto.nextControlAt) : undefined,
+          sutureRemovalAt: dto.sutureRemovalAt ? new Date(dto.sutureRemovalAt) : undefined,
+          sutureRemovalCompletedAt: dto.sutureRemovalCompletedAt ? new Date(dto.sutureRemovalCompletedAt) : undefined,
           prescriptions: {
             create: (dto.prescriptions ?? []).map((i) => ({
               productId: i.productId,
@@ -133,6 +136,23 @@ export class MedicalRecordsService {
       }
 
       return record;
+    });
+  }
+
+  async updateSutureRemoval(id: string, dto: UpdateSutureRemovalDto) {
+    const record = await this.prisma.medicalRecord.findUnique({ where: { id } });
+    if (!record) throw new BadRequestException('Registro clínico no encontrado.');
+    const sutureRemovalAt = dto.sutureRemovalAt === undefined
+      ? undefined
+      : new Date(dto.sutureRemovalAt);
+    if (sutureRemovalAt && Number.isNaN(sutureRemovalAt.getTime())) throw new BadRequestException('Fecha de retiro de puntos inválida.');
+    return this.prisma.medicalRecord.update({
+      where: { id },
+      data: {
+        sutureRemovalAt,
+        sutureRemovalCompletedAt: dto.completed === undefined ? undefined : dto.completed ? new Date() : null,
+      },
+      include: { veterinarian: true, appointment: { include: { service: true } }, prescriptions: { include: { product: true } }, files: true },
     });
   }
 }

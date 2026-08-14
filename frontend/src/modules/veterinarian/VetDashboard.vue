@@ -115,6 +115,8 @@ const form = ref({
   frequency: '',
   recommendations: '',
   nextControlAt: '',
+  sutureRemovalAt: '',
+  sutureRemovalCompleted: false,
 });
 
 const readyStatuses = ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'];
@@ -181,6 +183,10 @@ const nextControl = computed(() => history.value.find(record => record.nextContr
 const surgeryCode = computed(() => selectedPet.value?.id
   ? `CX-${String(selectedPet.value.id).replace(/-/g, '').slice(0, 8).toUpperCase()}`
   : 'CX-00000000');
+
+function petRecordCode(pet) {
+  return pet?.recordNumber ? `HD-${String(pet.recordNumber).padStart(6, '0')}` : 'Pendiente de asignación';
+}
 
 function dateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -407,6 +413,8 @@ function resetForm(appointment) {
     frequency: '',
     recommendations: '',
     nextControlAt: '',
+    sutureRemovalAt: '',
+    sutureRemovalCompleted: false,
   };
   prescription.value = { productId: '', manualName: '', quantity: 1, dosage: '', instructions: '' };
   Object.assign(preventiveForm, {
@@ -1154,6 +1162,8 @@ async function saveRecord() {
       treatment: buildTreatmentText(),
       observations: buildObservationNotes(),
       nextControlAt: limaDateTimeToIso(form.value.nextControlAt) || undefined,
+      sutureRemovalAt: attentionType.value === 'SURGERY' ? limaDateTimeToIso(form.value.sutureRemovalAt) || undefined : undefined,
+      sutureRemovalCompletedAt: attentionType.value === 'SURGERY' && form.value.sutureRemovalCompleted ? new Date().toISOString() : undefined,
       prescriptions: buildPrescriptions(),
     });
     lastSavedAppointmentId.value = savedRecord.appointmentId || selected.value?.id || '';
@@ -1169,6 +1179,18 @@ async function saveRecord() {
       : e.response?.data?.message || 'No se pudo guardar la atención.';
   } finally {
     saving.value = false;
+  }
+}
+
+async function setSutureRemovalStatus(record, completed) {
+  error.value = '';
+  success.value = '';
+  try {
+    const { data } = await api.patch(`/medical-records/${record.id}/suture-removal`, { completed });
+    history.value = history.value.map(item => item.id === data.id ? data : item);
+    success.value = completed ? 'Retiro de puntos marcado como realizado.' : 'Retiro de puntos marcado como pendiente.';
+  } catch (e) {
+    error.value = e.response?.data?.message || 'No se pudo actualizar el retiro de puntos.';
   }
 }
 
@@ -1471,6 +1493,7 @@ onUnmounted(() => {
             <div class="sheet-subtitle">Datos de la mascota</div>
             <div class="clinical-table pet-grid">
               <div><span>Nombre:</span><strong>{{ selectedPet?.name || '-' }}</strong></div>
+              <div><span>Código clínico:</span><strong>{{ petRecordCode(selectedPet) }}</strong></div>
               <div><span>Especie:</span><strong>{{ selectedPet?.species || '-' }}</strong></div>
               <div><span>Raza:</span><strong>{{ selectedPet?.breed || '-' }}</strong></div>
               <div><span>Sexo:</span><strong>{{ sexLabel(selectedPet?.sex) }}</strong></div>
@@ -1523,6 +1546,12 @@ onUnmounted(() => {
             <div class="frequency-row">
               <label>Frecuencia<input v-model="form.frequency" placeholder="Cada 12 h, cada 24 h, por 5 días..."></label>
               <label>Recomendaciones<textarea v-model="form.recommendations" placeholder="Cuidados en casa, dieta, reposo, señales de alerta"></textarea></label>
+            </div>
+
+            <div v-if="attentionType === 'SURGERY'" class="surgery-followup-editor">
+              <label>Retiro de puntos programado<input v-model="form.sutureRemovalAt" type="datetime-local"></label>
+              <label class="checkbox-row"><input v-model="form.sutureRemovalCompleted" type="checkbox"> Retiro de puntos realizado hoy</label>
+              <small>La fecha y el estado quedarán visibles en el historial y en el reporte de cirugías.</small>
             </div>
 
             <div class="consultation-prescription">
@@ -1593,7 +1622,7 @@ onUnmounted(() => {
             <div class="document-auto-section">
             <div class="document-section-label"><strong>Datos del paciente</strong><small>Tomados de su ficha</small></div>
               <div class="document-auto-grid">
-                <div><span>N.º historia</span><strong>{{ selectedPet.id?.slice(0, 8).toUpperCase() }}</strong></div>
+                <div><span>N.º historia</span><strong>{{ petRecordCode(selectedPet) }}</strong></div>
                 <div><span>Propietario</span><strong>{{ selectedClient?.fullName || '-' }}</strong></div>
                 <div><span>Teléfono</span><strong>{{ selectedClient?.phone || '-' }}</strong></div>
                 <div><span>DNI</span><strong>{{ selectedClient?.documentNumber || selectedClient?.dni || '-' }}</strong></div>
@@ -1768,6 +1797,10 @@ onUnmounted(() => {
                 <div class="history-prescriptions"><span v-for="item in record.prescriptions" :key="item.id"><strong>{{ item.product?.name || 'Producto' }} × {{ item.quantity }}</strong><small>{{ [item.dosage, item.instructions].filter(Boolean).join(' · ') || 'Sin indicaciones adicionales' }}</small></span></div>
               </section>
               <section v-if="record.files?.length"><h4>Archivos clínicos</h4><div class="history-files"><button v-for="file in record.files" :key="file.id" type="button" class="ghost small" @click="downloadClinicalFile(file)">{{ file.originalName }}</button></div></section>
+              <div v-if="record.sutureRemovalAt" class="suture-removal-status">
+                <p><strong>Retiro de puntos:</strong> {{ formatDate(record.sutureRemovalAt) }} · {{ record.sutureRemovalCompletedAt ? 'Realizado' : 'Pendiente' }}</p>
+                <button class="secondary small" type="button" @click="setSutureRemovalStatus(record, !record.sutureRemovalCompletedAt)">{{ record.sutureRemovalCompletedAt ? 'Marcar pendiente' : 'Marcar realizado' }}</button>
+              </div>
               <p v-if="record.nextControlAt" class="next-control-note"><strong>Próximo control:</strong> {{ formatDate(record.nextControlAt) }}</p>
             </div>
           </article>

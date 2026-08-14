@@ -218,6 +218,7 @@ function defaultCashSummary() {
   return {
     income: 0,
     expenses: 0,
+    externalExpenses: 0,
     debtPayments: 0,
     adjustments: 0,
     net: 0,
@@ -238,6 +239,7 @@ function defaultCashForm() {
     referenceCode: '',
     amount: 0,
     paymentMethod: 'CASH',
+    affectsCash: true,
     occurredAt: toDateTimeInput(new Date()),
     clientName: '',
     petName: '',
@@ -1061,6 +1063,9 @@ watch(() => route.query.tab, () => {
 });
 
 watch(cashDate, loadCash);
+watch(() => cashForm.value.type, (type) => {
+  if (type !== 'EXPENSE') cashForm.value.affectsCash = true;
+});
 
 onMounted(async () => {
   await loadData();
@@ -1424,7 +1429,7 @@ onMounted(async () => {
       <div v-else-if="cashWorkspace === 'day'" class="cash-day-view">
       <div class="cash-cards">
         <div class="cash-metric income"><span>Ingresos</span><strong>S/ {{ formatMoney(cashSummary.income + cashSummary.debtPayments) }}</strong><small>Ventas y cobros</small></div>
-        <div class="cash-metric expense"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong></div>
+        <div class="cash-metric expense"><span>Gastos</span><strong>S/ {{ formatMoney(cashSummary.expenses) }}</strong><small v-if="cashSummary.externalExpenses">S/ {{ formatMoney(cashSummary.externalExpenses) }} fuera de caja</small></div>
         <div class="cash-metric emphasis"><span>Saldo del día</span><strong>S/ {{ formatMoney(cashSummary.net) }}</strong><small>{{ cashActivityLabel }}</small></div>
       </div>
 
@@ -1552,6 +1557,10 @@ onMounted(async () => {
         <label class="full">Notas
           <textarea v-model="cashForm.notes" rows="2" placeholder="Observacion opcional"></textarea>
         </label>
+        <label v-if="cashForm.type === 'EXPENSE'" class="full checkbox-row cash-scope-option">
+          <input v-model="cashForm.affectsCash" type="checkbox">
+          <span><strong>Este gasto sale del efectivo de caja</strong><small>Desmárcalo si se pagó desde una cuenta externa y solo debe quedar registrado.</small></span>
+        </label>
         <div class="cash-form-actions">
           <button :disabled="saving">{{ saving ? 'Guardando...' : 'Guardar movimiento' }}</button>
           <button class="secondary" type="button" @click="resetCashForm(); showCashForm = false">Cancelar</button>
@@ -1618,6 +1627,7 @@ onMounted(async () => {
               <small v-if="movement.product">{{ movement.product.name }} · {{ movement.productQuantity }} unidad(es) descontada(s)</small>
               <small v-if="movement.clientName || movement.petName">{{ movement.clientName || '-' }} · {{ movement.petName || '-' }}</small>
               <small v-if="movement.counterparty || movement.referenceCode">{{ movement.counterparty || 'Sin proveedor' }}<template v-if="movement.referenceCode"> · Ref. {{ movement.referenceCode }}</template></small>
+              <small v-if="movement.type === 'EXPENSE' && movement.affectsCash === false">Egreso registrado fuera de caja</small>
             </td>
             <td>{{ cashCategoryLabels[movement.category] || movement.category }}</td>
             <td>{{ paymentLabels[movement.paymentMethod] || '-' }}</td>

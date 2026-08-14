@@ -35,6 +35,7 @@ export class AppointmentsService {
     if (dto.serviceId?.trim()) data.serviceId = dto.serviceId.trim();
     if (dto.quotedPrice !== undefined) data.quotedPrice = Number(dto.quotedPrice);
     if (dto.priceNote !== undefined) data.priceNote = dto.priceNote.trim() || null;
+    if (dto.campaignName !== undefined) data.campaignName = dto.campaignName.trim() || null;
     if (dto.durationMinutes !== undefined) data.durationMinutes = Number(dto.durationMinutes);
     if (dto.notes?.trim()) data.notes = dto.notes.trim();
     if (dto.status !== undefined) {

@@ -11,6 +11,7 @@ function appointmentText(appointment) {
     appointment?.serviceName,
     appointment?.serviceCondition,
     appointment?.reason,
+    appointment?.campaignName,
   ].join(' '));
 }
 

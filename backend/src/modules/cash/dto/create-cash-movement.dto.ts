@@ -1,5 +1,5 @@
 import { CashMovementCategory, CashMovementType, PaymentMethod } from '@prisma/client';
-import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateCashMovementDto {
   @IsEnum(CashMovementType)
@@ -27,6 +27,10 @@ export class CreateCashMovementDto {
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
+
+  @IsOptional()
+  @IsBoolean()
+  affectsCash?: boolean;
 
   @IsOptional()
   @IsDateString()

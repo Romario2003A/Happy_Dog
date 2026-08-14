@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateMedicalRecordDto } from './dto/create-medical-record.dto';
+import { UpdateSutureRemovalDto } from './dto/update-suture-removal.dto';
 import { MedicalRecordsService } from './medical-records.service';
 @UseGuards(JwtAuthGuard, RolesGuard) @Controller('medical-records')
 export class MedicalRecordsController {
@@ -14,5 +15,9 @@ export class MedicalRecordsController {
   @Roles(Role.VETERINARIAN) @Post()
   create(@Body() dto:CreateMedicalRecordDto,@CurrentUser('id') veterinarianId:string){
     return this.service.create({...dto,veterinarianId});
+  }
+  @Roles(Role.ADMIN, Role.VETERINARIAN, Role.RECEPTIONIST) @Patch(':id/suture-removal')
+  updateSutureRemoval(@Param('id') id:string,@Body() dto:UpdateSutureRemovalDto){
+    return this.service.updateSutureRemoval(id,dto);
   }
 }

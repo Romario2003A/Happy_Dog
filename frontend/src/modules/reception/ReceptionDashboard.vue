@@ -46,6 +46,7 @@ const selectedAppointment = ref(null);
 const confirmationDateTime = ref('');
 const appointmentServiceCategory = ref('');
 const appointmentServiceId = ref('');
+const appointmentCampaignName = ref('');
 const duplicateOverride = ref(false);
 const reschedulingPastAppointment = ref(false);
 const hours = Array.from({ length: 11 }, (_, i) => i + 8);
@@ -69,6 +70,7 @@ const selectedDate = ref(dateKey());
 const quick = ref({
   serviceType: 'MEDICAL',
   serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30,
+  campaignName: '',
   clientId: '',
   petId: '',
   fullName: '',
@@ -307,6 +309,7 @@ function selectAppointment(appointment) {
   selectedAppointment.value = current ? { ...current } : { ...appointment };
   appointmentServiceCategory.value = selectedAppointment.value.service?.category || '';
   appointmentServiceId.value = selectedAppointment.value.serviceId || selectedAppointment.value.service?.id || '';
+  appointmentCampaignName.value = selectedAppointment.value.campaignName || '';
   confirmationDateTime.value = requiresTimeAssignment(selectedAppointment.value)
     ? `${dateKey(selectedAppointment.value.scheduledAt)}T09:00`
     : '';
@@ -408,11 +411,13 @@ async function assignServiceToAppointment() {
       quotedPrice: Number(service.price || 0),
       priceNote: service.priceLabel || undefined,
       durationMinutes: Number(service.durationMinutes || 30),
+      campaignName: /CAMP/i.test(String(service.category || '')) ? appointmentCampaignName.value.trim() || undefined : undefined,
     });
     patchAppointmentInMemory(data);
     selectedAppointment.value = { ...data };
     appointmentServiceCategory.value = data.service?.category || service.category || '';
     appointmentServiceId.value = data.serviceId || data.service?.id || service.id;
+    appointmentCampaignName.value = data.campaignName || '';
     success.value = 'Servicio y precio asignados. Ya puedes confirmar la cita.';
     await loadData();
     const refreshed = getAppointmentById(appointment.id);
@@ -723,7 +728,7 @@ async function uploadPetPhoto(petId, event) {
 }
 
 function resetQuick() {
-  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, clientId: '', petId: '', fullName: '', documentNumber: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
+  quick.value = { serviceType: 'MEDICAL', serviceCategory: '', serviceId: '', quotedPrice: '', priceNote: '', durationMinutes: 30, campaignName: '', clientId: '', petId: '', fullName: '', documentNumber: '', phone: '', email: '', petName: '', species: '', breed: '', sex: 'UNKNOWN', age: '', weightKg: '', scheduledAt: '', pickupAt: '', reason: '' };
   quickMode.value = 'lookup';
   quickClientSearch.value = '';
   addingPetToExisting.value = false;
@@ -868,6 +873,7 @@ async function saveQuickAppointment() {
       quotedPrice: quick.value.quotedPrice === '' ? undefined : Number(quick.value.quotedPrice),
       priceNote: quick.value.priceNote || undefined,
       durationMinutes: Number(quick.value.durationMinutes || 30),
+      campaignName: /CAMP/i.test(quick.value.serviceCategory) ? quick.value.campaignName.trim() || undefined : undefined,
       reason: quick.value.reason.trim(),
       notes: `SERVICE_TYPE:${quick.value.serviceType}`,
     });
@@ -1042,10 +1048,14 @@ onMounted(loadData);
             <span>El registro anterior se conserva. Acuerda con el cliente una nueva fecha y hora.</span>
           </div>
           <label>¿Qué atención necesita?
-            <select v-model="quick.serviceCategory" required @change="quick.serviceId=''; quick.quotedPrice=''; quick.reason=''">
+            <select v-model="quick.serviceCategory" required @change="quick.serviceId=''; quick.quotedPrice=''; quick.reason=''; quick.campaignName=''">
               <option value="">Seleccionar categoría</option>
               <option v-for="category in serviceCategories" :key="category" :value="category">{{ category }}</option>
             </select>
+          </label>
+          <label v-if="/CAMP/i.test(quick.serviceCategory)" class="wide">Nombre de la campaña
+            <input v-model="quick.campaignName" required placeholder="Ej. Campaña de esterilización de agosto">
+            <small>Servirá para agrupar estas atenciones en los reportes.</small>
           </label>
           <label v-if="quick.serviceCategory">Servicio y condición
             <select v-model="quick.serviceId" required>
@@ -1218,7 +1228,7 @@ onMounted(loadData);
             <strong>Completar servicio solicitado</strong>
             <span>El cliente eligió una necesidad general. Aquí recepción asigna la tarifa y condición exactas.</span>
             <label>Categoría
-              <select v-model="appointmentServiceCategory" @change="appointmentServiceId=''">
+              <select v-model="appointmentServiceCategory" @change="appointmentServiceId=''; appointmentCampaignName=''">
                 <option value="">Seleccionar categoría</option>
                 <option v-for="category in serviceCategories" :key="category" :value="category">{{ category }}</option>
               </select>
@@ -1229,7 +1239,10 @@ onMounted(loadData);
                 <option v-for="service in appointmentServiceOptions" :key="service.id" :value="service.id">{{ serviceDisplayLabel(service) }} — {{ service.priceLabel || `S/ ${Number(service.price || 0).toFixed(2)}` }}</option>
               </select>
             </label>
-            <button class="small" type="button" :disabled="saving || !appointmentServiceId" @click="assignServiceToAppointment">Guardar servicio y precio</button>
+            <label v-if="/CAMP/i.test(appointmentServiceCategory)">Nombre de la campaña
+              <input v-model="appointmentCampaignName" required placeholder="Ej. Campaña de esterilización de agosto">
+            </label>
+            <button class="small" type="button" :disabled="saving || !appointmentServiceId || (/CAMP/i.test(appointmentServiceCategory) && !appointmentCampaignName.trim())" @click="assignServiceToAppointment">Guardar servicio y precio</button>
           </div>
           <label v-if="selectedAppointment.status==='PENDING' && requiresTimeAssignment(selectedAppointment)" class="confirmation-time-field">
             Hora que asignará recepción

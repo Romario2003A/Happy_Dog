@@ -22,3 +22,7 @@ test('busca por paciente, dueño o servicio ignorando tildes', () => {
   assert.deepEqual(filterReportRows(rows, 'maria'), [rows[0]]);
   assert.deepEqual(filterReportRows(rows, 'bano'), [rows[1]]);
 });
+
+test('clasifica una atención por el nombre explícito de su campaña', () => {
+  assert.equal(isCampaignReportAppointment({ campaignName: 'Campaña municipal de agosto', serviceName: 'Esterilización' }), true);
+});

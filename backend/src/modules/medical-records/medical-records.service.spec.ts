@@ -32,4 +32,18 @@ describe('MedicalRecordsService safeguards', () => {
       diagnosis: 'Diagnóstico',
     })).rejects.toThrow('La cita seleccionada no corresponde a esta mascota.');
   });
+
+  it('marca el retiro de puntos como realizado sin cambiar la fecha programada', async () => {
+    const prisma = {
+      medicalRecord: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'record-1', sutureRemovalAt: new Date('2026-08-20T15:00:00Z') }),
+        update: jest.fn().mockImplementation(({ data }) => ({ id: 'record-1', ...data })),
+      },
+    };
+    const service = new MedicalRecordsService(prisma as any);
+
+    const result = await service.updateSutureRemoval('record-1', { completed: true });
+    expect(result.sutureRemovalCompletedAt).toBeInstanceOf(Date);
+    expect(prisma.medicalRecord.update.mock.calls[0][0].data.sutureRemovalAt).toBeUndefined();
+  });
 });
